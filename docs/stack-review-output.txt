@@ -1,0 +1,81 @@
+== Node / npm versions ==
+v20.12.2
+10.5.0
+== Docker usage ==
+Docker version 29.8.0, build 88096ef
+Docker Compose version v5.5.1
+./docker-compose.yml
+== Root (frontend) dependencies ==
+{
+  "@emotion/react": "^11.11.1",
+  "@emotion/styled": "^11.11.0",
+  "@mui/icons-material": "^7.3.2",
+  "@mui/material": "^7.3.2",
+  "@mui/x-data-grid": "^8.11.2",
+  "@testing-library/jest-dom": "^6.8.0",
+  "@testing-library/react": "^16.3.0",
+  "@testing-library/user-event": "^14.4.3",
+  "axios": "^1.4.0",
+  "chart.js": "^4.3.0",
+  "csv-parser": "^3.2.0",
+  "date-fns": "^4.1.0",
+  "formik": "^2.4.2",
+  "multer": "^2.0.2",
+  "react": "^19.1.1",
+  "react-chartjs-2": "^5.2.0",
+  "react-dom": "^19.1.1",
+  "react-dropzone": "^14.2.3",
+  "react-router-dom": "^7.9.0",
+  "react-scripts": "^5.0.1",
+  "recharts": "^3.2.0",
+  "yup": "^1.2.0"
+}
+== Backend dependencies (src/backend) ==
+{
+  "bcryptjs": "^2.4.3",
+  "cors": "^2.8.5",
+  "csv-parser": "^3.2.0",
+  "dotenv": "^16.3.1",
+  "express": "^4.18.2",
+  "jsonwebtoken": "^9.0.2",
+  "mongoose": "^8.18.1",
+  "multer": "^2.0.2",
+  "nodemailer": "^7.0.9"
+}
+== Top-level folder layout ==
+.
+./DEPLOYMENT_GUIDE.md
+./Frontend-Backend API Contract Document
+./PROJECT STRUCTURE
+./README.md
+./build
+./build/404.html
+./build/_redirects
+./build/asset-manifest.json
+./build/index.html
+./build/static
+./docker-compose.yml
+./docs
+./docs/architecture
+./docs/csv-upload-format.md
+./docs/gantt
+./docs/meeting-notes
+./docs/requirements
+./docs/research-report
+./docs/stack-review-output.txt
+./docs/user-manual
+./frontend-backend-integration-guide.txt
+./package-lock.json
+./package.json
+./public
+./public/404.html
+./public/_redirects
+./public/index.html
+./render-build-info.txt
+./render-env-variables.txt
+./src
+./src/backend
+./src/frontend
+./src/index.js
+./start.bat
+./start.ps1
