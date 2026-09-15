@@ -45,7 +45,7 @@ const calculateMeanScore = (evaluations) => {
 /**
  * Apply curved grading formula
  */
-const applyCurvedGrading = (scores, boostFactor = 0.5, protectionThreshold = 80) => {
+const applyCurvedGrading = (scores, boostFactor, protectionThreshold) => {
   // Calculate class statistics
   const mean = scores.reduce((sum, score) => sum + score, 0) / scores.length;
   const variance = scores.reduce((sum, score) => sum + Math.pow(score - mean, 2), 0) / scores.length;
@@ -253,9 +253,7 @@ exports.getCourseReport = async (req, res, next) => {
       
       if (gradingMethod === 'curved' && gradingResults && item.originalScore > 0) {
         const scoreIndex = rawScores.indexOf(item.originalScore);
-        if (scoreIndex !== -1) {
-          finalScore = parseFloat(gradingResults.adjustedScores[scoreIndex].toFixed(2));
-        }
+        finalScore = parseFloat(gradingResults.adjustedScores[scoreIndex].toFixed(2));
       }
       
       return {

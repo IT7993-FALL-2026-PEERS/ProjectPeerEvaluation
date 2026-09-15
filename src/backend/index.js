@@ -25,10 +25,12 @@ app.use((req, res, next) => {
   next();
 });
 
-// Connect to MongoDB
-mongoose.connect(process.env.MONGODB_URI || process.env.MONGO_URI || 'mongodb://localhost:27017/peer-evaluation')
-  .then(() => console.log('✅ MongoDB connected'))
-  .catch(err => console.error('❌ MongoDB connection error:', err));
+// Connect to MongoDB unless the app is running in a test environment.
+if (process.env.NODE_ENV !== 'test') {
+  mongoose.connect(process.env.MONGODB_URI || process.env.MONGO_URI || 'mongodb://localhost:27017/peer-evaluation')
+    .then(() => console.log('✅ MongoDB connected'))
+    .catch(err => console.error('❌ MongoDB connection error:', err));
+}
 
 // Root route
 app.get('/', (req, res) => {
@@ -59,8 +61,6 @@ app.use('/api/courses', require('./routes/courses'));
 app.use('/api/evaluate', require('./routes/evaluate'));
 app.use('/api/ai', require('./routes/ai'));
 app.use('/api/professor', require('./routes/professor'));
-app.use('/api/professor', require('./routes/professor'));
-
 
 // Global error handler (must be last)
 const errorHandler = require('./middleware/errorHandler');
@@ -68,4 +68,9 @@ app.use(errorHandler);
 
 // Start Server
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+/* istanbul ignore if -- entrypoint guard, exercised by running the process directly, not unit tests */
+if (require.main === module) {
+  app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+}
+
+module.exports = app;

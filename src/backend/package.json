@@ -3,7 +3,12 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "test": "jest --coverage --runInBand --verbose",
+    "test:unit": "jest --coverage --runInBand --verbose tests/unit",
+    "test:integration": "jest --coverage --runInBand --verbose tests/integration",
+    "coverage": "jest --coverage --runInBand --verbose",
+    "coverage:api": "jest --config jest.api-coverage.config.js --runInBand --verbose"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
@@ -15,5 +20,48 @@
     "mongoose": "^8.18.1",
     "multer": "^2.0.2",
     "nodemailer": "^7.0.9"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "supertest": "^7.0.0"
+  },
+  "jest": {
+    "collectCoverageFrom": [
+      "index.js",
+      "config/**/*.js",
+      "middleware/**/*.js",
+      "models/**/*.js",
+      "routes/**/*.js",
+      "controllers/**/*.js",
+      "utils/**/*.js",
+      "!node_modules/**",
+      "!tests/**",
+      "!coverage/**",
+      "!scripts/**",
+      "!migrations/**",
+      "!debug_student.js",
+      "!test_api.js",
+      "!routes/authRoutes.js",
+      "!routes/courseRoutes.js",
+      "!routes/testData.js",
+      "!config/corsConfig.js",
+      "!config/db.js",
+      "!middleware/authMiddleware.js",
+      "!utils/tokenUtils.js"
+    ],
+    "coverageThreshold": {
+      "global": {
+        "statements": 100,
+        "branches": 100,
+        "functions": 100,
+        "lines": 100
+      }
+    },
+    "coverageReporters": [
+      "text",
+      "html",
+      "lcov"
+    ],
+    "coverageDirectory": "coverage"
   }
 }

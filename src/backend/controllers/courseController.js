@@ -239,7 +239,7 @@ exports.migrateCourses = async (req, res, next) => {
 			
 			// Migrate course_code to course_number and course_section
 			if (course.course_code && !course.course_number) {
-				const parts = course.course_code.split(' ');
+				const parts = course.course_code.trim().split(' ').filter(Boolean);
 				updates.course_number = parts[0] || course.course_code;
 				if (parts.length > 1 && !course.course_section) {
 					updates.course_section = parts.slice(1).join(' ');

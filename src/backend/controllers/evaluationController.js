@@ -246,7 +246,7 @@ exports.evaluationStatus = async (req, res, next) => {
       total_count: total,              // Match frontend expectation
       completed_count: completed,      // Match frontend expectation
       pending_count: pending,
-      completion_rate: total > 0 ? Math.round((completed / total) * 100) : 0,
+      completion_rate: Math.round((completed / total) * 100),
       evaluations_sent: true,         // Evaluations have been sent
       students: studentStatus
     });
