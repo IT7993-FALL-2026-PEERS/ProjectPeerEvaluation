@@ -1,7 +1,6 @@
 const express = require('express');
 const router = express.Router();
 const authController = require('../controllers/authController');
-console.log('authController:', authController); // DEBUG: Log the imported controller
 const { authenticateToken } = require('../middleware/auth');
 
 // Auth endpoints

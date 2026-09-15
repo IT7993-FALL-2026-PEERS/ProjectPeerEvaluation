@@ -1,0 +1,12 @@
+node_modules
+npm-debug.log
+.env
+.env.example
+.git
+coverage
+tests
+jest.api-coverage.config.js
+scripts
+migrations
+debug_student.js
+test_api.js

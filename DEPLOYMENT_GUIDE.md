@@ -2,13 +2,23 @@
 
 ## Option 1: Render.com (Free tier available)
 
-### Backend Deployment:
+### Backend Deployment (Docker):
+The backend deploys as a Docker-based Render Web Service, built from
+`src/backend/Dockerfile`. A `render.yaml` Blueprint at the repo root
+defines this service, so the easiest path is:
 1. Create account at render.com
-2. Connect your GitHub repository
-3. Create a new "Web Service"
-4. Set build command: `cd src/backend && npm install`
-5. Set start command: `cd src/backend && node index.js`
-6. Add environment variables:
+2. New > Blueprint, connect your GitHub repository, and let Render read
+   `render.yaml`. It will create a Web Service with `runtime: docker`,
+   `dockerfilePath: ./src/backend/Dockerfile`, `dockerContext: ./src/backend`.
+3. Render prompts for the environment variables marked `sync: false`
+   (secrets below) during Blueprint setup.
+
+Or configure it manually without the Blueprint:
+1. Create a new "Web Service", connect the repo
+2. Set the runtime to "Docker"
+3. Set Dockerfile path: `src/backend/Dockerfile`
+4. Set Docker build context: `src/backend`
+5. Add environment variables:
    - `MONGODB_URI`: Your MongoDB connection string
    - `SMTP_HOST`: Your email server (e.g., smtp.gmail.com)
    - `SMTP_PORT`: 587
@@ -52,23 +62,19 @@ SMTP_FROM=your-email@gmail.com
 FRONTEND_URL=http://localhost:3000
 ```
 
-## Option 4: Docker + Cloud Provider
+## Option 4: Docker on another cloud provider
 
-### Create Dockerfile for backend:
-```dockerfile
-FROM node:18
-WORKDIR /app
-COPY src/backend/package*.json ./
-RUN npm install
-COPY src/backend .
-EXPOSE 5000
-CMD ["node", "index.js"]
-```
-
-### Deploy to:
+The backend's Dockerfile (`src/backend/Dockerfile`) is generic and also
+runs on any Docker-capable host, not just Render:
 - Google Cloud Run
 - AWS ECS
 - DigitalOcean App Platform
+
+Build and run it locally to verify:
+```bash
+docker build -t peer-eval-backend ./src/backend
+docker run -p 5000:5000 --env-file src/backend/.env peer-eval-backend
+```
 
 ## Email Service Recommendations:
 - **Development**: Gmail SMTP with app password

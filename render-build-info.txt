@@ -1,10 +1,12 @@
 # Build settings for Render.com
 
-# Backend build command
-cd src/backend && npm install
-
-# Backend start command  
-cd src/backend && node index.js
+# Backend service (Docker runtime, see render.yaml)
+# Dockerfile path: src/backend/Dockerfile
+# Docker context: src/backend
+# The image runs `node index.js` from within src/backend (see Dockerfile CMD),
+# equivalent to the previous native build/start commands:
+#   Build:  cd src/backend && npm install
+#   Start:  cd src/backend && node index.js
 
 # Frontend build command
 cd src/frontend && npm install && npm run build

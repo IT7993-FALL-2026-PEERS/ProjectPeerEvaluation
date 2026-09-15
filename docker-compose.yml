@@ -1,41 +1,24 @@
-version: '3.8'
-
+# Local dev stack for the backend API. The frontend has no Dockerfile yet
+# and runs separately via `npm start` in src/frontend against this backend.
 services:
-  postgres:
-    image: postgres:14
-    environment:
-      POSTGRES_DB: peer_eval_db
-      POSTGRES_USER: peer_eval_user
-      POSTGRES_PASSWORD: secure_password
+  mongo:
+    image: mongo:7
     ports:
-      - "5432:5432"
+      - "27017:27017"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - mongo_data:/data/db
 
   backend:
     build: ./src/backend
     ports:
       - "5000:5000"
     environment:
-      DATABASE_URL: postgresql://peer_eval_user:secure_password@postgres:5432/peer_eval_db
-      JWT_SECRET_KEY: your-secret-key
-      SMTP_SERVER: smtp.gmail.com
+      MONGODB_URI: mongodb://mongo:27017/peer-evaluation
+      SMTP_HOST: smtp.gmail.com
       SMTP_PORT: 587
+      FRONTEND_URL: http://localhost:3000
     depends_on:
-      - postgres
-    volumes:
-      - ./src/backend:/app
-
-  frontend:
-    build: ./src/frontend
-    ports:
-      - "3000:3000"
-    environment:
-      REACT_APP_API_URL: http://localhost:5000/api
-    depends_on:
-      - backend
-    volumes:
-      - ./src/frontend:/app
+      - mongo
 
 volumes:
-  postgres_data:
+  mongo_data:
