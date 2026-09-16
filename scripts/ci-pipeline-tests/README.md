@@ -41,3 +41,10 @@ reachable at `MONGODB_URI` (defaults to
 `mongodb://127.0.0.1:27017/peer-evaluation-integration-test`). Start one
 with `docker compose up -d mongo` from the repo root, or
 `docker run -d --rm -p 27017:27017 mongo:7`.
+
+## Two ways to verify the same gates
+
+These scripts drive the pipeline through GitHub Actions. `scripts/run-local.sh`
+at the repo root verifies the same unit-tests-then-integration-tests gate
+entirely locally -- starts MongoDB, runs both suites, and only if they pass,
+runs the app itself so you can interact with it directly.
