@@ -1,14 +1,37 @@
+# CI/CD pipeline: unit-tests -> integration-tests -> deploy.
+#
+# Deploy only runs once BOTH test stages pass, so a broken commit can never
+# reach production. integration-tests runs against a real (but ephemeral)
+# MongoDB service container, not mocks and not production -- see
+# src/backend/tests/integration/local-api.test.js. There's a local
+# equivalent of this whole pipeline at scripts/run-local.sh, and manual
+# scenario scripts that exercise it end-to-end (including the "unit fails"
+# and "integration fails" paths) at scripts/ci-pipeline-tests/.
+#
+# Required repo secret: RENDER_DEPLOY_HOOK_URL (Render dashboard -> this
+# service -> Settings -> Deploy Hook). Render's own Auto-Deploy must stay
+# OFF for this service, otherwise every push deploys twice: once
+# unconditionally from Render itself, once from the gated `deploy` job here.
+
 name: CI/CD
 
 on:
   push:
     branches: [main, with-test-coverage]
+  # Manual "Run workflow" button in the Actions tab. Note: GitHub only shows
+  # this control once a workflow_dispatch-triggering version of this file
+  # exists on the repo's default branch -- until this is merged to main, use
+  # the push trigger above instead.
   workflow_dispatch:
 
 env:
+  # Public URL of the deployed backend. Used only to poll /api/health in the
+  # deploy job below; not a secret.
   SERVICE_URL: https://peer-evaluation-backend-rd6z.onrender.com
 
 jobs:
+  # Fast, fully mocked tests: no network, no database, no external services.
+  # See src/backend/tests/unit/.
   unit-tests:
     runs-on: ubuntu-latest
     defaults:
@@ -24,6 +47,11 @@ jobs:
       - run: npm ci
       - run: npm run test:unit
 
+  # Boots the real, unmocked Express app against a real MongoDB and drives it
+  # with supertest -- actual route/controller/model code paths, not live
+  # HTTPS calls against production. The mongo service container below is
+  # thrown away with the job; local-api.test.js also drops its own test
+  # database in afterAll for a clean slate on every run.
   integration-tests:
     needs: unit-tests
     runs-on: ubuntu-latest
@@ -36,6 +64,13 @@ jobs:
       run:
         working-directory: src/backend
     env:
+      # Deliberately scoped to this job only, not the workflow-level `env:`
+      # above. If unit-tests inherited this too, tests/unit/index-coverage.
+      # test.js's mongo-connect branch tests would always see MONGODB_URI as
+      # already set, and their "no URI provided" branch would never get
+      # exercised -- the 100% coverage threshold would fail even though
+      # every individual test still passes. (Hit this for real once while
+      # building scripts/run-local.sh; see that script's comments too.)
       MONGODB_URI: mongodb://127.0.0.1:27017/peer-evaluation-integration-test
     steps:
       - uses: actions/checkout@v6
@@ -51,9 +86,21 @@ jobs:
     needs: integration-tests
     runs-on: ubuntu-latest
     steps:
+      # Render Deploy Hooks are fire-and-forget: this returns immediately
+      # and the actual build/deploy happens asynchronously on Render's side.
+      # `?ref=<sha>` pins the deploy to the exact commit this pipeline just
+      # tested, regardless of whatever branch the Render service is
+      # otherwise configured to build from by default.
       - name: Trigger Render deploy
         run: curl -fsS -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}&ref=${{ github.sha }}"
 
+      # Because the hook above doesn't wait for the deploy to finish, poll
+      # /api/health until it reports this commit's SHA. Render keeps the
+      # previous instance serving traffic during a rolling deploy, so a
+      # plain "did /api/health return 200" check would pass immediately
+      # against the OLD code -- checking the `commit` field (which reads
+      # Render's own RENDER_GIT_COMMIT env var; see src/backend/index.js) is
+      # what actually confirms the NEW commit is the one live.
       - name: Wait for the new commit to go live
         env:
           EXPECTED_SHA: ${{ github.sha }}
