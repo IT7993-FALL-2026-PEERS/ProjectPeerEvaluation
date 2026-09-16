@@ -1,3 +1,11 @@
+/**
+ * controllers/authController.js: login, register, logout, refreshToken,
+ * verifyMfa, resetPassword, updatePassword.
+ *
+ * Mocks bcryptjs, jsonwebtoken, crypto, emailUtils, and the Professor model
+ * so each branch (bad credentials, MFA required, duplicate email, expired
+ * reset token, etc.) can be forced deterministically without a database.
+ */
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');

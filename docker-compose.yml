@@ -1,5 +1,19 @@
-# Local dev stack for the backend API. The frontend has no Dockerfile yet
-# and runs separately via `npm start` in src/frontend against this backend.
+# Local dev stack for the backend API: a MongoDB container plus the backend
+# built from its own Dockerfile (src/backend/Dockerfile). This is one of two
+# ways to run everything locally -- the other is scripts/run-local.sh, which
+# runs mongo the same way but runs the backend directly with `node` (faster
+# iteration, no image rebuild needed) after running unit + integration tests
+# against it. Use this file when you specifically want the backend running
+# in its production Docker image, e.g. to reproduce a Render deploy locally.
+#
+# The frontend has no Dockerfile yet and runs separately via `npm start` in
+# src/frontend against this backend (see docs/architecture and the frontend
+# package.json).
+#
+# `docker compose up -d mongo` alone (without the backend service) is also
+# how scripts/run-local.sh and the "Running the integration suite locally"
+# section of scripts/ci-pipeline-tests/README.md start a MongoDB for
+# tests/integration/local-api.test.js.
 services:
   mongo:
     image: mongo:7
@@ -13,6 +27,12 @@ services:
     ports:
       - "5000:5000"
     environment:
+      # Talks to the `mongo` service over the Docker Compose network by its
+      # service name, not localhost -- containers on the same Compose
+      # network resolve each other by service name. This is unrelated to
+      # Render/MongoDB Atlas: in production (see render.yaml), MONGODB_URI
+      # is a real mongodb+srv://... Atlas connection string set as a Render
+      # secret, not this value.
       MONGODB_URI: mongodb://mongo:27017/peer-evaluation
       SMTP_HOST: smtp.gmail.com
       SMTP_PORT: 587

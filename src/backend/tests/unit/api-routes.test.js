@@ -1,3 +1,12 @@
+/**
+ * API route coverage.
+ *
+ * Requires the real, unmocked app and its routers (no jest.mock here) and
+ * diffs the routes each router actually registers against a hand-maintained
+ * expected list, so a route that's accidentally unmounted or removed shows
+ * up as a failing assertion instead of silently disappearing from the API.
+ * Also smoke-tests /api/health against the real app.
+ */
 const app = require('../../index');
 const request = require('supertest');
 const authRouter = require('../../routes/auth');

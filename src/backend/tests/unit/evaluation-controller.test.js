@@ -1,3 +1,13 @@
+/**
+ * controllers/evaluationController.js: sendTeamEvaluations, sendEvaluations,
+ * evaluationStatus, remindEvaluations, getEvaluationForm, submitEvaluation,
+ * evaluationTokenStatus.
+ *
+ * Mocks Student, Course, Team, Evaluation, and emailUtils, since these
+ * handlers are the token-based public-facing evaluation flow (student
+ * clicks an emailed link with no auth) and touch the most models of any
+ * controller in the app.
+ */
 jest.mock('../../models/Student', () => ({
   find: jest.fn(),
   findOne: jest.fn(),

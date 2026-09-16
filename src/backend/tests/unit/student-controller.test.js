@@ -1,3 +1,12 @@
+/**
+ * controllers/studentController.js: addStudent, updateStudent,
+ * deleteStudent, bulk delete, and CSV roster upload/parsing.
+ *
+ * Mocks Student, Course, Team, Evaluation, csv-parser, and fs, so the CSV
+ * upload tests can drive parsing behavior (malformed rows, missing
+ * columns, duplicate emails) via a fake readable stream instead of real
+ * files on disk.
+ */
 jest.mock('../../models/Student', () => {
   const Student = jest.fn(function Student(data) {
     Object.assign(this, data);

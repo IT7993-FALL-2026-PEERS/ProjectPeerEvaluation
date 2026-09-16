@@ -1,3 +1,11 @@
+/**
+ * The remaining pieces not covered by a dedicated file: Mongoose schema
+ * defaults on the model files themselves (models/*.js), the
+ * authenticateToken route-mounting wiring in routes/courses.js (controllers
+ * mocked so only the middleware/routing layer is under test), and
+ * utils/emailUtils.js's template-building and send-failure paths.
+ * nodemailer is mocked so no real network I/O happens.
+ */
 const mockTransport = { sendMail: jest.fn() };
 jest.mock('nodemailer', () => ({
   createTransport: jest.fn(() => mockTransport)

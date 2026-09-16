@@ -1,3 +1,13 @@
+/**
+ * controllers/courseController.js: listCourses, createCourse, getCourse,
+ * updateCourse, deleteCourse, migrateCourses.
+ *
+ * Mocks the Course, Team, and Student models. migrateCourses in particular
+ * gets heavy edge-case coverage (whitespace-only course_code, single- vs
+ * multi-token codes, already-migrated records) since it parses legacy
+ * `course_code` strings into `course_number`/`course_section` and has bitten
+ * us with off-by-one branch coverage gaps before.
+ */
 jest.mock('../../models/Course', () => {
   const Course = jest.fn(function Course(data) {
     Object.assign(this, data);

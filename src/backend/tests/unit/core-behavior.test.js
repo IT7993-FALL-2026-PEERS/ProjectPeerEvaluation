@@ -1,3 +1,11 @@
+/**
+ * Cross-cutting pieces that don't warrant their own file: the auth
+ * middleware (middleware/auth.js), the global error handler
+ * (middleware/errorHandler.js), the not-yet-implemented AI controller
+ * stubs, the professor AI-word controller, and the app's boundary routes
+ * (/ and unknown-route 404 handling). jsonwebtoken and the Professor model
+ * are mocked; everything else runs for real against a mocked Express app.
+ */
 const request = require('supertest');
 const jwt = require('jsonwebtoken');
 

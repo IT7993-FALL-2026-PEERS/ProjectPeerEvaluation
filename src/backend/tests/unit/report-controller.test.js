@@ -1,3 +1,15 @@
+/**
+ * controllers/reportController.js: the peer-evaluation scoring pipeline --
+ * calculateMeanScore, applyCurvedGrading, AI concerning-word flagging, and
+ * the report-generation/download/course-grade-summary route handlers.
+ *
+ * Mocks Student, Course, Team, and Evaluation. Grading-math edge cases
+ * (zero evaluations, all-scores-identical curves, protected-threshold
+ * scores) get direct coverage here rather than only through the route
+ * handlers, since applyCurvedGrading's default parameters were removed as
+ * dead code once we confirmed its one call site always supplies both args
+ * explicitly -- see the function itself for that history.
+ */
 jest.mock('../../models/Student', () => ({ find: jest.fn(), findOne: jest.fn() }));
 jest.mock('../../models/Course', () => ({ findById: jest.fn() }));
 jest.mock('../../models/Team', () => ({ find: jest.fn(), findById: jest.fn() }));

@@ -1,3 +1,13 @@
+/**
+ * controllers/teamController.js: listTeams, createTeams, updateTeam
+ * (including renaming a team's students' group_assignment field),
+ * deleteTeam, clearAllTeams, and add/remove student from a team
+ * (describe.each covering both directions). autoAssignTeams is currently
+ * just a stub that reports 501 Not Implemented, so it's covered as that,
+ * not as real assignment logic.
+ *
+ * Mocks Team, Course, and Student.
+ */
 jest.mock('../../models/Team', () => {
   const Team = jest.fn();
   Team.find = jest.fn();
