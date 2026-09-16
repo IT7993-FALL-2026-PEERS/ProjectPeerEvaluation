@@ -6,7 +6,7 @@
     "start": "node index.js",
     "test": "jest --coverage --runInBand --verbose",
     "test:unit": "jest --coverage --runInBand --verbose tests/unit",
-    "test:integration": "jest --coverage --runInBand --verbose tests/integration",
+    "test:integration": "jest --runInBand --verbose tests/integration",
     "coverage": "jest --coverage --runInBand --verbose",
     "coverage:api": "jest --config jest.api-coverage.config.js --runInBand --verbose"
   },

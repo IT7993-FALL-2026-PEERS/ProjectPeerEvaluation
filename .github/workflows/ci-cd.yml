@@ -1,0 +1,66 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+
+env:
+  SERVICE_URL: https://peer-evaluation-backend-rd6z.onrender.com
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src/backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: src/backend/package-lock.json
+      - run: npm ci
+      - run: npm run test:unit
+
+  deploy:
+    needs: unit-tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Render deploy
+        run: curl -fsS -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}"
+
+      - name: Wait for the new commit to go live
+        env:
+          EXPECTED_SHA: ${{ github.sha }}
+        run: |
+          for i in $(seq 1 40); do
+            body="$(curl -fsS "$SERVICE_URL/api/health" || true)"
+            live_commit="$(echo "$body" | grep -o '"commit":"[^"]*"' | cut -d'"' -f4)"
+            echo "Attempt $i: live commit is ${live_commit:-<none>}, waiting for $EXPECTED_SHA"
+            case "$live_commit" in
+              "$EXPECTED_SHA"*)
+                echo "New commit is live."
+                exit 0
+                ;;
+            esac
+            sleep 15
+          done
+          echo "Timed out waiting for commit $EXPECTED_SHA to go live."
+          exit 1
+
+  integration-tests:
+    needs: deploy
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src/backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: src/backend/package-lock.json
+      - run: npm ci
+      - run: npm run test:integration

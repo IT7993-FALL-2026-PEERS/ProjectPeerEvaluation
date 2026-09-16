@@ -2,7 +2,7 @@ const https = require('https');
 
 jest.setTimeout(30000);
 
-const BASE_URL = 'https://projectpeerevaluation.onrender.com/api';
+const BASE_URL = 'https://peer-evaluation-backend-rd6z.onrender.com/api';
 
 function fetchJson(url, options = {}) {
   return new Promise((resolve, reject) => {
@@ -43,7 +43,7 @@ function fetchJson(url, options = {}) {
 const integrationCases = [
   {
     name: 'GET /',
-    call: () => fetchJson('https://projectpeerevaluation.onrender.com/'),
+    call: () => fetchJson('https://peer-evaluation-backend-rd6z.onrender.com/'),
     expect: (response) => {
       expect(response.status).toBe(200);
       expect(response.data).toHaveProperty('status', 'Running');

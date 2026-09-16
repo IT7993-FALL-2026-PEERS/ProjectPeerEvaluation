@@ -48,10 +48,11 @@ app.get('/', (req, res) => {
 
 // Health check endpoint for API
 app.get('/api/health', (req, res) => {
-  res.json({ 
+  res.json({
     status: 'OK',
     message: 'Backend API is running',
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    commit: process.env.RENDER_GIT_COMMIT || null
   });
 });
 
