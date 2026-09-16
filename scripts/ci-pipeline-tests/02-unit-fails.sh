@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Scenario 2: unit-tests fail -> deploy and integration-tests are skipped, nothing deploys.
+# Scenario 2: unit-tests fail -> integration-tests and deploy are skipped, nothing deploys.
 # Breaks /api/health's status field, which tests/unit/api-routes.test.js asserts on.
 set -euo pipefail
 
@@ -28,7 +28,7 @@ if ! grep -q "    status: 'OK'," "$FILE"; then
 fi
 
 echo "This will commit a change that fails tests/unit/api-routes.test.js and push it"
-echo "to '$BRANCH'. deploy and integration-tests should be SKIPPED (not run)."
+echo "to '$BRANCH'. integration-tests and deploy should be SKIPPED (not run)."
 read -r -p "Continue? [y/N] " confirm
 if [ "$confirm" != "y" ] && [ "$confirm" != "Y" ]; then
   echo "Aborted."
@@ -38,12 +38,12 @@ fi
 sed -i "s/    status: 'OK',/    status: 'BROKEN',/" "$FILE"
 
 git add "$FILE"
-git commit -m "test: intentionally break unit test to verify pipeline halts before deploy"
+git commit -m "test: intentionally break unit test to verify pipeline halts before integration/deploy"
 git push origin "$BRANCH"
 
 echo
 echo "Pushed $(git rev-parse HEAD)."
-echo "Expected: unit-tests FAILS, deploy and integration-tests show as SKIPPED."
+echo "Expected: unit-tests FAILS, integration-tests and deploy show as SKIPPED."
 echo "Watch: https://github.com/$REPO/actions"
 echo
 echo "When you've confirmed the failure, clean up with:"

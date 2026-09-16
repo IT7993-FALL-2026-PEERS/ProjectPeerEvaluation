@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Scenario 1: unit-tests pass -> deploy -> integration-tests pass.
+# Scenario 1: unit-tests pass -> integration-tests pass -> deploy happens.
 # No source change needed -- just pushes an empty commit to trigger the pipeline.
 set -euo pipefail
 
@@ -20,7 +20,7 @@ git push origin "$BRANCH"
 
 echo
 echo "Pushed $(git rev-parse HEAD)."
-echo "Expected: unit-tests OK -> deploy OK -> integration-tests OK."
+echo "Expected: unit-tests OK -> integration-tests OK -> deploy OK."
 echo "Watch: https://github.com/$REPO/actions"
 
 if command -v gh >/dev/null 2>&1; then

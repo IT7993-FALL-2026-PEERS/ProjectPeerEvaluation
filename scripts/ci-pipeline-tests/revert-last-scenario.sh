@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Reverts the most recent commit on the current branch and pushes the revert.
-# Use after 02-build-fails.sh (cleanup) or 03-integration-fails.sh (fix-forward
-# rollback -- re-runs the full pipeline against the reverted code, including a
-# real redeploy).
+# Use after 02-unit-fails.sh or 03-integration-fails.sh to clean up the
+# deliberately broken demo commit. Neither scenario ever reaches deploy, so
+# this is just branch cleanup, not a production rollback -- there's nothing
+# to roll back, since a failing integration-tests run always blocks deploy.
 set -euo pipefail
 
 BRANCH="with-test-coverage"
