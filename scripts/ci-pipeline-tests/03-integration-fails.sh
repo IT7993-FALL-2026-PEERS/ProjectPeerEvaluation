@@ -51,8 +51,7 @@ echo "Pushed $(git rev-parse HEAD). Production is now running this commit."
 echo "Expected: unit-tests OK -> deploy OK -> integration-tests FAILS (GET / status check)."
 echo "Watch: https://github.com/$REPO/actions"
 echo
-echo "To roll back once you've confirmed the failure, run one of:"
-echo "  ./04-rollback-render-api.sh     (fast, via Render API)"
+echo "To roll back once you've confirmed the failure, run:"
 echo "  ./revert-last-scenario.sh       (fix-forward through the pipeline)"
 
 if command -v gh >/dev/null 2>&1; then

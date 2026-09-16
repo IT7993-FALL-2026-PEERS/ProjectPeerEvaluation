@@ -9,8 +9,8 @@ to run unattended.
 Each script must be run from a clean working tree with the target branch
 checked out (defaults to `with-test-coverage` -- edit the `BRANCH` variable
 at the top of a script if you're validating a different branch). Scripts
-that push a deliberately broken commit or hit the Render API prompt for
-confirmation before doing anything.
+that push a deliberately broken commit prompt for confirmation before
+doing anything.
 
 **Run in order:**
 
@@ -22,12 +22,15 @@ confirmation before doing anything.
    only the live integration suite catches, not unit tests. **This
    actually deploys the broken commit to production.** Expect
    `unit-tests` and `deploy` green, `integration-tests` red.
-4. Roll back from step 3, either:
-   - `04-rollback-render-api.sh` -- fast, via the Render API. Needs
-     `RENDER_API_KEY` and `RENDER_SERVICE_ID` env vars (see the script's
-     header comment) and `jq`.
-   - `revert-last-scenario.sh` -- fix-forward: reverts the commit and
-     pushes, re-running the full pipeline against the reverted code.
+4. Roll back from step 3 with `revert-last-scenario.sh` -- fix-forward:
+   reverts the commit and pushes, re-running the full pipeline (including
+   a fresh Docker build and deploy) against the reverted code. There's no
+   Render-API-based fast rollback here on purpose: it would restore
+   production in seconds without a rebuild, but it needs `RENDER_API_KEY`
+   credentials that shouldn't be scripted into a repo, and it doesn't fix
+   or re-verify anything in git -- the bad commit would still sit on the
+   branch. For a real incident where seconds matter, roll back manually
+   from the Render dashboard's Deploys tab instead.
 
 `revert-last-scenario.sh` always reverts whatever commit is currently at
 `HEAD`, so run it right after the scenario script it's cleaning up --
