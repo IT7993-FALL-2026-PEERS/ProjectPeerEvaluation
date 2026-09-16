@@ -36,7 +36,7 @@ if (process.env.NODE_ENV !== 'test') {
 app.get('/', (req, res) => {
   res.json({ 
     message: '🎓 Peer Evaluation System API', 
-    status: 'Deployed',
+    status: 'Running',
     endpoints: [
       'POST /api/auth/login - User login',
       'GET /api/courses - List courses',
