@@ -47,6 +47,7 @@ const integrationCases = [
     expect: (response) => {
       expect(response.status).toBe(200);
       expect(response.data).toHaveProperty('status', 'Running');
+      expect(response.data).toHaveProperty('message', '🎓 Peer Evaluation System API');
       expect(response.data).toHaveProperty('endpoints');
     }
   },

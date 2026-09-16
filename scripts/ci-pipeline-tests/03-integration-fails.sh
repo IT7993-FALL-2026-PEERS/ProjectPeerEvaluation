@@ -1,11 +1,14 @@
 #!/usr/bin/env bash
 # Scenario 3: unit-tests pass -> deploy succeeds (production gets this commit!) ->
-# integration-tests fail. Breaks the root route's status field, which only the
-# live integration suite checks (tests/unit never asserts on it), so /api/health
-# and app boot are untouched and the deploy step's health-poll still succeeds.
+# integration-tests fail. Breaks the root route's message field, which only
+# tests/integration/render-api.test.js asserts on -- no unit test checks it
+# (unlike the root route's status/endpoints fields, which core-behavior.test.js
+# does pin, and which an earlier version of this script mistakenly targeted).
+# /api/health and app boot are untouched, so the deploy step's health-poll
+# still succeeds.
 #
 # WARNING: this deliberately deploys broken-per-integration-tests code to
-# production. Have 04-rollback-*.sh ready before running this.
+# production. Have revert-last-scenario.sh ready before running this.
 set -euo pipefail
 
 BRANCH="with-test-coverage"
@@ -26,21 +29,21 @@ if ! git diff --quiet -- "$FILE" || ! git diff --cached --quiet -- "$FILE"; then
   exit 1
 fi
 
-if ! grep -q "    status: 'Running'," "$FILE"; then
-  echo "Expected line (    status: 'Running',) not found in $FILE -- has it changed?" >&2
+if ! grep -q "message: '🎓 Peer Evaluation System API'," "$FILE"; then
+  echo "Expected root-route message line not found in $FILE -- has it changed?" >&2
   echo "Edit the script's sed pattern to match the current source before running." >&2
   exit 1
 fi
 
 echo "This WILL deploy a broken commit to production (peer-evaluation-backend-rd6z)."
-echo "unit-tests and deploy should succeed; integration-tests should fail on GET /."
+echo "unit-tests and deploy should succeed; integration-tests should fail on GET / (message check)."
 read -r -p "Continue? [y/N] " confirm
 if [ "$confirm" != "y" ] && [ "$confirm" != "Y" ]; then
   echo "Aborted."
   exit 1
 fi
 
-sed -i "s/    status: 'Running',/    status: 'Deployed',/" "$FILE"
+sed -i "s/message: '🎓 Peer Evaluation System API',/message: 'Peer Evaluation System API (broken)',/" "$FILE"
 
 git add "$FILE"
 git commit -m "test: intentionally break integration-only assertion to verify deploy still occurs"
@@ -48,7 +51,7 @@ git push origin "$BRANCH"
 
 echo
 echo "Pushed $(git rev-parse HEAD). Production is now running this commit."
-echo "Expected: unit-tests OK -> deploy OK -> integration-tests FAILS (GET / status check)."
+echo "Expected: unit-tests OK -> deploy OK -> integration-tests FAILS (GET / message check)."
 echo "Watch: https://github.com/$REPO/actions"
 echo
 echo "To roll back once you've confirmed the failure, run:"

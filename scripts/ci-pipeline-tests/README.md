@@ -18,10 +18,13 @@ doing anything.
 2. `02-build-fails.sh` -- breaks `/api/health`'s status so `unit-tests`
    fails. Expect `deploy` and `integration-tests` to show as **Skipped**.
    Clean up with `revert-last-scenario.sh`.
-3. `03-integration-fails.sh` -- breaks the root route's status in a way
-   only the live integration suite catches, not unit tests. **This
-   actually deploys the broken commit to production.** Expect
-   `unit-tests` and `deploy` green, `integration-tests` red.
+3. `03-integration-fails.sh` -- breaks the root route's `message` field, which
+   only tests/integration/render-api.test.js checks (unlike the root route's
+   `status`/`endpoints` fields, which a unit test pins -- an earlier version
+   of this script targeted `status` and only ever reproduced scenario 2,
+   since it never actually got past `unit-tests`). **This actually deploys
+   the broken commit to production.** Expect `unit-tests` and `deploy`
+   green, `integration-tests` red.
 4. Roll back from step 3 with `revert-last-scenario.sh` -- fix-forward:
    reverts the commit and pushes, re-running the full pipeline (including
    a fresh Docker build and deploy) against the reverted code. There's no
