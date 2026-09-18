@@ -3,11 +3,7 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js",
-    "test": "jest"
-  },
-  "devDependencies": {
-    "jest": "^29.7.0"
+    "start": "node index.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

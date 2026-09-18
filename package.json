@@ -30,7 +30,6 @@
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
-    "test:backend": "cd src/backend && npm test",
     "eject": "react-scripts eject",
   "start:backend": "cd src/backend && npm start",
   "start:frontend": "cross-env HOST=0.0.0.0 react-scripts start",
