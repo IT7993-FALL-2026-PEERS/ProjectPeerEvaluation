@@ -62,6 +62,10 @@ what the pipeline provisions.
 - Automated test/build reporting, finalized technical documentation
 - Final system demonstration and repository delivery
 
+Full per-person, per-week breakdown (sponsor-approved):
+
+![Project Gantt chart](docs/gantt/gantt-chart.png)
+
 ---
 
 ## Getting Started (For New Users)

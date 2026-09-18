@@ -1,3 +1,5 @@
-# Project Schedule
-
-(Gantt chart or project schedule here.)
+See gantt-chart.png in this folder — the sponsor-approved schedule (Dr. Vyas approved
+`PEERS_CICD_Pipeline_Plan_Revised.docx`, Draft 1, on 2026-09-17), extracted directly from that
+document rather than recreated. It breaks each milestone down to per-person weekly tasks with
+planned member-hours; it's the authoritative source for "who owns what, when" — more granular
+than the narrative plan document.
