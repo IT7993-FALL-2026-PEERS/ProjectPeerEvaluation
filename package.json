@@ -30,6 +30,7 @@
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
+    "test:backend": "cd src/backend && npm test",
     "eject": "react-scripts eject",
   "start:backend": "cd src/backend && npm start",
   "start:frontend": "cross-env HOST=0.0.0.0 react-scripts start",
@@ -41,6 +42,15 @@
     "extends": [
       "react-app",
       "react-app/jest"
+    ]
+  },
+  "jest": {
+    "testMatch": [
+      "<rootDir>/src/frontend/**/__tests__/**/*.{js,jsx}",
+      "<rootDir>/src/frontend/**/*.{spec,test}.{js,jsx}"
+    ],
+    "transformIgnorePatterns": [
+      "[/\\\\]node_modules[/\\\\](?!axios)"
     ]
   },
   "browserslist": {
