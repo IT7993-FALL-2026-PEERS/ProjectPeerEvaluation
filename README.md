@@ -121,7 +121,7 @@ Not yet on `main` as of this writing — merging soon from open PRs:
 | M3 | Laeticia Neno Aloyem | Requirements validation & Requirements Traceability Matrix, security scanning (Dependabot, OWASP Dependency Check), technical assessment / testing-strategy / architecture documentation | laloyem@students.kennesaw.edu |
 | M4 | Khoa Ho | Frontend unit & integration tests, end-to-end student workflow (Playwright), automated test reporting | kho6@students.kennesaw.edu |
 | M5 | Kylee Gipson | Backend unit & integration tests, functional regression tests, end-to-end instructor workflow, post-deploy smoke tests | kgipson5@students.kennesaw.edu |
-| Advisor / Instructor | Ying Xie | Facilitate progress; advise on planning and project management | gzheng@kennesaw.edu |
+| Advisor / Instructor | Ying Xie | Facilitate progress; advise on planning and project management | yxie2@kennesaw.view.usg.edu |
 
 Primary contact for inquiries: Team Leader (Donald Gobin).
 
