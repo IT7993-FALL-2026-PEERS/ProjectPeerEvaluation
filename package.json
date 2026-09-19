@@ -43,6 +43,15 @@
       "react-app/jest"
     ]
   },
+  "jest": {
+    "testMatch": [
+      "<rootDir>/src/frontend/**/__tests__/**/*.{js,jsx}",
+      "<rootDir>/src/frontend/**/*.{spec,test}.{js,jsx}"
+    ],
+    "transformIgnorePatterns": [
+      "[/\\\\]node_modules[/\\\\](?!axios)"
+    ]
+  },
   "browserslist": {
     "production": [
       ">0.2%",
