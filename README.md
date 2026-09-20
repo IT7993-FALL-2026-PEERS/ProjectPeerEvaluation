@@ -145,6 +145,7 @@ Commit `package.json` and `package-lock.json` together. `npm ci` fails if they a
 | Team Leader / M4 | Khoa Ho | Frontend unit & integration tests, end-to-end student workflow (Playwright), automated test reporting | kho6@students.kennesaw.edu |
 | M5 | Kylee Gipson | Backend unit & integration tests, functional regression tests, end-to-end instructor workflow, post-deploy smoke tests | kgipson5@students.kennesaw.edu |
 | Advisor / Instructor | Ying Xie | Facilitate progress; advise on planning and project management | yxie2@kennesaw.view.usg.edu |
+| Capstone Program Support | Taylor Cuffie | CCSE capstone program coordination; CC'd on sponsor emails; escalation point | tcuffie1@kennesaw.edu |
 
 Primary contact for inquiries: Team Leader (Khoa Ho).
 
@@ -153,8 +154,16 @@ Primary contact for inquiries: Team Leader (Khoa Ho).
 ## Collaboration & Communication
 
 - Channel: Microsoft Teams
+- **Weekly sponsor update:** the team meets weekly with the sponsor (Dr. Vyas). Most or all of the
+  team attends, with video on, and the Team Leader leads. Each update covers completed work,
+  obstacles, and the plan for the following week, with a summary slide where it helps.
 - Weekly async check-ins track task-by-task progress against the project Gantt chart
-- Blockers raised at milestone review meetings with the sponsor and advisor
+- **Sponsor correspondence:** direct email with the sponsor is fine, but always **CC** (carbon
+  copy, the "CC" field in your email) the Program Coordinator and the faculty advisor on every
+  message.
+- **Escalation:** unresolved issues go to the Program Coordinator and the Director of Partnerships.
+- Blockers are raised at the weekly sponsor update and at milestone review meetings with the
+  sponsor and advisor
 
 ---
 
