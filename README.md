@@ -51,11 +51,11 @@ GitHub Actions. After merge, Continuous Delivery (CD) deploys it to Render.com s
 production stays behind a manual sponsor approval.
 
 ```mermaid
-flowchart LR
+flowchart TB
     DEV(["Developer<br/>pushes a branch"]) --> PR["Open pull request<br/>into main"]
 
     subgraph CI["CONTINUOUS INTEGRATION · GitHub Actions · runs on every pull request"]
-        direction TB
+        direction LR
         FE["Frontend<br/>install · Jest tests · build"]
         BEU["Backend unit tests"]
         BEI["Backend integration tests<br/>real MongoDB"]
