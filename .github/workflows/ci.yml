@@ -15,7 +15,9 @@ permissions:
   contents: read
 
 env:
-  NODE_VERSION: 22
+  # Node 24 ships npm 11, which matches how package-lock.json was generated;
+  # npm 10 (Node 22) rejects the lockfile in `npm ci`.
+  NODE_VERSION: 24
 
 jobs:
   frontend:
