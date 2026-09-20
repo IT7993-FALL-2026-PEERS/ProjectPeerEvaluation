@@ -46,69 +46,89 @@ what the pipeline provisions.
 
 ## CI/CD Pipeline
 
-Every change reaches `main` through a pull request. Continuous Integration (CI) checks it on
-GitHub Actions. After merge, Continuous Delivery (CD) deploys it to Render.com staging, and
-production stays behind a manual sponsor approval.
+Every change reaches `main` through a pull request. Continuous Integration (CI) runs automatically
+on GitHub Actions for every pull request, and a change that fails a required check cannot be
+merged. After merge, Continuous Delivery (CD) automatically builds, deploys to staging on
+Render.com, and verifies the release. Production deployment is the one manual step: it requires
+sponsor approval.
 
 ```mermaid
 flowchart TB
-    DEV(["Developer<br/>pushes a branch"]) --> PR["Open pull request<br/>into main"]
+    DEV(["Developer<br/>pushes a branch"]) --> PR["Open a pull request<br/>into main"]
 
-    subgraph CI["CONTINUOUS INTEGRATION · GitHub Actions · runs on every pull request"]
+    subgraph CI["Continuous Integration (CI) · GitHub Actions · runs on every pull request"]
         direction LR
-        FE["Frontend<br/>install · Jest tests · build"]
-        BEU["Backend unit tests"]
-        BEI["Backend integration tests<br/>real MongoDB"]
-        E2E["End-to-end smoke<br/>Playwright"]
-        LINT["Static analysis<br/>ESLint"]
-        SEC["Security scan<br/>Dependabot · OWASP"]
+        subgraph STATIC["Build and static checks"]
+            direction TB
+            BUILD_APP["Install dependencies<br/>and build"]
+            LINT["Static analysis<br/>ESLint"]
+            SEC["Dependency validation<br/>and security scan<br/>Dependabot, OWASP"]
+        end
+        subgraph TESTS["Automated tests"]
+            direction TB
+            UNIT["Unit tests<br/>Jest"]
+            INTEG["Integration tests<br/>real MongoDB"]
+            REG["Functional regression<br/>tests"]
+            E2E["End-to-end tests<br/>Playwright"]
+        end
     end
 
     PR --> CI
-    CI --> GATE{"Quality gate<br/>all checks pass<br/>+ 1 approval"}
-    GATE -- "fail" --> FIX["Fix and push again"]
+    CI --> REPORT["Test report<br/>results, duration, coverage"]
+    REPORT --> GATE{"Quality gate<br/>all required checks pass"}
+    GATE -- "Fail" --> FIX["Fix and push again"]
     FIX --> PR
-    GATE -- "pass" --> MERGE["Merge to main"]
+    GATE -- "Pass" --> MERGE["Merge to main"]
 
-    subgraph CD["CONTINUOUS DELIVERY · runs after merge to main"]
+    subgraph CD["Continuous Delivery (CD) · runs automatically after merge to main"]
         direction TB
-        BUILD["Build artifacts<br/>+ Docker images"]
+        ARTIFACTS["Build deployment artifacts<br/>and Docker images"]
         STG["Deploy to staging<br/>Render.com"]
-        SMOKE["Smoke tests<br/>+ /api/health check"]
-        RC["Tag release candidate"]
-        BUILD --> STG --> SMOKE --> RC
+        SMOKE["Smoke tests"]
+        HEALTH["Verify deployment health<br/>/api/health"]
+        RC["Produce release candidate"]
+        DREPORT["Publish reports<br/>build history, deployment status"]
+        ARTIFACTS --> STG --> SMOKE --> HEALTH --> RC --> DREPORT
     end
 
-    MERGE --> BUILD
-    RC --> APPROVE{{"Manual approval<br/>sponsor gate"}}
+    MERGE --> ARTIFACTS
+    DREPORT --> APPROVE{{"Manual approval<br/>required for production"}}
     APPROVE --> PROD(["Production<br/>Render.com"])
 
     classDef done fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef partial fill:#ecfccb,stroke:#65a30d,color:#365314,stroke-dasharray: 5 4
     classDef planned fill:#f1f5f9,stroke:#64748b,color:#334155,stroke-dasharray: 5 4
     classDef gate fill:#fef3c7,stroke:#d97706,color:#78350f
     classDef endpoint fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
 
-    class FE,E2E done
-    class BEU,BEI,LINT,SEC,BUILD,STG,SMOKE,RC planned
+    class BUILD_APP done
+    class UNIT,E2E partial
+    class LINT,SEC,INTEG,REG,REPORT,ARTIFACTS,STG,SMOKE,HEALTH,RC,DREPORT planned
     class GATE,APPROVE gate
     class DEV,PROD,PR,MERGE,FIX endpoint
 ```
 
-**Legend:** green = running today · grey dashed = planned · amber = gate that needs a person or a
-rule.
+**Legend:** solid green = running today · dashed light green = partly running (see the table) ·
+dashed grey = planned · amber = gate (the quality gate is enforced today; production approval is manual) · blue = start, end, and pull request steps.
 
-| Stage | What it does | Owner | Status / target (per the Gantt chart) |
+| Stage | What it does | Owner | Status and target (per the Gantt chart) |
 |---|---|---|---|
-| Frontend checks | `npm ci`, Jest + React Testing Library, production build | M1 / M4 | Live (`.github/workflows/ci.yml`) |
-| End-to-end smoke | Playwright launches a browser; real student and instructor workflows replace it later | M4 / M5 | Smoke live; workflows planned for week of 26 Oct |
-| Backend unit and integration tests | Unit tests plus integration tests against a real MongoDB | M5 / M1 | Planned, weeks of 5–19 Oct |
+| Install dependencies and build | `npm ci` and the production build | M1 / M4 | Live (`.github/workflows/ci.yml`) |
+| Unit tests | Jest and React Testing Library for the frontend; Jest for the backend | M4 / M5 | Frontend live. Backend planned, weeks of 5–12 Oct |
+| Integration tests | Frontend, backend, database, authentication, and email, against a real MongoDB | M4 / M5 | Planned, weeks of 12–19 Oct |
+| Functional regression tests | One automated test per critical business workflow | M5 | Planned, week of 19 Oct |
+| End-to-end tests | Playwright: student and instructor workflows | M4 / M5 | Smoke test live. Workflows planned, week of 26 Oct |
 | Static analysis | ESLint | M1 | Planned, week of 19 Oct |
-| Security scan | Dependabot and OWASP Dependency Check | M3 | Planned, week of 19 Oct |
-| Quality gate | Branch ruleset: required checks and 1 approval before merge | M1 | Ruleset drafted, enforcement pending; week of 26 Oct |
-| Build artifacts and Docker images | Build the frontend and backend images | M2 | Planned, week of 2 Nov |
-| Staging deploy | Automated deploy to Render.com staging | M2 | Planned, week of 9 Nov |
-| Smoke tests and health check | Hit `/api/health` and the app after deploy | M5 / M1 | Planned, weeks of 9–16 Nov |
-| Release candidate and production | Tag the release candidate. Production deploy is a manual sponsor approval and is not automated | M1 | Planned, week of 16 Nov |
+| Dependency validation and security scan | Dependabot and OWASP Dependency Check | M3 | Planned, week of 19 Oct |
+| Test report | Executed, passed, and failed tests, duration, and coverage | M4 | Planned, week of 16 Nov |
+| Quality gate | Branch ruleset on `main`: a pull request and passing required checks before merge | M1 | Live. Required checks grow as jobs are added, week of 26 Oct |
+| Build artifacts and Docker images | Build the deployment artifacts and the frontend and backend images | M2 | Planned, week of 2 Nov |
+| Staging deploy | Automatic deploy to Render.com staging | M2 | Planned, week of 9 Nov |
+| Smoke tests | Verify the deployment after each release | M5 | Planned, week of 9 Nov |
+| Deployment health check | Poll `/api/health` after deploy | M1 | Planned, week of 16 Nov |
+| Release candidate | Produce a release candidate after staging passes | M1 | Planned, week of 16 Nov |
+| Build and deployment reports | Build history and deployment status | M2 | Planned, week of 16 Nov |
+| Production deploy | Manual sponsor approval. Not automated | Sponsor | By design |
 
 ---
 
