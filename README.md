@@ -1,316 +1,191 @@
+# PEERS: Peer Evaluation System
 
+Productionization, Automated Testing, and CI/CD for the PEERS Peer Evaluation System
 
-# PEERS: Peer End to End Review System
+Date: 09/18/2026
+Status: In Progress — Milestone 1 (Assessment & Planning)
 
-Peer Evaluation Automation and Feedback System
+A web-based platform for professors to manage peer evaluations in team-based courses: create and
+manage student rosters, assign students to courses/teams, trigger email invitations, and receive
+structured, professor-friendly reports with both numeric and textual feedback.
 
-Date: 09/04/2025  
-Status: Planning / In Progress
-
-A web-based platform to streamline peer evaluations in team-based courses. Professors can securely create and manage student rosters, assign students to courses/teams, trigger email invitations, and receive structured, professor-friendly reports with both numeric and textual feedback. Optional AI features may summarize comments and flag potential concerns, depending on timeline and scope.
-
-Project website URL: 
-
-https://peer-evaluation-frontend.onrender.com/
-
-You can find more information about the project on our website:
-
-[Project Peer Evaluation Site](https://sites.google.com/d/1--7WFDwNF4-hJqB9fhH2VXELfxtjDwCy/p/1p6or7HniSsgUybdmLGxZgFywj6BTcmaA/edit)
+This capstone is a **continuation** of a previous KSU senior capstone project. The application
+itself already exists (source: [`SameerHerm/ProjectPeerEvaluation`](https://github.com/SameerHerm/ProjectPeerEvaluation)).
+This project's focus is **not new features** — it's transforming the inherited app into a
+professionally engineered, production-ready product: automated testing, containerization,
+deployment automation, and CI/CD.
 
 ---
 
 ## Objectives
 
-- Simplify and automate peer evaluations for team-based courses
-- Provide an intuitive UI for professors and students
-- Ensure secure roster management and personalized evaluation links
-- Generate clear, actionable reports (numeric + textual)
-- Optionally use AI to summarize feedback and detect red flags (time-permitting)
+- Assess the inherited application's architecture, tech stack, and existing test coverage
+- Build a full automated testing pyramid: unit, integration, functional regression, and
+  end-to-end tests
+- Containerize the application (Docker/Docker Compose) and finalize a repeatable local dev setup
+- Stand up a Continuous Integration pipeline (build, static analysis, tests, quality gates)
+- Stand up a Continuous Delivery pipeline (staging deployment to Render.com, smoke tests) —
+  production deployment remains a manual approval step, out of scope
+- Maintain a Requirements Traceability Matrix linking business requirements to automated tests
+- Document architecture, testing strategy, Docker setup, and release procedures
+
+Explicitly **out of scope**: redesigning the UI, new application features, replacing the tech
+stack, a commercial production hosting environment, or migrating databases.
 
 ---
 
-## Core Features
+## Deployment
 
-- Secure professor login and multi-course management
-- Student roster upload and team assignment
-- Personalized email invitations for peer evaluations
-- Personalized evaluation forms per student/team
-- Aggregated, structured reporting for professors
-- Downloadable reports (raw data, calculated scores, summaries)
-- Optional AI assistance:
-  - Text summarization of comments
-  - Red flag detection (e.g., significant discrepancies or concerning language)
-
-AI features are optional and will depend on remaining timeline after core milestones are met.
+**Render.com only** — this is the sponsor's explicit choice; other platforms (Vercel, Railway,
+etc.) are not used for this project even though `DEPLOYMENT_GUIDE.md` documents them as
+historical alternatives. Deployment is automated via the CI/CD pipeline in
+`.github/workflows/` once merged to `main`; there is no separate staging environment beyond
+what the pipeline provisions.
 
 ---
 
 ## Project Timeline and Milestones
 
-📅 Milestone 1 — By 09/28/2025  
-- Finalize system requirements and user stories  
-- Finalize tech stack  
-- Build basic UI mockups and initial backend structure  
-- Schedule and present initial prototype
+📅 **Milestone 1 — Assessment & Planning** — 14 Sep – 04 Oct 2026 (review 28 Sep)
+- Application architecture review, technical assessment report
+- Requirements validation, critical workflow identification, Requirements Traceability Matrix
+- Development environment validation, containerization assessment
+- CI/CD architecture design, automated testing strategy
 
-📅 Milestone 2 — By 10/26/2025  
-- Implement secure login and student roster upload  
-- Begin email automation and evaluation form generation  
-- Enable data collection and report generation  
-- Begin testing with sample data  
-- Schedule milestone meeting and present working demo
+📅 **Milestone 2 — Quality Automation** — 05 Oct – 01 Nov 2026 (review 26 Oct)
+- Development environment finalized, containerization completed
+- Unit, integration, functional regression, and end-to-end tests implemented
+- Continuous Integration pipeline operational with automated quality gates
 
-📅 Milestone 3 — By 11/30/2025  
-- Finalize UI and polish user experience  
-- Complete email automation and form generation  
-- Complete documentation  
-- Implement optional AI features (summarization, red flag detection)  
-- Present final system and submit all deliverables
+📅 **Milestone 3 — Productionization** — 02 Nov – 06 Dec 2026 (review 30 Nov, final 06 Dec)
+- Continuous Delivery pipeline, automated staging deployment, smoke testing
+- Automated test/build reporting, finalized technical documentation
+- Final system demonstration and repository delivery
+
+Full per-person, per-week breakdown (sponsor-approved):
+
+![Project Gantt chart](docs/gantt/gantt-chart.png)
 
 ---
-
 
 ## Getting Started (For New Users)
 
 ### Prerequisites
 
-1. **Install [Node.js and npm](https://nodejs.org/)**
-  - Download and install the LTS version for your operating system.
-  - npm is included with Node.js.
-
-2. **Install [Git](https://git-scm.com/)** (optional, for cloning the repo)
-  - Or download the ZIP from GitHub and extract it.
-
-3. **Install [VS Code](https://code.visualstudio.com/)** (already installed)
-
----
+1. **Install [Node.js and npm](https://nodejs.org/)** — LTS version; npm is included.
+2. **Install [Git](https://git-scm.com/)**
+3. A code editor, e.g. [VS Code](https://code.visualstudio.com/)
 
 ### Setup Steps
 
-1. **Clone or Download the Repository**
-  - Using Git: `git clone <repo-url>`
-  - Or download ZIP and extract.
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/dgobin-ksu/ProjectPeerEvaluation.git
+   ```
+2. **Install dependencies** (installs both frontend and backend)
+   ```bash
+   npm run setup
+   ```
+3. **Configure environment variables** — copy `src/backend/.env.example` to `src/backend/.env`
+   and fill in `MONGODB_URI` and SMTP settings.
+4. **Start the application**
+   ```bash
+   npm run dev
+   ```
+5. **Access the app**
+   - Frontend: [http://localhost:3000](http://localhost:3000)
+   - Backend API: [http://localhost:5000](http://localhost:5000)
 
-2. **Open the Project Folder in VS Code**
+### Available Scripts
 
-3. **Install Dependencies**
-  - Open a terminal in VS Code (Ctrl+`)
-  - Run:
-    ```bash
-    npm run setup
-    ```
-  - This will install all required packages for both frontend and backend.
+- `npm run dev` — start both frontend and backend servers simultaneously
+- `npm run setup` — install dependencies for both frontend and backend
+- `npm run start:backend` / `npm run start:frontend` — start one side only
+- `npm test` — frontend unit tests (Jest + React Testing Library)
 
-4. **Start the Application**
-  - To start both frontend and backend together:
-    ```bash
-    npm run dev
-    ```
-  - Or use the provided scripts:
-    - Windows Batch: `./start.bat`
-    - PowerShell: `./start.ps1`
-
-5. **Access the App in Your Browser**
-  - Frontend: [http://localhost:3000](http://localhost:3000)
-  - Backend API: [http://localhost:5000](http://localhost:5000)
-
----
+Not yet on `main` as of this writing — merging soon from open PRs:
+- `npm run test:e2e` — end-to-end tests (Playwright)
+- `npm run test:backend` — backend unit tests
 
 ### Troubleshooting
 
-- If you see errors about missing dependencies, re-run `npm run setup`.
-- If ports 3000 or 5000 are in use, close other apps or change the port in the config.
-- For Windows, you may need to allow scripts to run (see PowerShell execution policy).
-- If you have issues with email sending, check your `.env` file for SMTP settings.
-
----
-
-### Available Scripts
-- `npm run dev` - Start both frontend and backend servers simultaneously
-- `npm run setup` - Install dependencies for both frontend and backend
-- `npm run start:backend` - Start only the backend server
-- `npm run start:frontend` - Start only the frontend server (default React scripts)
-
----
-
----
-
-## Final Deliverables
-
-- Updated research report including finalized tech stack and meeting notes
-- Fully functional, multi-user system for:
-  - Secure roster management
-  - Triggering peer evaluations
-  - Receiving structured feedback reports
-- Integrated email system sending personalized forms based on team membership
-- Downloadable reports:
-  - Raw numeric and textual feedback
-  - Calculated scores based on preset formulas
-  - Optional AI-generated summaries and red-flag alerts
-- Complete, documented source code hosted on GitHub
-- Documentation:
-  - System architecture and design documents
-  - User manual for professors
-  - IT Capstone Project Plan
-
----
-
-## Collaboration & Communication
-
-- Channels: Microsoft Teams chat and KSU email  
-- Expected response time: within 24 hours  
-- Team meetings: Every Monday (weekly) to discuss blockers and priorities  
-- Meeting notes: Posted to the team site by the Team Leader  
-- Weekly reports: Submitted every Friday to the Team Leader; compiled and shared back for approval, then submitted to D2L  
-- File sharing: GitHub and email
+- Missing dependencies: re-run `npm run setup`.
+- Ports 3000/5000 in use: close conflicting apps or change the port in config.
+- Email sending issues: check `src/backend/.env` SMTP settings.
 
 ---
 
 ## Team
 
-| Role                | Name            | Responsibilities                                                       
-|---------------------|-----------------|------------------------------------------------------------------------
-| Project Owner       | Geetika Vyas    | Project owner and stakeholder                                         
-| Team Leader         | Preston Jordan  | Documentation, repository creation, project coordination               
-| Team Member         | Linh La         | Back-end development                                                   
-| Team Member         | Sameer Khan     | Front-end development, Google Site creation, repository creation       
-| Team Member         | Nnedi Okafor    | Front-end development                                                   
-| Team Member         | Deangela Saad   | Back-end development                                                  
-| Advisor/Instructor  | Jack Zheng      | Facilitate progress; advise on planning and project management         
+| Role | Name | Responsibilities | Contact |
+|---|---|---|---|
+| Sponsor | Dr. Geetika Vyas | Repository access, functional guidance, requirements validation, milestone reviews | gvyas@kennesaw.edu |
+| M1 | Donald Gobin | CI/CD architecture & design, branch governance, CI pipeline, CD pipeline oversight, release procedures, final repository delivery | dgobin@students.kennesaw.edu |
+| M2 | Aaron Simpson | Dev environment finalization, Docker/Docker Compose containerization, CD pipeline (artifact/image builds, staging deploy), build/deployment reporting | asimps57@students.kennesaw.edu |
+| M3 | Laeticia Neno Aloyem | Requirements validation & Requirements Traceability Matrix, security scanning (Dependabot, OWASP Dependency Check), technical assessment / testing-strategy / architecture documentation | laloyem@students.kennesaw.edu |
+| Team Leader / M4 | Khoa Ho | Frontend unit & integration tests, end-to-end student workflow (Playwright), automated test reporting | kho6@students.kennesaw.edu |
+| M5 | Kylee Gipson | Backend unit & integration tests, functional regression tests, end-to-end instructor workflow, post-deploy smoke tests | kgipson5@students.kennesaw.edu |
+| Advisor / Instructor | Ying Xie | Facilitate progress; advise on planning and project management | yxie2@kennesaw.view.usg.edu |
 
-Primary contact for inquiries: Team Leader (Preston Jordan)
+Primary contact for inquiries: Team Leader (Khoa Ho).
 
 ---
 
-## Repository Structure (proposed)
+## Collaboration & Communication
 
-- docs/
-  - requirements/
-  - architecture/
-  - user-manual/
-  - research-report/
-- designs/
-  - ui-mockups/
-  - wireframes/
-- meeting-notes/
-- reports/
-  - samples/
-- gantt/
-  - project-schedule.gantt
-- src/ (added as development begins)
-  - backend/
-  - frontend/
-- scripts/
-- .github/
-  - issue_templates/
-  - pull_request_template.md
-- LICENSE
-- CONTRIBUTING.md
+- Channel: Microsoft Teams
+- Weekly async check-ins track task-by-task progress against the project Gantt chart
+- Blockers raised at milestone review meetings with the sponsor and advisor
 
-Note: Actual structure may evolve with the project.
+---
+
+## Repository Structure
+
+```
+src/
+  frontend/       # React 19 (Create React App)
+  backend/        # Express + MongoDB (Mongoose); own package.json
+e2e/              # Playwright end-to-end tests
+docs/
+  requirements/
+  architecture/
+  testing-strategy/
+  technical-assessment/
+  meeting-notes/
+  research-report/
+  user-manual/
+  gantt/
+docker-compose.yml  # currently non-functional — see docs/technical-assessment; being
+                     # rebuilt as part of Milestone 2 containerization work
+```
 
 ---
 
 ## Tech Stack
 
-To be finalized by Milestone 1 (09/28/2025).  
-Documentation will specify:
-- Front-end framework (TBD)
-- Back-end framework (TBD)
-- Database (TBD)
-- Email service provider / SMTP (TBD)
-- Authentication (TBD)
-- Optional AI/NLP services or libraries (TBD)
-- Deployment target (TBD)
+- **Frontend**: React 19, Create React App, MUI, React Router, Formik/Yup, Chart.js/Recharts
+- **Backend**: Node.js, Express, MongoDB via Mongoose, JWT auth, Nodemailer
+- **Testing**: Jest + React Testing Library (frontend unit), Jest (backend unit — in progress),
+  Playwright (end-to-end)
+- **CI/CD**: GitHub Actions, deploying to Render.com
+- **Containerization**: Docker / Docker Compose (in progress — see Milestone 2)
 
 ---
-
-## High-Level Workflow
-
-1. Professor creates course and uploads roster (with emails) and team assignments.  
-2. System generates personalized evaluation links.  
-3. Email service sends invitations/reminders to students.  
-4. Students evaluate teammates via web forms.  
-5. System aggregates responses and computes scores.  
-6. Professor downloads or views reports (numeric + textual).  
-7. Optional: AI summaries and flagged red flags for review.
-
----
-
-## Lower-Level Tasks 
-
-- Professor logs into the system and creates a new course. 
-   - Professor can update course information 
-   - Professor can delete course information 
-- Professor uploads student roster csv files that include students' names and emails.  
-   - Professor can add students to courses manually 
-   - Professor can edit student information 
-   - Professor can delete student information
-- Professor creates teams
-   - Professor can add students to teams
-   - Professor can delete students from teams
-   - Professor can edit teams’ information
-   - Professor can delete teams’ information
-- Professor selects course and sends evaluation rubric 
-- Evaluation Link Generation 
-  - System automatically generates unique, secure evaluation links for each student. 
-  - Links are personalized based on team membership. 
-- Email Distribution 
-  - Integrated email service sends:  
-  - Initial invitations with evaluation links. 
-  - Automated reminders to non-respondents. 
-  - Emails are personalized and tracked for delivery status. 
--  Peer Evaluation Submission 
-  - Students access web-based forms via their unique links. 
-  - Forms include structured questions for teammate evaluation based on the rubric. 
-  - Submissions are encrypted and stored securely. 
-- Feedback Aggregation and Scoring 
-  - System aggregates and evaluates feedback. 
-  - System calculates grades using preset formulas. 
-- Optional AI Analysis 
-  - AI module generates:  
-  - Summarized feedback per student/team. 
-  - Alerts for potential red flags (e.g., low scores, concerning comments). 
-- Report Access for Professors 
-  - Professor can:  
-  - View reports online or download them. 
-  - Choose between raw data, calculated scores, and AI summaries. 
-  - Filter by team, student, or evaluation round. 
-  - AI module tested and optional for use 
 
 ## Security & Privacy
 
-- Store student data securely; restrict access to authorized users only.  
-- Use HTTPS for all traffic; protect credentials and tokens.  
-- Avoid sending sensitive data in plain text emails.  
-- Comply with institutional policies and applicable regulations (e.g., FERPA).  
-- Document data retention and deletion policies.
-
----
-
-## Risks, Assumptions, and Planning
-
-- No major delays currently foreseen.  
-- Capacity planned with two front-end and two back-end developers to cover downtime.  
-- Client (professor) availability expected to be consistent.  
-- AI features are optional and contingent on time after core functionality is complete.  
-- Email deliverability and spam filtering may require configuration and testing.
+- Restrict access to student data to authorized users only
+- HTTPS for all traffic; protect credentials and tokens
+- Avoid sending sensitive data in plain text emails
+- Comply with institutional policies and applicable regulations (e.g., FERPA)
 
 ---
 
 ## Contributing
 
-- Use feature branches and open pull requests for review.  
-- Link issues to PRs and keep commit messages descriptive.  
-- Follow coding standards defined in CONTRIBUTING.md (to be added).  
-- Document changes in PR descriptions and update relevant docs.
-
----
-
-
-## Acknowledgments
-
-- Advisor/Instructor: Dr. Jack Zheng (guidance on planning and management)
+- Use feature branches and open pull requests for review
+- Reference the relevant Milestone/task in PR descriptions
+- Keep commit messages descriptive
 
 ---
 
