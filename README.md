@@ -72,7 +72,9 @@ Full per-person, per-week breakdown (sponsor-approved):
 
 ### Prerequisites
 
-1. **Install [Node.js and npm](https://nodejs.org/)** — LTS version; npm is included.
+1. **Install [Node.js and npm](https://nodejs.org/)** — Node 24 (npm 11 is included). The required
+   version is pinned in `.nvmrc`; with [nvm](https://github.com/nvm-sh/nvm) run `nvm use`. Other
+   Node/npm versions can generate a different `package-lock.json`, which then fails `npm ci` in CI.
 2. **Install [Git](https://git-scm.com/)**
 3. A code editor, e.g. [VS Code](https://code.visualstudio.com/)
 
@@ -102,14 +104,31 @@ Full per-person, per-week breakdown (sponsor-approved):
 - `npm run setup` — install dependencies for both frontend and backend
 - `npm run start:backend` / `npm run start:frontend` — start one side only
 - `npm test` — frontend unit tests (Jest + React Testing Library)
-
-Not yet on `main` as of this writing — merging soon from open PRs:
 - `npm run test:e2e` — end-to-end tests (Playwright)
+
+Not yet on `main` as of this writing:
 - `npm run test:backend` — backend unit tests
+
+### Continuous Integration
+
+GitHub Actions (`.github/workflows/ci.yml`) runs on every pull request to `main`: frontend tests and
+build, a backend syntax check, and the Playwright smoke test. To reproduce it locally, use Node 24
+(see `.nvmrc`) and run:
+
+```bash
+npm ci
+npm test -- --watchAll=false
+npm run build
+npm run test:e2e
+```
+
+Commit `package.json` and `package-lock.json` together. `npm ci` fails if they are out of sync.
 
 ### Troubleshooting
 
 - Missing dependencies: re-run `npm run setup`.
+- `npm ci` says the lock file is out of sync: check `node -v` (should be 24) and `npm -v`, then
+  reinstall with `npm install` on the pinned Node version and commit both files.
 - Ports 3000/5000 in use: close conflicting apps or change the port in config.
 - Email sending issues: check `src/backend/.env` SMTP settings.
 

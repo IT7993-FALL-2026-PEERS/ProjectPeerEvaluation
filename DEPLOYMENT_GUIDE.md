@@ -56,7 +56,7 @@ FRONTEND_URL=http://localhost:3000
 
 ### Create Dockerfile for backend:
 ```dockerfile
-FROM node:18
+FROM node:24
 WORKDIR /app
 COPY src/backend/package*.json ./
 RUN npm install
