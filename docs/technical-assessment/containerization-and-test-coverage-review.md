@@ -48,8 +48,8 @@ As of the point this review started, `main` had:
 
 **Current state (this report):** [PR #1](../../pull/1) adds a first batch of frontend unit tests
 (`AuthContext`, the `login` service, `ProtectedRoute` — 7 tests) as early groundwork for my
-Milestone 2 deliverable. It is not yet merged to `main`; this review describes the baseline it
-was measured against.
+Milestone 2 deliverable. It has since been merged to `main` (2026-09-19); this review describes
+the baseline it was measured against.
 
 ## 3. Implication for planning
 
