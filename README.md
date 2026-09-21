@@ -95,11 +95,12 @@ flowchart TB
     DREPORT --> APPROVE{{"Manual approval<br/>required for production"}}
     APPROVE --> PROD(["Production<br/>Render.com"])
 
-    classDef done fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef partial fill:#ecfccb,stroke:#65a30d,color:#365314,stroke-dasharray: 5 4
-    classDef planned fill:#f1f5f9,stroke:#64748b,color:#334155,stroke-dasharray: 5 4
-    classDef gate fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef endpoint fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef done fill:#dcfce7,stroke:#15803d,color:#14532d,stroke-width:3px
+    classDef partial fill:#ecfccb,stroke:#4d7c0f,color:#365314,stroke-width:3px,stroke-dasharray: 9 6
+    classDef planned fill:#f1f5f9,stroke:#475569,color:#334155,stroke-width:3px,stroke-dasharray: 9 6
+    classDef gate fill:#fef3c7,stroke:#d97706,color:#78350f,stroke-width:3px
+    classDef endpoint fill:#dbeafe,stroke:#2563eb,color:#1e3a8a,stroke-width:3px
+    linkStyle default stroke-width:2px
 
     class BUILD_APP done
     class UNIT,E2E partial
