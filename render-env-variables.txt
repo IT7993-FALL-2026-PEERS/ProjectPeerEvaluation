@@ -5,6 +5,12 @@
 ### Database
 MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/peer-eval
 
+### Authentication and environment (both required)
+# JWT_SECRET signs login tokens: a long random string, at least 32 characters.
+# NODE_ENV must be "production" on Render. The app only enforces JWT_SECRET when it is.
+JWT_SECRET=a-long-random-string
+NODE_ENV=production
+
 ### Email Configuration (Gmail example)
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
@@ -16,5 +22,4 @@ SMTP_FROM=your-email@gmail.com
 FRONTEND_URL=https://your-frontend-url.onrender.com
 
 ### Optional
-NODE_ENV=production
 PORT=5000

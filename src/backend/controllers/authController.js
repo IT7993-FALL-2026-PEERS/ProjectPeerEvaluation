@@ -3,7 +3,9 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'dev_secret_key';
+const { getConfig } = require('../config/env');
+
+const JWT_SECRET = getConfig().jwtSecret;
 const JWT_EXPIRES_IN = '1h';
 
 exports.login = async (req, res, next) => {

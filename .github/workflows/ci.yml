@@ -76,6 +76,9 @@ jobs:
       - name: Syntax check
         run: find . -name node_modules -prune -o -name '*.js' -print0 | xargs -0 -n1 node --check
 
+      - name: Config check tests
+        run: npm run test:env
+
   e2e-smoke:
     name: E2E smoke (Playwright)
     runs-on: ubuntu-latest
