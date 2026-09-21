@@ -2,7 +2,7 @@
 
 Productionization, Automated Testing, and CI/CD for the PEERS Peer Evaluation System
 
-Date: 09/18/2026
+Date: 09/20/2026
 Status: In Progress — Milestone 1 (Assessment & Planning)
 
 A web-based platform for professors to manage peer evaluations in team-based courses: create and
@@ -38,9 +38,9 @@ stack, a commercial production hosting environment, or migrating databases.
 
 **Render.com only** — this is the sponsor's explicit choice; other platforms (Vercel, Railway,
 etc.) are not used for this project even though `DEPLOYMENT_GUIDE.md` documents them as
-historical alternatives. Deployment is automated via the CI/CD pipeline in
-`.github/workflows/` once merged to `main`; there is no separate staging environment beyond
-what the pipeline provisions.
+historical alternatives. Continuous Integration already runs on every pull request (see
+[CI/CD Pipeline](#cicd-pipeline)). Automated staging deployment is planned for Milestone 3, and
+production deployment always stays a manual sponsor approval.
 
 ---
 
@@ -114,6 +114,7 @@ dashed grey = planned · amber = gate (the quality gate is enforced today; produ
 | Stage | What it does | Owner | Status and target (per the Gantt chart) |
 |---|---|---|---|
 | Install dependencies and build | `npm ci` and the production build | M1 / M4 | Live (`.github/workflows/ci.yml`) |
+| Workflow lint | `actionlint` checks the workflow files themselves | M1 / M4 | Live |
 | Unit tests | Jest and React Testing Library for the frontend; Jest for the backend | M4 / M5 | Frontend live. Backend planned, weeks of 5–12 Oct |
 | Integration tests | Frontend, backend, database, authentication, and email, against a real MongoDB | M4 / M5 | Planned, weeks of 12–19 Oct |
 | Functional regression tests | One automated test per critical business workflow | M5 | Planned, week of 19 Oct |
@@ -170,7 +171,7 @@ Full per-person, per-week breakdown (sponsor-approved):
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/dgobin-ksu/ProjectPeerEvaluation.git
+   git clone https://github.com/IT7993-FALL-2026-PEERS/ProjectPeerEvaluation.git
    ```
 2. **Install dependencies** (installs both frontend and backend)
    ```bash
@@ -199,8 +200,10 @@ Not yet on `main` as of this writing:
 
 ### Continuous Integration
 
-GitHub Actions (`.github/workflows/ci.yml`) runs on every pull request to `main`: frontend tests and
-build, a backend syntax check, and the Playwright smoke test. To reproduce it locally, use Node 24
+GitHub Actions (`.github/workflows/ci.yml`) runs on every pull request to `main` and on every push
+to `main`. It has four jobs: frontend tests and build, a backend syntax check, the Playwright smoke
+test, and a lint of the workflow files (`actionlint`). The `main` branch ruleset requires a pull
+request and all four checks to pass before merging. To reproduce the checks locally, use Node 24
 (see `.nvmrc`) and run:
 
 ```bash
@@ -211,6 +214,10 @@ npm run test:e2e
 ```
 
 Commit `package.json` and `package-lock.json` together. `npm ci` fails if they are out of sync.
+
+If a pull request shows "Expected — Waiting for status to be reported" on a check, its branch is
+behind `main` and does not have the latest workflow. Update the branch (the **Update branch**
+button on the pull request, or `gh pr update-branch <number>`) and the check will run.
 
 ### Troubleshooting
 
@@ -258,19 +265,23 @@ Primary contact for inquiries: Team Leader (Khoa Ho).
 ## Repository Structure
 
 ```
+.github/workflows/  # CI workflow (ci.yml)
+.nvmrc              # pinned Node version (24)
 src/
   frontend/       # React 19 (Create React App)
   backend/        # Express + MongoDB (Mongoose); own package.json
 e2e/              # Playwright end-to-end tests
 docs/
   requirements/
-  architecture/
-  testing-strategy/
-  technical-assessment/
+  architecture/          # system and database documentation
+  testing-strategy/      # frontend testing strategy
+  technical-assessment/  # Milestone 1 reviews (containerization and test coverage, and more)
   meeting-notes/
   research-report/
   user-manual/
-  gantt/
+  gantt/                 # sponsor-approved schedule
+  deployment-review.md   # current deployment flow and the gap to automated staging
+DEPLOYMENT_GUIDE.md      # historical deployment notes (Render.com is the one in use)
 docker-compose.yml  # currently non-functional — see docs/technical-assessment; being
                      # rebuilt as part of Milestone 2 containerization work
 ```
@@ -281,10 +292,11 @@ docker-compose.yml  # currently non-functional — see docs/technical-assessment
 
 - **Frontend**: React 19, Create React App, MUI, React Router, Formik/Yup, Chart.js/Recharts
 - **Backend**: Node.js, Express, MongoDB via Mongoose, JWT auth, Nodemailer
-- **Testing**: Jest + React Testing Library (frontend unit), Jest (backend unit — in progress),
-  Playwright (end-to-end)
-- **CI/CD**: GitHub Actions, deploying to Render.com
-- **Containerization**: Docker / Docker Compose (in progress — see Milestone 2)
+- **Testing**: Jest + React Testing Library (frontend unit), Playwright (end-to-end); backend unit
+  tests are planned (Milestone 2)
+- **CI/CD**: GitHub Actions (CI is live), deploying to Render.com (CD is planned, Milestone 3)
+- **Containerization**: Docker / Docker Compose (planned, see Milestone 2; the current
+  `docker-compose.yml` does not work)
 
 ---
 
@@ -299,9 +311,13 @@ docker-compose.yml  # currently non-functional — see docs/technical-assessment
 
 ## Contributing
 
-- Use feature branches and open pull requests for review
+- Never push directly to `main`. Use a feature branch and open a pull request into `main`
+- All four CI checks must pass before a pull request can be merged (see
+  [Continuous Integration](#continuous-integration))
 - Reference the relevant Milestone/task in PR descriptions
 - Keep commit messages descriptive
+- Keep secrets out of the repository. Never commit a real `.env` file
+- Merged branches are deleted automatically
 
 ---
 
