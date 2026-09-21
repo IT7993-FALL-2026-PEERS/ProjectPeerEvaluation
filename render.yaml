@@ -1,4 +1,5 @@
-# Render.com Blueprint for the backend API. Render reads this file when you
+# Render.com Blueprint for the backend API (Docker web service) and the
+# frontend (static site). Render reads this file when you
 # create a Blueprint-based service (Dashboard -> New -> Blueprint) or sync
 # an existing Blueprint instance; it does nothing on its own otherwise.
 #
@@ -50,4 +51,31 @@ services:
       - key: SMTP_FROM
         sync: false
       - key: FRONTEND_URL
+        sync: false
+
+  # React frontend, built with react-scripts from the repo root (package.json
+  # and public/ live at the root; source is under src/, not src/frontend/) and
+  # served as static files. The SPA rewrite makes client-side routes like
+  # /evaluate/<token> load index.html instead of 404ing on refresh/deep links.
+  #
+  # Auto-deploy is left on here: unlike the backend, no CI deploy hook is
+  # wired up for the frontend.
+  - type: web
+    name: peer-evaluation-frontend
+    runtime: static
+    buildCommand: npm install && npm run build
+    staticPublishPath: ./build
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      # REACT_APP_* values are baked in at build time (see src/frontend/
+      # config.js). Set REACT_APP_API_URL to the deployed backend's URL plus
+      # /api, e.g. https://peer-evaluation-backend-rd6z.onrender.com/api --
+      # Render prompts for it during Blueprint setup. Changing it later
+      # requires re-deploying the static site.
+      - key: REACT_APP_API_URL
+        sync: false
+      - key: REACT_APP_FRONTEND_URL
         sync: false

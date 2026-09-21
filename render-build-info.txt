@@ -9,7 +9,7 @@
 #   Start:  cd src/backend && node index.js
 
 # Frontend build command
-cd src/frontend && npm install && npm run build
+npm install && npm run build
 
 # Frontend publish directory
-src/frontend/build
+build

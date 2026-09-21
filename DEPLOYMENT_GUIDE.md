@@ -28,9 +28,17 @@ Or configure it manually without the Blueprint:
    - `FRONTEND_URL`: Your frontend URL (after frontend deployment)
 
 ### Frontend Deployment:
-1. Create another "Static Site" on Render
-2. Set build command: `cd src/frontend && npm install && npm run build`
-3. Set publish directory: `src/frontend/build`
+The frontend is also defined in `render.yaml` as a `runtime: static` site
+(`peer-evaluation-frontend`), so the Blueprint above creates it too. To
+configure it manually instead, create a "Static Site" on Render with:
+1. Build command: `npm install && npm run build` (run from the repo root --
+   `package.json` lives there; there is no `src/frontend/package.json`)
+2. Publish directory: `build`
+3. Rewrite rule: `/*` -> `/index.html` (so client-side routes work)
+4. Environment variable `REACT_APP_API_URL`: the backend's URL plus `/api`,
+   e.g. `https://peer-evaluation-backend-rd6z.onrender.com/api`. It is baked
+   in at build time, so re-deploy the site after changing it.
+5. Then set the backend's `FRONTEND_URL` to the static site's URL.
 
 ## Option 2: Vercel + Railway
 
