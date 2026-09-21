@@ -109,8 +109,26 @@ flowchart TB
     class DEV,PROD,PR,MERGE,FIX endpoint
 ```
 
-**Legend:** solid green = running today · dashed light green = partly running (see the table) ·
-dashed grey = planned · amber = gate (the quality gate is enforced today; production approval is manual) · blue = start, end, and pull request steps.
+**Legend**
+
+```mermaid
+flowchart LR
+    L1["Running today"] ~~~ L2["Partly running<br/>(see the table)"] ~~~ L3["Planned"] ~~~ L4["Gate"] ~~~ L5["Start, end, or<br/>pull request step"]
+
+    classDef done fill:#dcfce7,stroke:#15803d,color:#14532d,stroke-width:3px
+    classDef partial fill:#ecfccb,stroke:#4d7c0f,color:#365314,stroke-width:3px,stroke-dasharray: 9 6
+    classDef planned fill:#f1f5f9,stroke:#475569,color:#334155,stroke-width:3px,stroke-dasharray: 9 6
+    classDef gate fill:#fef3c7,stroke:#d97706,color:#78350f,stroke-width:3px
+    classDef endpoint fill:#dbeafe,stroke:#2563eb,color:#1e3a8a,stroke-width:3px
+
+    class L1 done
+    class L2 partial
+    class L3 planned
+    class L4 gate
+    class L5 endpoint
+```
+
+The quality gate is enforced today. Production approval is manual.
 
 | Stage | What it does | Owner | Status and target (per the Gantt chart) |
 |---|---|---|---|
