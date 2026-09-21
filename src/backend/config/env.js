@@ -1,14 +1,13 @@
-// Reads and checks the settings the backend needs, once, at startup.
+// Checks the login-token secret once, at startup.
 //
-// In production (NODE_ENV=production) a missing or weak setting stops the app
-// with a clear message. In development it falls back to safe local defaults and
-// prints a warning, so `npm run dev` keeps working without extra setup.
+// With NODE_ENV=production a missing or short JWT_SECRET stops the app with a
+// clear message. Anywhere else it falls back to a development default and warns,
+// so `npm run dev` keeps working without extra setup.
 
 const DEV_JWT_SECRET = 'dev_secret_key';
-const DEFAULT_MONGO_URI = 'mongodb://localhost:27017/peer-evaluation';
 const MIN_PROD_SECRET_LENGTH = 32;
 
-// Pure function: takes an env object and returns the settings plus any problems.
+// Pure function: takes an env object and returns the secret plus any problems.
 function loadConfig(env = process.env) {
   const isProduction = env.NODE_ENV === 'production';
   const errors = [];
@@ -26,12 +25,7 @@ function loadConfig(env = process.env) {
     errors.push(`JWT_SECRET is too short. Use at least ${MIN_PROD_SECRET_LENGTH} characters in production.`);
   }
 
-  const mongoUri = env.MONGODB_URI || env.MONGO_URI;
-  if (!mongoUri && isProduction) {
-    errors.push('MONGODB_URI is not set. It is required in production.');
-  }
-
-  return { isProduction, jwtSecret, mongoUri: mongoUri || DEFAULT_MONGO_URI, errors, warnings };
+  return { isProduction, jwtSecret, errors, warnings };
 }
 
 let cached;
