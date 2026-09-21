@@ -16,6 +16,10 @@
 - [ ] No secrets or real `.env` values are committed
 - [ ] Docs updated if setup, behavior, or the pipeline changed
 
+## Can this be undone?
+
+<!-- Two-way door: easy to revert. One-way door: deploys, data, secrets, history. If one-way, say what could go wrong. See docs/team-guide.md. -->
+
 ## Notes for reviewers
 
 <!-- Anything reviewers should look at first, decisions you want input on, or follow-up work. -->
