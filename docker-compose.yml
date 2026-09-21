@@ -1,17 +1,18 @@
-# Local dev stack for the backend API: a MongoDB container plus the backend
-# built from its own Dockerfile (src/backend/Dockerfile). This is one of two
-# ways to run everything locally -- the other is scripts/run-local.sh, which
-# runs mongo the same way but runs the backend directly with `node` (faster
-# iteration, no image rebuild needed) after running unit + integration tests
-# against it. Use this file when you specifically want the backend running
-# in its production Docker image, e.g. to reproduce a Render deploy locally.
+# Local stack: MongoDB, the backend API and the frontend, each as a container
+# built from its own Dockerfile (src/backend/Dockerfile and
+# Dockerfile.frontend). `docker compose up --build` starts all three:
+#   frontend  http://localhost:3000
+#   backend   http://localhost:5000  (health: /api/health)
+#   mongo     localhost:27017
+# This is one of two ways to run things locally -- the other is
+# scripts/run-local.sh, which runs mongo the same way but runs the backend
+# directly with `node` (faster iteration, no image rebuild needed) after
+# running unit + integration tests against it. Use this file when you want
+# both apps in their production-style images, e.g. to reproduce a Render
+# deploy locally.
 #
-# The frontend has no Dockerfile yet and runs separately via `npm start` in
-# src/frontend against this backend (see docs/architecture and the frontend
-# package.json).
-#
-# `docker compose up -d mongo` alone (without the backend service) is also
-# how scripts/run-local.sh and the "Running the integration suite locally"
+# `docker compose up -d mongo` alone (without the app services) is also how
+# scripts/run-local.sh and the "Running the integration suite locally"
 # section of scripts/ci-pipeline-tests/README.md start a MongoDB for
 # tests/integration/local-api.test.js.
 services:
@@ -39,6 +40,25 @@ services:
       FRONTEND_URL: http://localhost:3000
     depends_on:
       - mongo
+
+  frontend:
+    build:
+      # Repo root, not src/frontend: package.json and public/ live there.
+      context: .
+      dockerfile: Dockerfile.frontend
+      # Baked into the JS bundle at build time (see src/frontend/config.js).
+      # The browser calls the backend directly, so this is the backend's
+      # host-published address, not the `backend` service name. Changing
+      # either requires `docker compose build frontend`.
+      args:
+        REACT_APP_API_URL: http://localhost:5000/api
+        REACT_APP_FRONTEND_URL: http://localhost:3000
+    ports:
+      # nginx listens on 80 inside the container; 3000 on the host matches
+      # the origin the backend's CORS config and FRONTEND_URL expect.
+      - "3000:80"
+    depends_on:
+      - backend
 
 volumes:
   mongo_data:

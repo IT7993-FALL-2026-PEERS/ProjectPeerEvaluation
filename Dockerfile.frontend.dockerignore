@@ -1,0 +1,10 @@
+# Used automatically by BuildKit for Dockerfile.frontend only (the backend
+# has its own .dockerignore in src/backend, which is a separate build context).
+node_modules
+build
+coverage
+.git
+.github
+docs
+scripts
+src/backend
