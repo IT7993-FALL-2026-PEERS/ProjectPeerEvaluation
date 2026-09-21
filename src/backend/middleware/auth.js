@@ -1,5 +1,6 @@
 // ...existing code from peer-evaluation-backend/middleware/auth.js
 const jwt = require('jsonwebtoken');
+const { getConfig } = require('../config/env');
 
 function authenticateToken(req, res, next) {
   const authHeader = req.headers['authorization'];
@@ -10,7 +11,7 @@ function authenticateToken(req, res, next) {
     err.status = 401;
     return next(err);
   }
-  jwt.verify(token, process.env.JWT_SECRET || 'dev_secret_key', (err, user) => {
+  jwt.verify(token, getConfig().jwtSecret, (err, user) => {
     if (err) {
       const error = new Error('Invalid or expired token.');
       error.code = 'UNAUTHORIZED';

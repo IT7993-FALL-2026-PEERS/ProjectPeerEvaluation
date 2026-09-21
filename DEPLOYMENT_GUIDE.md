@@ -10,6 +10,7 @@
 5. Set start command: `cd src/backend && node index.js`
 6. Add environment variables:
    - `MONGODB_URI`: Your MongoDB connection string
+   - `JWT_SECRET`: A long random string (at least 32 characters) used to sign login tokens
    - `SMTP_HOST`: Your email server (e.g., smtp.gmail.com)
    - `SMTP_PORT`: 587
    - `SMTP_USER`: Your email address

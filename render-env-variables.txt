@@ -5,6 +5,9 @@
 ### Database
 MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/peer-eval
 
+### Authentication (required in production, at least 32 characters)
+JWT_SECRET=a-long-random-string
+
 ### Email Configuration (Gmail example)
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
