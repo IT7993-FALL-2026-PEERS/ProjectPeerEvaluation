@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const { getHealth } = require('./config/health');
 
 const app = express();
 
@@ -44,13 +45,13 @@ app.get('/', (req, res) => {
   });
 });
 
-// Health check endpoint for API
+// Health check endpoint for API. Used by CD as the post-deploy readiness/smoke
+// check (Milestone 3), so it has to reflect real dependency state, not just
+// "the process is running" — it previously returned OK unconditionally even
+// with MongoDB down.
 app.get('/api/health', (req, res) => {
-  res.json({ 
-    status: 'OK',
-    message: 'Backend API is running',
-    timestamp: new Date().toISOString()
-  });
+  const health = getHealth(mongoose.connection);
+  res.status(health.status === 'OK' ? 200 : 503).json(health);
 });
 
 // Routes
