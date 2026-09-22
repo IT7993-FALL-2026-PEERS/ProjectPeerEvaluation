@@ -1,46 +1,54 @@
-# Manual production deploy: promotes the backend and/or frontend to
+# Production deploy: promotes the backend and/or frontend to
 # peer-evaluation-backend-production / peer-evaluation-frontend-production.
 #
-# Unlike backend-ci-cd.yml / frontend-ci-cd.yml (which deploy to STAGING
-# automatically on every push, gated on their own tests), this pipeline only
-# runs when a human deliberately triggers it, and lets them deploy the
-# backend and the frontend independently of each other -- e.g. promote a
-# backend fix to production without also re-deploying an unrelated frontend
-# change, or vice versa. It still runs the same unit + integration tests
-# first for whichever app is being promoted, as a safety gate -- "manual"
-# means a human decides *when* and *what* to promote, not that untested code
-# can reach production.
+# Fully automated, with one deliberate checkpoint: this workflow fires on
+# its own right after backend-ci-cd.yml / frontend-ci-cd.yml successfully
+# deploys that app to STAGING (via the workflow_run trigger below) -- no
+# script, no tag, no button. It runs that app's tests again, then pauses at
+# the deploy-backend / deploy-frontend job (each targets a GitHub
+# Environment -- production-backend / production-frontend -- configured
+# with a required reviewer) until a human clicks Approve on the run in the
+# Actions tab. That's the only manual step left; everything else is
+# automatic. Backend and frontend promote independently of each other,
+# same as before.
 #
-# Triggered by pushing a tag, not (only) workflow_dispatch's "Run workflow"
-# button: this repo intentionally keeps `main` and `with-test-coverage`
-# separate (main has its own, independently-evolving CI/test setup), and a
-# workflow that has NEVER run isn't known to GitHub at all -- it 404s from
-# the API and has no "Run workflow" button -- unless its file exists on the
-# repo's default branch (main here). A tag push has no such restriction:
-# GitHub runs whatever workflow files exist at the pushed ref, on any
-# branch, so this works today without putting anything from this branch
-# onto main. See scripts/deploy-to-production.sh, which tags and pushes for
-# you:
-#
+# Can still be triggered manually two other ways, kept as fallbacks (e.g.
+# to re-promote production without a new staging run):
 #   scripts/deploy-to-production.sh backend    # tags & pushes deploy-backend-production-<timestamp>
 #   scripts/deploy-to-production.sh frontend   # tags & pushes deploy-frontend-production-<timestamp>
 #   scripts/deploy-to-production.sh both       # both of the above
+# ...or the Actions tab's "Run workflow" button / `gh workflow run
+# deploy-production.yml --ref with-test-coverage`. All three trigger types
+# (tag push, workflow_dispatch, workflow_run) still land on the same
+# required-reviewer gate below -- automation changes *how* a deploy starts,
+# never whether a human approves it.
 #
-# Once this workflow has run at least once (i.e. after the first tag push),
-# GitHub knows about it and workflow_dispatch (the "Run workflow" button, or
-# `gh workflow run deploy-production.yml --ref with-test-coverage`) starts
-# working too, from this branch, without needing main -- confirmed by
-# testing the same thing on backend-ci-cd.yml. The tag push is only required
-# to bootstrap that; after that, either mechanism works.
+# Why workflow_run works here without touching main: this repo intentionally
+# keeps `main` and `with-test-coverage` separate (main has its own,
+# independently-evolving CI/test setup). A workflow that has NEVER run isn't
+# known to GitHub at all -- unless its file exists on the repo's default
+# branch (main here). But workflow_run and workflow_dispatch both need this
+# workflow to be a *registered* workflow (i.e. it needs to have run once,
+# via any trigger), not specifically to live on the default branch forever
+# -- confirmed by testing workflow_dispatch on backend-ci-cd.yml. This
+# workflow bootstrapped its registration via a tag push before workflow_run
+# was added; now that it's registered, workflow_run fires correctly from
+# with-test-coverage with no main involvement.
 #
 # Required repo secrets: RENDER_BACKEND_PRODUCTION_DEPLOY_HOOK_URL,
 # RENDER_FRONTEND_PRODUCTION_DEPLOY_HOOK_URL (Render dashboard -> each
 # *-production service -> Settings -> Deploy Hook). Both services' own
 # Auto-Deploy must stay OFF, for the same reason given in backend-ci-cd.yml
 # -- doubly so here, since Auto-Deploy would push every commit straight to
-# production with no test gate and no human trigger at all.
+# production with no test gate and no approval at all.
+#
+# Required environments (Settings -> Environments): production-backend,
+# production-frontend, each with a required reviewer. Created via the API
+# with dgobin-ksu as reviewer, prevent_self_review off (a solo-maintainer
+# project can't require a *different* approver from whoever pushed) and no
+# branch restriction (deploys happen from with-test-coverage, not main).
 
-name: Deploy to production (manual)
+name: Deploy to production
 
 on:
   push:
@@ -57,18 +65,27 @@ on:
         description: 'Deploy frontend to peer-evaluation-frontend-production'
         type: boolean
         default: true
+  workflow_run:
+    workflows: ['Backend CI/CD (staging)', 'Frontend CI/CD (staging)']
+    types: [completed]
 
 jobs:
   backend-unit-tests:
     if: >-
       (github.event_name == 'workflow_dispatch' && inputs.deploy_backend) ||
-      (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/deploy-backend-production-'))
+      (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/deploy-backend-production-')) ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.name == 'Backend CI/CD (staging)' && github.event.workflow_run.conclusion == 'success')
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: src/backend
     steps:
+      # workflow_run's default checkout would otherwise use the default
+      # branch's HEAD, not the commit backend-ci-cd.yml actually just tested
+      # and deployed to staging -- pin explicitly for every trigger type.
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
       - uses: actions/setup-node@v5
         with:
           node-version: '20'
@@ -93,6 +110,8 @@ jobs:
       MONGODB_URI: mongodb://127.0.0.1:27017/peer-evaluation-integration-test
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
       - uses: actions/setup-node@v5
         with:
           node-version: '20'
@@ -104,6 +123,11 @@ jobs:
   deploy-backend:
     needs: backend-integration-tests
     runs-on: ubuntu-latest
+    # Pauses here until dgobin-ksu clicks Approve on this run in the Actions
+    # tab (Settings -> Environments -> production-backend's required
+    # reviewer) -- the one manual step in an otherwise fully automatic
+    # pipeline.
+    environment: production-backend
     env:
       # Job-scoped, not workflow-wide: emailUtils.js reads process.env.
       # FRONTEND_URL directly, so setting it workflow-wide leaked it into
@@ -114,35 +138,37 @@ jobs:
       # Confirmed locally: `FRONTEND_URL=<anything> npm run test:unit` fails
       # that threshold; unset, it passes.
       BACKEND_URL: https://peer-evaluation-backend-production.onrender.com
+      DEPLOY_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
     steps:
       - name: Trigger Render production deploy
-        run: curl -fsS -X POST "${{ secrets.RENDER_BACKEND_PRODUCTION_DEPLOY_HOOK_URL }}&ref=${{ github.sha }}"
+        run: curl -fsS -X POST "${{ secrets.RENDER_BACKEND_PRODUCTION_DEPLOY_HOOK_URL }}&ref=${{ env.DEPLOY_SHA }}"
       - name: Wait for the new commit to go live
-        env:
-          EXPECTED_SHA: ${{ github.sha }}
         run: |
           for i in $(seq 1 40); do
             body="$(curl -fsS "$BACKEND_URL/api/health" || true)"
             live_commit="$(echo "$body" | grep -o '"commit":"[^"]*"' | cut -d'"' -f4)"
-            echo "Attempt $i: live commit is ${live_commit:-<none>}, waiting for $EXPECTED_SHA"
+            echo "Attempt $i: live commit is ${live_commit:-<none>}, waiting for $DEPLOY_SHA"
             case "$live_commit" in
-              "$EXPECTED_SHA"*) echo "New commit is live."; exit 0 ;;
+              "$DEPLOY_SHA"*) echo "New commit is live."; exit 0 ;;
             esac
             sleep 15
           done
-          echo "Timed out waiting for commit $EXPECTED_SHA to go live."
+          echo "Timed out waiting for commit $DEPLOY_SHA to go live."
           exit 1
 
   frontend-unit-tests:
     if: >-
       (github.event_name == 'workflow_dispatch' && inputs.deploy_frontend) ||
-      (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/deploy-frontend-production-'))
+      (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/deploy-frontend-production-')) ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.name == 'Frontend CI/CD (staging)' && github.event.workflow_run.conclusion == 'success')
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: src/frontend
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
       - uses: actions/setup-node@v5
         with:
           node-version: '20'
@@ -159,6 +185,8 @@ jobs:
         working-directory: src/frontend
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
       - uses: actions/setup-node@v5
         with:
           node-version: '20'
@@ -170,25 +198,27 @@ jobs:
   deploy-frontend:
     needs: frontend-integration-tests
     runs-on: ubuntu-latest
+    # Pauses here until dgobin-ksu clicks Approve -- see deploy-backend's
+    # environment comment above.
+    environment: production-frontend
     env:
       # Job-scoped, not workflow-wide -- see deploy-backend's BACKEND_URL
       # comment above for why (this is the var that actually caused it).
       FRONTEND_URL: https://peer-evaluation-frontend-production.onrender.com
+      DEPLOY_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
     steps:
       - name: Trigger Render production deploy
-        run: curl -fsS -X POST "${{ secrets.RENDER_FRONTEND_PRODUCTION_DEPLOY_HOOK_URL }}&ref=${{ github.sha }}"
+        run: curl -fsS -X POST "${{ secrets.RENDER_FRONTEND_PRODUCTION_DEPLOY_HOOK_URL }}&ref=${{ env.DEPLOY_SHA }}"
       # See frontend-ci-cd.yml for why this polls /version.txt.
       - name: Wait for the new commit to go live
-        env:
-          EXPECTED_SHA: ${{ github.sha }}
         run: |
           for i in $(seq 1 40); do
             live_commit="$(curl -fsS "$FRONTEND_URL/version.txt" || true)"
-            echo "Attempt $i: live commit is ${live_commit:-<none>}, waiting for $EXPECTED_SHA"
+            echo "Attempt $i: live commit is ${live_commit:-<none>}, waiting for $DEPLOY_SHA"
             case "$live_commit" in
-              "$EXPECTED_SHA"*) echo "New commit is live."; exit 0 ;;
+              "$DEPLOY_SHA"*) echo "New commit is live."; exit 0 ;;
             esac
             sleep 15
           done
-          echo "Timed out waiting for commit $EXPECTED_SHA to go live."
+          echo "Timed out waiting for commit $DEPLOY_SHA to go live."
           exit 1

@@ -1,8 +1,12 @@
 #!/usr/bin/env bash
-# Triggers .github/workflows/deploy-production.yml by pushing a tag -- see
-# that file's header for why a tag push, not the Actions "Run workflow"
-# button. Deploys whichever app(s) you name, only after that app's unit +
-# integration tests pass in CI; nothing reaches production untested.
+# Manual fallback for .github/workflows/deploy-production.yml -- normally
+# that workflow triggers itself, automatically, right after
+# backend-ci-cd.yml/frontend-ci-cd.yml deploys to staging, and only pauses
+# for a required-reviewer approval click before actually deploying. Use
+# this script instead when you want to (re-)promote to production without a
+# new staging run. Deploys whichever app(s) you name, only after that app's
+# unit + integration tests pass in CI, and still pauses for the same
+# approval click -- nothing reaches production untested or unapproved.
 #
 # Usage:
 #   scripts/deploy-to-production.sh backend

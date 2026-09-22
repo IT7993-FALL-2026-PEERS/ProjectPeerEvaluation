@@ -19,10 +19,13 @@
 #     frontend-ci-cd.yml respectively, on every push, gated on that app's
 #     own unit + integration tests.
 #   - peer-evaluation-backend-production / peer-evaluation-frontend-production:
-#     deployed only by a human running .github/workflows/deploy-production.yml
-#     (scripts/deploy-to-production.sh, which pushes the tag that triggers
-#     it -- see that workflow's header for why a tag push, not the Actions
-#     "Run workflow" button), which runs the same tests first.
+#     deployed by .github/workflows/deploy-production.yml, which triggers
+#     itself automatically right after the matching staging deploy
+#     succeeds, runs that app's tests again, then pauses for a
+#     required-reviewer approval click (GitHub Environments
+#     production-backend / production-frontend) before actually deploying --
+#     see that workflow's header for the full mechanism and its fallback
+#     manual triggers.
 services:
   - type: web
     name: peer-evaluation-backend-staging

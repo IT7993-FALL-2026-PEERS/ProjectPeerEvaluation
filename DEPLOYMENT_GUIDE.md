@@ -11,8 +11,8 @@ app -- see `render.yaml` for the full shape of each and
 |---|---|---|---|
 | `peer-evaluation-backend-staging` | Docker web service | https://peer-evaluation-backend-staging.onrender.com | `backend-ci-cd.yml`, automatically, on every push whose backend tests pass |
 | `peer-evaluation-frontend-staging` | Static site | https://peer-evaluation-frontend-staging.onrender.com | `frontend-ci-cd.yml`, automatically, on every push whose frontend tests pass |
-| `peer-evaluation-backend-production` | Docker web service | https://peer-evaluation-backend-production.onrender.com | `deploy-production.yml`, only when a human runs it |
-| `peer-evaluation-frontend-production` | Static site | https://peer-evaluation-frontend-production.onrender.com | `deploy-production.yml`, only when a human runs it |
+| `peer-evaluation-backend-production` | Docker web service | https://peer-evaluation-backend-production.onrender.com | `deploy-production.yml`, automatically, right after backend-staging deploys -- paused for approval |
+| `peer-evaluation-frontend-production` | Static site | https://peer-evaluation-frontend-production.onrender.com | `deploy-production.yml`, automatically, right after frontend-staging deploys -- paused for approval |
 
 In every case, Render's own git-push auto-deploy is OFF for all four
 services; a GitHub Actions job triggers the actual deploy via that service's
@@ -26,6 +26,23 @@ service's Deploy Hook URL as the matching GitHub Actions repo secret
 - `RENDER_FRONTEND_PRODUCTION_DEPLOY_HOOK_URL`
 
 (Render dashboard -> that service -> Settings -> Deploy Hook.)
+
+### CI/CD pipeline
+Push to `with-test-coverage` -> that app's unit + integration tests ->
+staging deploys automatically -> production's tests run automatically ->
+production deploy **pauses for one approval click**. Nothing to run by
+hand except that click.
+
+The pause is a GitHub Environment (Settings -> Environments ->
+`production-backend` / `production-frontend`, each with a required
+reviewer) that the `deploy-backend`/`deploy-frontend` jobs in
+`deploy-production.yml` target. When one of those jobs is reached, the
+workflow run shows "Waiting" in the Actions tab until the reviewer approves
+it there. See that workflow's header comment for exactly how the
+staging-success trigger and the approval gate fit together, and for two
+fallback ways to trigger a production deploy without a new staging run
+(`scripts/deploy-to-production.sh`, or the Actions tab's "Run workflow"
+button) -- both still land on the same approval gate.
 
 ### Backend Deployment (Docker):
 Each backend deploys as a Docker-based Render Web Service, built from
