@@ -9,6 +9,10 @@
 # dashboard -> peer-evaluation-frontend-staging -> Settings -> Deploy Hook).
 # That service's own Auto-Deploy must stay OFF, for the same reason given in
 # backend-ci-cd.yml.
+#
+# The `deploy` job also triggers deploy-production.yml once staging is
+# confirmed live -- see backend-ci-cd.yml's header for the full mechanism
+# and why (workflow_dispatch via the API, not the workflow_run event).
 
 name: Frontend CI/CD (staging)
 
@@ -64,6 +68,11 @@ jobs:
   deploy:
     needs: integration-tests
     runs-on: ubuntu-latest
+    # actions: write is what lets the last step below call the workflow
+    # dispatch API; the repo's default token permissions are read-only.
+    permissions:
+      contents: read
+      actions: write
     steps:
       # Fire-and-forget, same as the backend's deploy hook -- see
       # backend-ci-cd.yml for why `?ref=<sha>` matters.
@@ -93,3 +102,8 @@ jobs:
           done
           echo "Timed out waiting for commit $EXPECTED_SHA to go live."
           exit 1
+
+      - name: Trigger the production deploy pipeline
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh workflow run deploy-production.yml --ref "${{ github.ref_name }}" -f deploy_backend=false -f deploy_frontend=true

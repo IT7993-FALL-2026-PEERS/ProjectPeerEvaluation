@@ -21,6 +21,18 @@
 # That service's own Auto-Deploy must stay OFF, otherwise every push deploys
 # twice: once unconditionally from Render itself, once from the gated
 # `deploy` job here.
+#
+# Once staging is confirmed live, the `deploy` job triggers
+# deploy-production.yml itself (workflow_dispatch via the API, not the
+# workflow_run event -- workflow_run only fires for a listening workflow
+# that exists on the repo's DEFAULT branch, no exceptions, confirmed against
+# GitHub's docs; this repo deliberately keeps main and with-test-coverage
+# separate, so that event can never fire here). workflow_dispatch has no
+# such restriction once a workflow is registered (i.e. has run at least
+# once, via any trigger) -- confirmed by testing it directly on this
+# workflow. deploy-production.yml then re-runs the backend's tests and
+# pauses for a required-reviewer approval before actually deploying to
+# production -- see that workflow's header for the full chain.
 
 name: Backend CI/CD (staging)
 
@@ -90,6 +102,11 @@ jobs:
   deploy:
     needs: integration-tests
     runs-on: ubuntu-latest
+    # actions: write is what lets the last step below call the workflow
+    # dispatch API; the repo's default token permissions are read-only.
+    permissions:
+      contents: read
+      actions: write
     steps:
       # Render Deploy Hooks are fire-and-forget: this returns immediately
       # and the actual build/deploy happens asynchronously on Render's side.
@@ -124,3 +141,8 @@ jobs:
           done
           echo "Timed out waiting for commit $EXPECTED_SHA to go live."
           exit 1
+
+      - name: Trigger the production deploy pipeline
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh workflow run deploy-production.yml --ref "${{ github.ref_name }}" -f deploy_backend=true -f deploy_frontend=false
