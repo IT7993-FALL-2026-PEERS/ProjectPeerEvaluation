@@ -150,6 +150,71 @@ The quality gate is enforced today. Production approval is manual.
 | Build and deployment reports | Build history and deployment status | M2 | Planned, week of 16 Nov |
 | Production deploy | Manual sponsor approval. Not automated | Sponsor | By design |
 
+### Detailed workflow reference (WF01–WF12)
+
+Every pipeline stage above as one numbered flow, start to finish. WF01–WF12 are our own stage IDs
+for this diagram only — not the same numbering as any external document or an FR/requirement ID.
+
+```mermaid
+flowchart TB
+    DEV(["Developer"]) --> WF01["WF01 Fresh checkout →<br/>configure → install → ready"]
+    WF01 --> PR["Open / update pull request"]
+    PR --> WF02
+
+    subgraph CI["CONTINUOUS INTEGRATION · runs on every pull request"]
+        direction TB
+        WF02["WF02 Test setup<br/>isolated DB + fixtures"]
+        WF03["★ WF03 Install deps + static checks (ESLint)"]
+        UNIT["Unit tests<br/>frontend live · backend planned"]
+        INTEG["Integration tests"]
+        REG["Functional regression tests"]
+        BUILD["Build"]
+        E2E["End-to-end tests<br/>smoke live · workflows planned"]
+        WF05["WF05 Dependency & security scan"]
+        WF06["WF06 Publish results<br/>Playwright reports live · full coverage planned"]
+        WF02 --> WF03 --> UNIT --> INTEG --> REG --> BUILD --> E2E --> WF05 --> WF06
+    end
+
+    WF06 --> GATE{"WF04 Quality gate<br/>all required checks pass"}
+    GATE -- "Fail: merge blocked" --> FIX["Fix and push again"]
+    FIX --> PR
+    GATE -- "Pass" --> MERGE["Qualifying merge to main"]
+    MERGE --> WF07
+
+    subgraph CD["CONTINUOUS DELIVERY · runs after merge to main"]
+        direction TB
+        WF07["WF07 Build artifacts and version images"]
+        WF08["WF08 Deploy to staging · readiness check · smoke tests"]
+        WF09{"WF09 Deploy or smoke test failed?"}
+        BLOCK["Block promotion · follow recovery procedure"]
+        WF10["WF10 Tag release candidate · retain version and evidence"]
+        WF07 --> WF08 --> WF09
+        WF09 -- "Yes" --> BLOCK
+        WF09 -- "No" --> WF10
+    end
+
+    WF10 --> APPROVE{{"WF12 Manual sponsor<br/>approval required"}}
+    APPROVE --> PROD(["Production · Render.com"])
+    PROD -.-> WF11{{"WF11 Rollback<br/>if approved"}}
+    WF11 -.->|"restore known-good release"| PROD
+
+    classDef done fill:#dcfce7,stroke:#15803d,color:#14532d,stroke-width:3px
+    classDef highlight fill:#dcfce7,stroke:#b45309,color:#14532d,stroke-width:5px
+    classDef partial fill:#ecfccb,stroke:#4d7c0f,color:#365314,stroke-width:3px,stroke-dasharray: 9 6
+    classDef planned fill:#f1f5f9,stroke:#475569,color:#334155,stroke-width:3px,stroke-dasharray: 9 6
+    classDef gate fill:#fef3c7,stroke:#d97706,color:#78350f,stroke-width:3px
+    classDef endpoint fill:#dbeafe,stroke:#2563eb,color:#1e3a8a,stroke-width:3px
+
+    class BUILD done
+    class WF03 highlight
+    class UNIT,E2E,WF06 partial
+    class WF01,WF02,INTEG,REG,WF05,WF07,WF08,WF09,BLOCK,WF10,WF11 planned
+    class GATE,APPROVE,WF09 gate
+    class DEV,PROD,PR,MERGE,FIX endpoint
+```
+
+★ = the most recently completed stage.
+
 ---
 
 ## Project Timeline and Milestones
