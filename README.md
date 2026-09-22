@@ -215,6 +215,36 @@ flowchart TB
 
 ★ = the most recently completed stage.
 
+#### WF03 close-up
+
+```mermaid
+flowchart TB
+    PR(["Pull request opened"]) --> WF03["★ WF03<br/>Install dependencies + static checks"]
+
+    subgraph WF03BOX["WF03 · install runs in all three CI jobs; lint runs in the frontend job"]
+        direction TB
+        subgraph INSTALL["Install dependencies · npm ci"]
+            direction LR
+            FE["Frontend job"]
+            BE["Backend job"]
+            E2E["E2E job"]
+        end
+        LINT["Lint · npm run lint<br/>its own CI step, frontend job only"]
+        FE --> LINT
+    end
+
+    WF03 --> WF03BOX
+    LINT --> NEXT["Unit tests<br/>(WF03 continues)"]
+
+    classDef done fill:#dcfce7,stroke:#15803d,color:#14532d,stroke-width:3px
+    classDef highlight fill:#dcfce7,stroke:#b45309,color:#14532d,stroke-width:5px
+    classDef endpoint fill:#dbeafe,stroke:#2563eb,color:#1e3a8a,stroke-width:3px
+
+    class FE,BE,E2E,LINT done
+    class PR,NEXT endpoint
+    class WF03 highlight
+```
+
 ---
 
 ## Project Timeline and Milestones
