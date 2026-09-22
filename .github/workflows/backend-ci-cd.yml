@@ -145,4 +145,4 @@ jobs:
       - name: Trigger the production deploy pipeline
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh workflow run deploy-production.yml --ref "${{ github.ref_name }}" -f deploy_backend=true -f deploy_frontend=false
+        run: gh workflow run deploy-production.yml --repo "${{ github.repository }}" --ref "${{ github.ref_name }}" -f deploy_backend=true -f deploy_frontend=false
