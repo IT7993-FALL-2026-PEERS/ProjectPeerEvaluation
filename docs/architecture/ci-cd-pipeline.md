@@ -13,6 +13,11 @@ Nothing reaches production without both a passing test run and a deliberate
 approval; nothing requires a human to manually run or trigger anything
 except that one click.
 
+| | Staging | Production |
+|---|---|---|
+| **Backend** | [peer-evaluation-backend-staging.onrender.com](https://peer-evaluation-backend-staging.onrender.com) | [peer-evaluation-backend-production.onrender.com](https://peer-evaluation-backend-production.onrender.com) |
+| **Frontend** | [peer-evaluation-frontend-staging.onrender.com](https://peer-evaluation-frontend-staging.onrender.com) | [peer-evaluation-frontend-production.onrender.com](https://peer-evaluation-frontend-production.onrender.com) |
+
 ```mermaid
 flowchart TB
     DEV(["Developer pushes<br/>to with-test-coverage"])
@@ -36,8 +41,8 @@ flowchart TB
     DEV --> BE_UNIT
     DEV --> FE_UNIT
 
-    BE_DEPLOY --> BE_STG_SVC[("peer-evaluation-<br/>backend-staging<br/>Render")]
-    FE_DEPLOY --> FE_STG_SVC[("peer-evaluation-<br/>frontend-staging<br/>Render")]
+    BE_DEPLOY --> BE_STG_SVC[("Render: peer-evaluation-<br/>backend-staging<br/>peer-evaluation-backend-staging.onrender.com")]
+    FE_DEPLOY --> FE_STG_SVC[("Render: peer-evaluation-<br/>frontend-staging<br/>peer-evaluation-frontend-staging.onrender.com")]
 
     subgraph FALLBACK["Manual fallbacks -- re-promote without a new push"]
         direction TB
@@ -82,8 +87,8 @@ flowchart TB
     BUTTON --> PBE_UNIT
     BUTTON --> PFE_UNIT
 
-    DEPLOY_BE --> BE_PROD_SVC[("peer-evaluation-<br/>backend-production<br/>Render")]
-    DEPLOY_FE --> FE_PROD_SVC[("peer-evaluation-<br/>frontend-production<br/>Render")]
+    DEPLOY_BE --> BE_PROD_SVC[("Render: peer-evaluation-<br/>backend-production<br/>peer-evaluation-backend-production.onrender.com")]
+    DEPLOY_FE --> FE_PROD_SVC[("Render: peer-evaluation-<br/>frontend-production<br/>peer-evaluation-frontend-production.onrender.com")]
 
     classDef auto fill:#dcfce7,stroke:#15803d,color:#14532d,stroke-width:2px
     classDef gate fill:#fef3c7,stroke:#d97706,color:#78350f,stroke-width:3px
@@ -97,6 +102,11 @@ flowchart TB
     class BE_STG_SVC,FE_STG_SVC,BE_PROD_SVC,FE_PROD_SVC service
     class DEV endpoint
     class TAG,BUTTON fallback
+
+    click BE_STG_SVC "https://peer-evaluation-backend-staging.onrender.com" "Open peer-evaluation-backend-staging" _blank
+    click FE_STG_SVC "https://peer-evaluation-frontend-staging.onrender.com" "Open peer-evaluation-frontend-staging" _blank
+    click BE_PROD_SVC "https://peer-evaluation-backend-production.onrender.com" "Open peer-evaluation-backend-production" _blank
+    click FE_PROD_SVC "https://peer-evaluation-frontend-production.onrender.com" "Open peer-evaluation-frontend-production" _blank
 ```
 
 ## Why it's shaped this way
