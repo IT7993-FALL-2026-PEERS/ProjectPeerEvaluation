@@ -135,14 +135,14 @@ The quality gate is enforced today. Production approval is manual.
 | Install dependencies and build | `npm ci` and the production build | M1 / M4 | Live (`.github/workflows/ci.yml`) |
 | Workflow lint | `actionlint` checks the workflow files themselves | M1 / M4 | Live |
 | Unit tests | Jest and React Testing Library for the frontend; Jest for the backend | M4 / M5 | Frontend live. Backend planned, weeks of 5–12 Oct |
-| Integration tests | Frontend, backend, database, authentication, and email, against a real MongoDB | M4 / M5 | Planned, weeks of 12–19 Oct |
+| Integration tests | Frontend, backend, database, authentication, and email, against a real MongoDB and an isolated email transport (never real student inboxes) | M4 / M5 | Planned, weeks of 12–19 Oct |
 | Functional regression tests | One automated test per critical business workflow | M5 | Planned, week of 19 Oct |
 | End-to-end tests | Playwright: student and instructor workflows | M4 / M5 | Smoke test live. Workflows planned, week of 26 Oct |
 | Static analysis | ESLint | M1 | Planned, week of 19 Oct |
 | Dependency validation and security scan | Dependabot and OWASP Dependency Check | M3 | Planned, week of 19 Oct |
 | Test report | Executed, passed, and failed tests, duration, and coverage | M4 | Planned, week of 16 Nov |
 | Quality gate | Branch ruleset on `main`: a pull request and passing required checks before merge | M1 | Live. Required checks grow as jobs are added, week of 26 Oct |
-| Build artifacts and Docker images | Build the deployment artifacts and the frontend and backend images | M2 | Planned, week of 2 Nov |
+| Build artifacts and Docker images | Build the deployment artifacts and the frontend and backend images for the exact commit that passed CI | M2 | Planned, week of 2 Nov |
 | Staging deploy | Automatic deploy to Render.com staging | M2 | Planned, week of 9 Nov |
 | Smoke tests | Verify the deployment after each release | M5 | Planned, week of 9 Nov |
 | Deployment health check | Poll `/api/health` after deploy | M1 | Planned, week of 16 Nov |

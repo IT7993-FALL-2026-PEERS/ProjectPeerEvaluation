@@ -4,7 +4,8 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "test:env": "node --test tests/env.test.js"
+    "test:env": "node --test tests/env.test.js",
+    "test:health": "node --test tests/health.test.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
