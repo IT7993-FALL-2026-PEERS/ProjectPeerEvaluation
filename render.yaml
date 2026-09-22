@@ -20,7 +20,9 @@
 #     own unit + integration tests.
 #   - peer-evaluation-backend-production / peer-evaluation-frontend-production:
 #     deployed only by a human running .github/workflows/deploy-production.yml
-#     ("Run workflow" in the Actions tab), which runs the same tests first.
+#     (scripts/deploy-to-production.sh, which pushes the tag that triggers
+#     it -- see that workflow's header for why a tag push, not the Actions
+#     "Run workflow" button), which runs the same tests first.
 services:
   - type: web
     name: peer-evaluation-backend-staging

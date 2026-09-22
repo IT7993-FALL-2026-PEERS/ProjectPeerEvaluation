@@ -3,13 +3,35 @@
 #
 # Unlike backend-ci-cd.yml / frontend-ci-cd.yml (which deploy to STAGING
 # automatically on every push, gated on their own tests), this pipeline only
-# runs when a human triggers it from the Actions tab ("Run workflow"), and
-# lets them deploy the backend and the frontend independently of each other
-# -- e.g. promote a backend fix to production without also re-deploying an
-# unrelated frontend change, or vice versa. It still runs the same unit +
-# integration tests first for whichever app(s) are selected, as a safety
-# gate -- "manual" means a human decides *when* and *what* to promote, not
-# that untested code can reach production.
+# runs when a human deliberately triggers it, and lets them deploy the
+# backend and the frontend independently of each other -- e.g. promote a
+# backend fix to production without also re-deploying an unrelated frontend
+# change, or vice versa. It still runs the same unit + integration tests
+# first for whichever app is being promoted, as a safety gate -- "manual"
+# means a human decides *when* and *what* to promote, not that untested code
+# can reach production.
+#
+# Triggered by pushing a tag, not (only) workflow_dispatch's "Run workflow"
+# button: this repo intentionally keeps `main` and `with-test-coverage`
+# separate (main has its own, independently-evolving CI/test setup), and a
+# workflow that has NEVER run isn't known to GitHub at all -- it 404s from
+# the API and has no "Run workflow" button -- unless its file exists on the
+# repo's default branch (main here). A tag push has no such restriction:
+# GitHub runs whatever workflow files exist at the pushed ref, on any
+# branch, so this works today without putting anything from this branch
+# onto main. See scripts/deploy-to-production.sh, which tags and pushes for
+# you:
+#
+#   scripts/deploy-to-production.sh backend    # tags & pushes deploy-backend-production-<timestamp>
+#   scripts/deploy-to-production.sh frontend   # tags & pushes deploy-frontend-production-<timestamp>
+#   scripts/deploy-to-production.sh both       # both of the above
+#
+# Once this workflow has run at least once (i.e. after the first tag push),
+# GitHub knows about it and workflow_dispatch (the "Run workflow" button, or
+# `gh workflow run deploy-production.yml --ref with-test-coverage`) starts
+# working too, from this branch, without needing main -- confirmed by
+# testing the same thing on backend-ci-cd.yml. The tag push is only required
+# to bootstrap that; after that, either mechanism works.
 #
 # Required repo secrets: RENDER_BACKEND_PRODUCTION_DEPLOY_HOOK_URL,
 # RENDER_FRONTEND_PRODUCTION_DEPLOY_HOOK_URL (Render dashboard -> each
@@ -21,6 +43,10 @@
 name: Deploy to production (manual)
 
 on:
+  push:
+    tags:
+      - 'deploy-backend-production-*'
+      - 'deploy-frontend-production-*'
   workflow_dispatch:
     inputs:
       deploy_backend:
@@ -38,7 +64,9 @@ env:
 
 jobs:
   backend-unit-tests:
-    if: ${{ inputs.deploy_backend }}
+    if: >-
+      (github.event_name == 'workflow_dispatch' && inputs.deploy_backend) ||
+      (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/deploy-backend-production-'))
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -54,7 +82,6 @@ jobs:
       - run: npm run test:unit
 
   backend-integration-tests:
-    if: ${{ inputs.deploy_backend }}
     needs: backend-unit-tests
     runs-on: ubuntu-latest
     services:
@@ -101,7 +128,9 @@ jobs:
           exit 1
 
   frontend-unit-tests:
-    if: ${{ inputs.deploy_frontend }}
+    if: >-
+      (github.event_name == 'workflow_dispatch' && inputs.deploy_frontend) ||
+      (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/deploy-frontend-production-'))
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -114,7 +143,6 @@ jobs:
       - run: npm run test:unit
 
   frontend-integration-tests:
-    if: ${{ inputs.deploy_frontend }}
     needs: frontend-unit-tests
     runs-on: ubuntu-latest
     steps:
