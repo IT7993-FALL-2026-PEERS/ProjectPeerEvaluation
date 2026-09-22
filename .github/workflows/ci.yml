@@ -40,12 +40,16 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # A standalone step, not just CRA's build-time check: build alone let a real
+      # unused-vars warning through uncaught (confirmed locally before adding this).
+      - name: Lint (ESLint)
+        run: npm run lint
+
       - name: Unit tests (Jest + React Testing Library)
         run: npm test -- --watchAll=false
         env:
           CI: true
 
-      # CI=true makes Create React App treat lint warnings as errors.
       - name: Build
         run: npm run build
         env:
