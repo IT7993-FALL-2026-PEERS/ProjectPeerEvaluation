@@ -1,13 +1,23 @@
 # CI/CD pipeline scenario scripts
 
-Manual verification scripts for `.github/workflows/ci-cd.yml`: unit-tests ->
-integration-tests -> deploy, deploying `peer-evaluation-backend-rd6z` on
-Render. Deploy is gated on **both** test stages passing -- integration-tests
-runs against a real local MongoDB service container in CI (see
-`tests/integration/local-api.test.js`), before Render is ever touched, so a
-broken commit never reaches production. Run these when you need to confirm
-the pipeline actually behaves as designed -- they are not part of any
-automated suite and are not meant to run unattended.
+Manual verification scripts for `.github/workflows/backend-ci-cd.yml`:
+unit-tests -> integration-tests -> deploy, deploying
+`peer-evaluation-backend-staging` on Render. Deploy is gated on **both**
+test stages passing -- integration-tests runs against a real local MongoDB
+service container in CI (see `tests/integration/local-api.test.js`), before
+Render is ever touched, so a broken commit never reaches staging (let alone
+production, which only `deploy-production.yml` touches, and only when a
+human runs it manually). Run these when you need to confirm the pipeline
+actually behaves as designed -- they are not part of any automated suite and
+are not meant to run unattended.
+
+These scripts push commits to `src/backend/index.js`, so they exercise
+`backend-ci-cd.yml` specifically. A push to `with-test-coverage` also
+triggers `frontend-ci-cd.yml` in parallel (it's a separate, independent
+pipeline -- see that workflow file), which is unaffected by anything here
+and should show green on its own. If `gh run watch` below picks the
+frontend run instead of the backend one, re-run it and pick the other, or
+watch https://github.com/$REPO/actions directly.
 
 Each script must be run from a clean working tree with the target branch
 checked out (defaults to `with-test-coverage` -- edit the `BRANCH` variable
@@ -25,7 +35,7 @@ doing anything.
    which only `tests/integration/local-api.test.js` checks (unlike the root
    route's `status`/`endpoints` fields, which a unit test pins). Expect
    `unit-tests` green, `integration-tests` red, `deploy` **Skipped**.
-   Nothing reaches production. Clean up with `revert-last-scenario.sh`.
+   Nothing reaches staging. Clean up with `revert-last-scenario.sh`.
 
 There's no rollback script: since deploy only ever runs after both
 unit-tests and integration-tests pass, there's no scenario here where

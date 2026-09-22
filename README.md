@@ -11,7 +11,7 @@ A web-based platform to streamline peer evaluations in team-based courses. Profe
 
 Project website URL: 
 
-https://peer-evaluation-frontend.onrender.com/
+https://peer-evaluation-frontend-production.onrender.com/
 
 You can find more information about the project on our website:
 

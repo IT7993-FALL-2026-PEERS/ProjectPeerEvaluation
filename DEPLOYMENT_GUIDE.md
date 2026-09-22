@@ -2,43 +2,74 @@
 
 ## Option 1: Render.com (Free tier available)
 
-### Backend Deployment (Docker):
-The backend deploys as a Docker-based Render Web Service, built from
-`src/backend/Dockerfile`. A `render.yaml` Blueprint at the repo root
-defines this service, so the easiest path is:
-1. Create account at render.com
-2. New > Blueprint, connect your GitHub repository, and let Render read
-   `render.yaml`. It will create a Web Service with `runtime: docker`,
-   `dockerfilePath: ./src/backend/Dockerfile`, `dockerContext: ./src/backend`.
-3. Render prompts for the environment variables marked `sync: false`
-   (secrets below) during Blueprint setup.
+There are four Render services, a staging and a production instance of each
+app -- see `render.yaml` for the full shape of each and
+`.github/workflows/backend-ci-cd.yml`, `frontend-ci-cd.yml` and
+`deploy-production.yml` for what deploys them:
 
-Or configure it manually without the Blueprint:
-1. Create a new "Web Service", connect the repo
+| Service | Kind | URL | Deployed by |
+|---|---|---|---|
+| `peer-evaluation-backend-staging` | Docker web service | https://peer-evaluation-backend-staging.onrender.com | `backend-ci-cd.yml`, automatically, on every push whose backend tests pass |
+| `peer-evaluation-frontend-staging` | Static site | https://peer-evaluation-frontend-staging.onrender.com | `frontend-ci-cd.yml`, automatically, on every push whose frontend tests pass |
+| `peer-evaluation-backend-production` | Docker web service | https://peer-evaluation-backend-production.onrender.com | `deploy-production.yml`, only when a human runs it |
+| `peer-evaluation-frontend-production` | Static site | https://peer-evaluation-frontend-production.onrender.com | `deploy-production.yml`, only when a human runs it |
+
+In every case, Render's own git-push auto-deploy is OFF for all four
+services; a GitHub Actions job triggers the actual deploy via that service's
+Deploy Hook, only after that app's unit + integration tests pass. Set each
+service's Deploy Hook URL as the matching GitHub Actions repo secret
+(Settings -> Secrets and variables -> Actions):
+
+- `RENDER_BACKEND_STAGING_DEPLOY_HOOK_URL`
+- `RENDER_FRONTEND_STAGING_DEPLOY_HOOK_URL`
+- `RENDER_BACKEND_PRODUCTION_DEPLOY_HOOK_URL`
+- `RENDER_FRONTEND_PRODUCTION_DEPLOY_HOOK_URL`
+
+(Render dashboard -> that service -> Settings -> Deploy Hook.)
+
+### Backend Deployment (Docker):
+Each backend deploys as a Docker-based Render Web Service, built from
+`src/backend/Dockerfile`. `render.yaml` documents both (see it for the exact
+env vars each needs); the easiest path to create them is New > Blueprint,
+connect the repo, let Render read `render.yaml`, and fill in the env vars
+marked `sync: false` during setup. `render.yaml`'s header explains why
+syncing it won't adopt already-existing services of the same name.
+
+Or configure one manually without the Blueprint:
+1. Create a new "Web Service", connect the repo, turn Auto-Deploy Off
 2. Set the runtime to "Docker"
 3. Set Dockerfile path: `src/backend/Dockerfile`
 4. Set Docker build context: `src/backend`
 5. Add environment variables:
-   - `MONGODB_URI`: Your MongoDB connection string
+   - `NODE_ENV`: `staging` or `production`
+   - `MONGODB_URI`: a MongoDB connection string -- staging should point at a
+     database distinct from production's (e.g. append `peer-evaluation-staging`
+     as the db name in the URI) so staging traffic and test data never touch
+     real data; production should point at the same database the live app
+     already uses
    - `SMTP_HOST`: Your email server (e.g., smtp.gmail.com)
    - `SMTP_PORT`: 587
    - `SMTP_USER`: Your email address
    - `SMTP_PASS`: Your email password/app password
    - `SMTP_FROM`: Your sender email
-   - `FRONTEND_URL`: Your frontend URL (after frontend deployment)
+   - `FRONTEND_URL`: the matching frontend service's URL
 
 ### Frontend Deployment:
-The frontend is also defined in `render.yaml` as a `runtime: static` site
-(`peer-evaluation-frontend`), so the Blueprint above creates it too. To
-configure it manually instead, create a "Static Site" on Render with:
-1. Build command: `npm install && npm run build` (run from the repo root --
-   `package.json` lives there; there is no `src/frontend/package.json`)
+Both frontends are also defined in `render.yaml` as `runtime: static` sites,
+so the Blueprint above creates them too. To configure one manually instead,
+create a "Static Site" on Render with Auto-Deploy Off and:
+1. Build command: `echo "$RENDER_GIT_COMMIT" > public/version.txt && npm install && npm run build`
+   (run from the repo root -- `package.json` lives there, not under
+   `src/frontend`; the `version.txt` step is how `frontend-ci-cd.yml` /
+   `deploy-production.yml` confirm a deploy actually picked up the new
+   commit, since a static site has nothing like the backend's `/api/health`)
 2. Publish directory: `build`
 3. Rewrite rule: `/*` -> `/index.html` (so client-side routes work)
-4. Environment variable `REACT_APP_API_URL`: the backend's URL plus `/api`,
-   e.g. `https://peer-evaluation-backend-rd6z.onrender.com/api`. It is baked
-   in at build time, so re-deploy the site after changing it.
-5. Then set the backend's `FRONTEND_URL` to the static site's URL.
+4. Environment variables (baked in at build time -- see `src/frontend/
+   config.js` -- so re-deploy the site after changing either):
+   - `REACT_APP_API_URL`: the matching backend's URL plus `/api`
+   - `REACT_APP_FRONTEND_URL`: this site's own URL
+5. Then set that backend's `FRONTEND_URL` to this site's URL.
 
 ## Option 2: Vercel + Railway
 

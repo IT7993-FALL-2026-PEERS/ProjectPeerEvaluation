@@ -1,0 +1,150 @@
+# Manual production deploy: promotes the backend and/or frontend to
+# peer-evaluation-backend-production / peer-evaluation-frontend-production.
+#
+# Unlike backend-ci-cd.yml / frontend-ci-cd.yml (which deploy to STAGING
+# automatically on every push, gated on their own tests), this pipeline only
+# runs when a human triggers it from the Actions tab ("Run workflow"), and
+# lets them deploy the backend and the frontend independently of each other
+# -- e.g. promote a backend fix to production without also re-deploying an
+# unrelated frontend change, or vice versa. It still runs the same unit +
+# integration tests first for whichever app(s) are selected, as a safety
+# gate -- "manual" means a human decides *when* and *what* to promote, not
+# that untested code can reach production.
+#
+# Required repo secrets: RENDER_BACKEND_PRODUCTION_DEPLOY_HOOK_URL,
+# RENDER_FRONTEND_PRODUCTION_DEPLOY_HOOK_URL (Render dashboard -> each
+# *-production service -> Settings -> Deploy Hook). Both services' own
+# Auto-Deploy must stay OFF, for the same reason given in backend-ci-cd.yml
+# -- doubly so here, since Auto-Deploy would push every commit straight to
+# production with no test gate and no human trigger at all.
+
+name: Deploy to production (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      deploy_backend:
+        description: 'Deploy backend to peer-evaluation-backend-production'
+        type: boolean
+        default: true
+      deploy_frontend:
+        description: 'Deploy frontend to peer-evaluation-frontend-production'
+        type: boolean
+        default: true
+
+env:
+  BACKEND_URL: https://peer-evaluation-backend-production.onrender.com
+  FRONTEND_URL: https://peer-evaluation-frontend-production.onrender.com
+
+jobs:
+  backend-unit-tests:
+    if: ${{ inputs.deploy_backend }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src/backend
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: src/backend/package-lock.json
+      - run: npm ci
+      - run: npm run test:unit
+
+  backend-integration-tests:
+    if: ${{ inputs.deploy_backend }}
+    needs: backend-unit-tests
+    runs-on: ubuntu-latest
+    services:
+      mongo:
+        image: mongo:7
+        ports:
+          - 27017:27017
+    defaults:
+      run:
+        working-directory: src/backend
+    env:
+      # See backend-ci-cd.yml for why this is job-scoped, not workflow-wide.
+      MONGODB_URI: mongodb://127.0.0.1:27017/peer-evaluation-integration-test
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: src/backend/package-lock.json
+      - run: npm ci
+      - run: npm run test:integration
+
+  deploy-backend:
+    needs: backend-integration-tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Render production deploy
+        run: curl -fsS -X POST "${{ secrets.RENDER_BACKEND_PRODUCTION_DEPLOY_HOOK_URL }}&ref=${{ github.sha }}"
+      - name: Wait for the new commit to go live
+        env:
+          EXPECTED_SHA: ${{ github.sha }}
+        run: |
+          for i in $(seq 1 40); do
+            body="$(curl -fsS "$BACKEND_URL/api/health" || true)"
+            live_commit="$(echo "$body" | grep -o '"commit":"[^"]*"' | cut -d'"' -f4)"
+            echo "Attempt $i: live commit is ${live_commit:-<none>}, waiting for $EXPECTED_SHA"
+            case "$live_commit" in
+              "$EXPECTED_SHA"*) echo "New commit is live."; exit 0 ;;
+            esac
+            sleep 15
+          done
+          echo "Timed out waiting for commit $EXPECTED_SHA to go live."
+          exit 1
+
+  frontend-unit-tests:
+    if: ${{ inputs.deploy_frontend }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - run: npm ci
+      - run: npm run test:unit
+
+  frontend-integration-tests:
+    if: ${{ inputs.deploy_frontend }}
+    needs: frontend-unit-tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - run: npm ci
+      - run: npm run test:integration
+
+  deploy-frontend:
+    needs: frontend-integration-tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Render production deploy
+        run: curl -fsS -X POST "${{ secrets.RENDER_FRONTEND_PRODUCTION_DEPLOY_HOOK_URL }}&ref=${{ github.sha }}"
+      # See frontend-ci-cd.yml for why this polls /version.txt.
+      - name: Wait for the new commit to go live
+        env:
+          EXPECTED_SHA: ${{ github.sha }}
+        run: |
+          for i in $(seq 1 40); do
+            live_commit="$(curl -fsS "$FRONTEND_URL/version.txt" || true)"
+            echo "Attempt $i: live commit is ${live_commit:-<none>}, waiting for $EXPECTED_SHA"
+            case "$live_commit" in
+              "$EXPECTED_SHA"*) echo "New commit is live."; exit 0 ;;
+            esac
+            sleep 15
+          done
+          echo "Timed out waiting for commit $EXPECTED_SHA to go live."
+          exit 1

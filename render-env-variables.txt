@@ -3,6 +3,9 @@
 ## Backend Service Environment Variables:
 
 ### Database
+# Staging and production should use different database names on the same
+# cluster (e.g. .../peer-evaluation-staging vs .../peer-evaluation) so
+# staging traffic and test data never touch real data -- see DEPLOYMENT_GUIDE.md.
 MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/peer-eval
 
 ### Email Configuration (Gmail example)

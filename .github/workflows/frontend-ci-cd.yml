@@ -1,0 +1,93 @@
+# Frontend CI/CD: unit-tests -> integration-tests -> deploy to STAGING.
+#
+# Counterpart to backend-ci-cd.yml -- see that file's header for why this is
+# split out as its own pipeline instead of one combined workflow, and
+# deploy-production.yml for the manually-triggered pipeline that promotes
+# this app to production.
+#
+# The frontend's package.json lives at the repo root (see PROJECT
+# STRUCTURE), not under src/frontend, so unlike the backend jobs this
+# doesn't need `defaults.run.working-directory`.
+#
+# Required repo secret: RENDER_FRONTEND_STAGING_DEPLOY_HOOK_URL (Render
+# dashboard -> peer-evaluation-frontend-staging -> Settings -> Deploy Hook).
+# That service's own Auto-Deploy must stay OFF, for the same reason given in
+# backend-ci-cd.yml.
+
+name: Frontend CI/CD (staging)
+
+on:
+  push:
+    branches: [main, with-test-coverage]
+  workflow_dispatch:
+
+env:
+  # Public URL of the staging static site. Used only to poll /version.txt in
+  # the deploy job below; not a secret.
+  SERVICE_URL: https://peer-evaluation-frontend-staging.onrender.com
+
+jobs:
+  # react-scripts test (Jest) against src/frontend/tests/unit -- isolated
+  # component/module tests, network fully mocked. See that directory and
+  # src/setupTests.js.
+  unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - run: npm ci
+      - run: npm run test:unit
+
+  # src/frontend/tests/integration -- the real App, real react-router, real
+  # AuthContext, rendered together and driven through their actual UI (React
+  # Testing Library + user-event). Only the network boundary (axios /
+  # services/api) is mocked, not the app code exercising it.
+  integration-tests:
+    needs: unit-tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - run: npm ci
+      - run: npm run test:integration
+
+  deploy:
+    needs: integration-tests
+    runs-on: ubuntu-latest
+    steps:
+      # Fire-and-forget, same as the backend's deploy hook -- see
+      # backend-ci-cd.yml for why `?ref=<sha>` matters.
+      - name: Trigger Render staging deploy
+        run: curl -fsS -X POST "${{ secrets.RENDER_FRONTEND_STAGING_DEPLOY_HOOK_URL }}&ref=${{ github.sha }}"
+
+      # Static sites have no /api/health-style endpoint to report a live
+      # commit, so peer-evaluation-frontend-staging's build command writes
+      # the commit it's building (Render's own RENDER_GIT_COMMIT build-time
+      # env var) to public/version.txt before `npm run build`; CRA copies
+      # public/* verbatim into build/, so it ends up served at /version.txt.
+      # See render.yaml.
+      - name: Wait for the new commit to go live
+        env:
+          EXPECTED_SHA: ${{ github.sha }}
+        run: |
+          for i in $(seq 1 40); do
+            live_commit="$(curl -fsS "$SERVICE_URL/version.txt" || true)"
+            echo "Attempt $i: live commit is ${live_commit:-<none>}, waiting for $EXPECTED_SHA"
+            case "$live_commit" in
+              "$EXPECTED_SHA"*)
+                echo "New commit is live."
+                exit 0
+                ;;
+            esac
+            sleep 15
+          done
+          echo "Timed out waiting for commit $EXPECTED_SHA to go live."
+          exit 1

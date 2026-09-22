@@ -1,42 +1,46 @@
-# Render.com Blueprint for the backend API (Docker web service) and the
-# frontend (static site). Render reads this file when you
-# create a Blueprint-based service (Dashboard -> New -> Blueprint) or sync
-# an existing Blueprint instance; it does nothing on its own otherwise.
+# Render.com Blueprint documenting the four live services: a backend
+# (Docker web service) and a frontend (static site), each duplicated into a
+# staging pair and a production pair. Render reads this file when you create
+# a Blueprint-based service (Dashboard -> New -> Blueprint) or sync an
+# existing Blueprint instance; it does nothing on its own otherwise.
 #
-# Note this defines a NEW service by name -- it does not adopt/reconfigure
-# an already-existing, manually-created Render service (like the current
-# production service, peer-evaluation-backend-rd6z, whose "-rd6z" suffix
-# exists specifically because "peer-evaluation-backend" was already taken).
-# Switching that existing service to Docker was instead done manually via
-# its own Settings -> Build -> Edit Source, which preserves its URL, env
-# vars, and deploy history -- see DEPLOYMENT_GUIDE.md for those steps. Use
-# this file as source-of-truth documentation of the service's shape, or to
-# spin up a genuinely new/second instance.
+# All four services below were created directly via the Render API, not by
+# syncing this file, so treat this as source-of-truth documentation of their
+# shape (and a way to spin up a fresh, independent instance) rather than
+# something that already controls them -- syncing this Blueprint against the
+# same account will try to create four NEW same-named services, not adopt
+# the existing ones.
 #
-# Deploys of the real production service are driven by
-# .github/workflows/ci-cd.yml's `deploy` job via a Render Deploy Hook, not
-# by Render's own git-push auto-deploy -- that must stay set to Off on the
-# service for the CI gating to mean anything (see the workflow file).
+# Deploys are driven by GitHub Actions via a Render Deploy Hook per service,
+# not by Render's own git-push auto-deploy -- that must stay Off on all four
+# services for the CI gating to mean anything:
+#   - peer-evaluation-backend-staging / peer-evaluation-frontend-staging:
+#     deployed automatically by .github/workflows/backend-ci-cd.yml and
+#     frontend-ci-cd.yml respectively, on every push, gated on that app's
+#     own unit + integration tests.
+#   - peer-evaluation-backend-production / peer-evaluation-frontend-production:
+#     deployed only by a human running .github/workflows/deploy-production.yml
+#     ("Run workflow" in the Actions tab), which runs the same tests first.
 services:
   - type: web
-    name: peer-evaluation-backend
+    name: peer-evaluation-backend-staging
     runtime: docker
+    branch: with-test-coverage
     dockerfilePath: ./src/backend/Dockerfile
     dockerContext: ./src/backend
     plan: free
     healthCheckPath: /api/health
+    autoDeploy: false
     envVars:
       - key: NODE_ENV
-        value: production
-      # A MongoDB Atlas connection string: mongodb+srv://<user>:<password>@
-      # <cluster>.mongodb.net/<database>?retryWrites=true&w=majority. From
-      # the Atlas dashboard: Database -> Connect -> Drivers -> copy the
-      # connection string, substitute your database user's password, and
-      # make sure Network Access allows connections from anywhere (0.0.0.0/0)
-      # or specifically from Render's IPs, since Render's outbound IPs
-      # aren't static on the free plan. `sync: false` means Render prompts
+        value: staging
+      # A MongoDB Atlas connection string, pointed at a database distinct
+      # from production's (e.g. .../peer-evaluation-staging?...) so staging
+      # traffic and test data never touch real production data -- same
+      # cluster and credentials as production is fine, only the database
+      # name in the URI needs to differ. `sync: false` means Render prompts
       # for this value during Blueprint setup rather than storing it here in
-      # git -- this is a real secret, not the same value docker-compose.yml
+      # git; this is a real secret, not the same value docker-compose.yml
       # uses for local dev, which points at a plain local mongo container.
       - key: MONGODB_URI
         sync: false
@@ -51,31 +55,82 @@ services:
       - key: SMTP_FROM
         sync: false
       - key: FRONTEND_URL
+        value: https://peer-evaluation-frontend-staging.onrender.com
+
+  - type: web
+    name: peer-evaluation-backend-production
+    runtime: docker
+    branch: main
+    dockerfilePath: ./src/backend/Dockerfile
+    dockerContext: ./src/backend
+    plan: free
+    healthCheckPath: /api/health
+    autoDeploy: false
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # The real production database -- the same MONGODB_URI already used
+      # by the account's original backend service, so promoting to this
+      # service doesn't strand existing professor/course/evaluation data.
+      - key: MONGODB_URI
         sync: false
+      - key: SMTP_HOST
+        value: smtp.gmail.com
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: SMTP_FROM
+        sync: false
+      - key: FRONTEND_URL
+        value: https://peer-evaluation-frontend-production.onrender.com
 
   # React frontend, built with react-scripts from the repo root (package.json
   # and public/ live at the root; source is under src/, not src/frontend/) and
   # served as static files. The SPA rewrite makes client-side routes like
   # /evaluate/<token> load index.html instead of 404ing on refresh/deep links.
   #
-  # Auto-deploy is left on here: unlike the backend, no CI deploy hook is
-  # wired up for the frontend.
+  # The buildCommand writes Render's own RENDER_GIT_COMMIT (available at
+  # build time) to public/version.txt before building; CRA copies public/*
+  # verbatim into build/, so GET /version.txt on the deployed site reports
+  # exactly which commit is live -- the frontend equivalent of the backend's
+  # /api/health `commit` field, since a static site has no running process
+  # to ask. frontend-ci-cd.yml and deploy-production.yml poll it after
+  # triggering a deploy.
   - type: web
-    name: peer-evaluation-frontend
+    name: peer-evaluation-frontend-staging
     runtime: static
-    buildCommand: npm install && npm run build
+    branch: with-test-coverage
+    buildCommand: echo "$RENDER_GIT_COMMIT" > public/version.txt && npm install && npm run build
     staticPublishPath: ./build
+    autoDeploy: false
     routes:
       - type: rewrite
         source: /*
         destination: /index.html
     envVars:
       # REACT_APP_* values are baked in at build time (see src/frontend/
-      # config.js). Set REACT_APP_API_URL to the deployed backend's URL plus
-      # /api, e.g. https://peer-evaluation-backend-rd6z.onrender.com/api --
-      # Render prompts for it during Blueprint setup. Changing it later
-      # requires re-deploying the static site.
+      # config.js), so changing either later requires re-deploying the site.
       - key: REACT_APP_API_URL
-        sync: false
+        value: https://peer-evaluation-backend-staging.onrender.com/api
       - key: REACT_APP_FRONTEND_URL
-        sync: false
+        value: https://peer-evaluation-frontend-staging.onrender.com
+
+  - type: web
+    name: peer-evaluation-frontend-production
+    runtime: static
+    branch: main
+    buildCommand: echo "$RENDER_GIT_COMMIT" > public/version.txt && npm install && npm run build
+    staticPublishPath: ./build
+    autoDeploy: false
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: REACT_APP_API_URL
+        value: https://peer-evaluation-backend-production.onrender.com/api
+      - key: REACT_APP_FRONTEND_URL
+        value: https://peer-evaluation-frontend-production.onrender.com

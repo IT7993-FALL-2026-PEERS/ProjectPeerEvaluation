@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Local counterpart to scripts/ci-pipeline-tests/ and .github/workflows/ci-cd.yml:
+# Local counterpart to scripts/ci-pipeline-tests/ and
+# .github/workflows/backend-ci-cd.yml:
 # starts a local MongoDB, runs unit tests, then integration tests against that
 # MongoDB, and only if both pass, runs the app itself so you can interact with
 # it. Gives two independent ways to verify the same gates -- this script
