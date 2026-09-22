@@ -58,10 +58,6 @@ on:
         type: boolean
         default: true
 
-env:
-  BACKEND_URL: https://peer-evaluation-backend-production.onrender.com
-  FRONTEND_URL: https://peer-evaluation-frontend-production.onrender.com
-
 jobs:
   backend-unit-tests:
     if: >-
@@ -108,6 +104,16 @@ jobs:
   deploy-backend:
     needs: backend-integration-tests
     runs-on: ubuntu-latest
+    env:
+      # Job-scoped, not workflow-wide: emailUtils.js reads process.env.
+      # FRONTEND_URL directly, so setting it workflow-wide leaked it into
+      # backend-unit-tests too, silently pinning that branch of
+      # `process.env.FRONTEND_URL || frontendUrl` and failing the 100%
+      # branch-coverage threshold -- the exact same category of mistake the
+      # MONGODB_URI job-scoping comments elsewhere already warn about.
+      # Confirmed locally: `FRONTEND_URL=<anything> npm run test:unit` fails
+      # that threshold; unset, it passes.
+      BACKEND_URL: https://peer-evaluation-backend-production.onrender.com
     steps:
       - name: Trigger Render production deploy
         run: curl -fsS -X POST "${{ secrets.RENDER_BACKEND_PRODUCTION_DEPLOY_HOOK_URL }}&ref=${{ github.sha }}"
@@ -158,6 +164,10 @@ jobs:
   deploy-frontend:
     needs: frontend-integration-tests
     runs-on: ubuntu-latest
+    env:
+      # Job-scoped, not workflow-wide -- see deploy-backend's BACKEND_URL
+      # comment above for why (this is the var that actually caused it).
+      FRONTEND_URL: https://peer-evaluation-frontend-production.onrender.com
     steps:
       - name: Trigger Render production deploy
         run: curl -fsS -X POST "${{ secrets.RENDER_FRONTEND_PRODUCTION_DEPLOY_HOOK_URL }}&ref=${{ github.sha }}"
