@@ -28,7 +28,9 @@ service's Deploy Hook URL as the matching GitHub Actions repo secret
 (Render dashboard -> that service -> Settings -> Deploy Hook.)
 
 ### CI/CD pipeline
-Push to `with-test-coverage` -> that app's unit + integration tests ->
+See [docs/architecture/ci-cd-pipeline.md](docs/architecture/ci-cd-pipeline.md)
+for a diagram of the full pipeline. In short: push to `with-test-coverage`
+-> that app's unit + integration tests ->
 staging deploys automatically -> production's tests run automatically ->
 production deploy **pauses for one approval click**. Nothing to run by
 hand except that click.
