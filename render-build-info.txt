@@ -8,9 +8,11 @@
 #   Build:  cd src/backend && npm install
 #   Start:  cd src/backend && node index.js
 
-# Frontend build command (the version.txt step is how the CI/CD pipelines
-# confirm a deploy picked up the right commit -- see render.yaml)
-echo "$RENDER_GIT_COMMIT" > public/version.txt && npm install && npm run build
+# Frontend build command (self-contained under src/frontend, like the
+# backend; Render always runs buildCommand from the repo root regardless.
+# The version.txt step is how the CI/CD pipelines confirm a deploy picked up
+# the right commit -- see render.yaml)
+cd src/frontend && echo "$RENDER_GIT_COMMIT" > public/version.txt && npm install && npm run build
 
 # Frontend publish directory
-build
+src/frontend/build

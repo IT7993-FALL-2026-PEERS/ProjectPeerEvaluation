@@ -1,6 +1,6 @@
 # Local stack: MongoDB, the backend API and the frontend, each as a container
 # built from its own Dockerfile (src/backend/Dockerfile and
-# Dockerfile.frontend). `docker compose up --build` starts all three:
+# src/frontend/Dockerfile). `docker compose up --build` starts all three:
 #   frontend  http://localhost:3000
 #   backend   http://localhost:5000  (health: /api/health)
 #   mongo     localhost:27017
@@ -43,10 +43,8 @@ services:
 
   frontend:
     build:
-      # Repo root, not src/frontend: package.json and public/ live there.
-      context: .
-      dockerfile: Dockerfile.frontend
-      # Baked into the JS bundle at build time (see src/frontend/config.js).
+      context: ./src/frontend
+      # Baked into the JS bundle at build time (see src/frontend/src/config.js).
       # The browser calls the backend directly, so this is the backend's
       # host-published address, not the `backend` service name. Changing
       # either requires `docker compose build frontend`.

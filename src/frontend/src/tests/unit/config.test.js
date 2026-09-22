@@ -1,8 +1,8 @@
-// Unit tests for src/frontend/config.js: pure environment-detection logic,
+// Unit tests for src/frontend/src/config.js: pure environment-detection logic,
 // no rendering. config.js reads process.env and window.location at module
 // load time, so each test resets the module registry and re-requires it
 // after arranging the environment it wants to observe.
-describe('frontend runtime config (src/frontend/config.js)', () => {
+describe('frontend runtime config (src/frontend/src/config.js)', () => {
   const ORIGINAL_ENV = process.env;
 
   beforeEach(() => {

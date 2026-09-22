@@ -89,10 +89,13 @@ services:
       - key: FRONTEND_URL
         value: https://peer-evaluation-frontend-production.onrender.com
 
-  # React frontend, built with react-scripts from the repo root (package.json
-  # and public/ live at the root; source is under src/, not src/frontend/) and
-  # served as static files. The SPA rewrite makes client-side routes like
-  # /evaluate/<token> load index.html instead of 404ing on refresh/deep links.
+  # React frontend, self-contained under src/frontend (its own package.json,
+  # public/, src/, Dockerfile -- see src/frontend/Dockerfile), matching
+  # src/backend's layout. Render's static-site builds run from the repo
+  # root regardless, so the buildCommand cds in and staticPublishPath points
+  # back out at src/frontend/build. Served as static files with an SPA
+  # rewrite so client-side routes like /evaluate/<token> load index.html
+  # instead of 404ing on refresh/deep links.
   #
   # The buildCommand writes Render's own RENDER_GIT_COMMIT (available at
   # build time) to public/version.txt before building; CRA copies public/*
@@ -105,16 +108,17 @@ services:
     name: peer-evaluation-frontend-staging
     runtime: static
     branch: with-test-coverage
-    buildCommand: echo "$RENDER_GIT_COMMIT" > public/version.txt && npm install && npm run build
-    staticPublishPath: ./build
+    buildCommand: cd src/frontend && echo "$RENDER_GIT_COMMIT" > public/version.txt && npm install && npm run build
+    staticPublishPath: ./src/frontend/build
     autoDeploy: false
     routes:
       - type: rewrite
         source: /*
         destination: /index.html
     envVars:
-      # REACT_APP_* values are baked in at build time (see src/frontend/
-      # config.js), so changing either later requires re-deploying the site.
+      # REACT_APP_* values are baked in at build time (see
+      # src/frontend/src/config.js), so changing either later requires
+      # re-deploying the site.
       - key: REACT_APP_API_URL
         value: https://peer-evaluation-backend-staging.onrender.com/api
       - key: REACT_APP_FRONTEND_URL
@@ -124,8 +128,8 @@ services:
     name: peer-evaluation-frontend-production
     runtime: static
     branch: main
-    buildCommand: echo "$RENDER_GIT_COMMIT" > public/version.txt && npm install && npm run build
-    staticPublishPath: ./build
+    buildCommand: cd src/frontend && echo "$RENDER_GIT_COMMIT" > public/version.txt && npm install && npm run build
+    staticPublishPath: ./src/frontend/build
     autoDeploy: false
     routes:
       - type: rewrite

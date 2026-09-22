@@ -58,15 +58,16 @@ Or configure one manually without the Blueprint:
 Both frontends are also defined in `render.yaml` as `runtime: static` sites,
 so the Blueprint above creates them too. To configure one manually instead,
 create a "Static Site" on Render with Auto-Deploy Off and:
-1. Build command: `echo "$RENDER_GIT_COMMIT" > public/version.txt && npm install && npm run build`
-   (run from the repo root -- `package.json` lives there, not under
-   `src/frontend`; the `version.txt` step is how `frontend-ci-cd.yml` /
+1. Build command: `cd src/frontend && echo "$RENDER_GIT_COMMIT" > public/version.txt && npm install && npm run build`
+   (Render always runs the build command from the repo root, hence the `cd`
+   -- the frontend is self-contained under `src/frontend`, like the backend
+   under `src/backend`; the `version.txt` step is how `frontend-ci-cd.yml` /
    `deploy-production.yml` confirm a deploy actually picked up the new
    commit, since a static site has nothing like the backend's `/api/health`)
-2. Publish directory: `build`
+2. Publish directory: `src/frontend/build`
 3. Rewrite rule: `/*` -> `/index.html` (so client-side routes work)
 4. Environment variables (baked in at build time -- see `src/frontend/
-   config.js` -- so re-deploy the site after changing either):
+   src/config.js` -- so re-deploy the site after changing either):
    - `REACT_APP_API_URL`: the matching backend's URL plus `/api`
    - `REACT_APP_FRONTEND_URL`: this site's own URL
 5. Then set that backend's `FRONTEND_URL` to this site's URL.

@@ -5,10 +5,6 @@
 # deploy-production.yml for the manually-triggered pipeline that promotes
 # this app to production.
 #
-# The frontend's package.json lives at the repo root (see PROJECT
-# STRUCTURE), not under src/frontend, so unlike the backend jobs this
-# doesn't need `defaults.run.working-directory`.
-#
 # Required repo secret: RENDER_FRONTEND_STAGING_DEPLOY_HOOK_URL (Render
 # dashboard -> peer-evaluation-frontend-staging -> Settings -> Deploy Hook).
 # That service's own Auto-Deploy must stay OFF, for the same reason given in
@@ -27,35 +23,41 @@ env:
   SERVICE_URL: https://peer-evaluation-frontend-staging.onrender.com
 
 jobs:
-  # react-scripts test (Jest) against src/frontend/tests/unit -- isolated
+  # react-scripts test (Jest) against src/tests/unit -- isolated
   # component/module tests, network fully mocked. See that directory and
-  # src/setupTests.js.
+  # src/setupTests.js (both under src/frontend/).
   unit-tests:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src/frontend
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v5
         with:
           node-version: '20'
           cache: npm
-          cache-dependency-path: package-lock.json
+          cache-dependency-path: src/frontend/package-lock.json
       - run: npm ci
       - run: npm run test:unit
 
-  # src/frontend/tests/integration -- the real App, real react-router, real
+  # src/tests/integration -- the real App, real react-router, real
   # AuthContext, rendered together and driven through their actual UI (React
   # Testing Library + user-event). Only the network boundary (axios /
   # services/api) is mocked, not the app code exercising it.
   integration-tests:
     needs: unit-tests
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src/frontend
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v5
         with:
           node-version: '20'
           cache: npm
-          cache-dependency-path: package-lock.json
+          cache-dependency-path: src/frontend/package-lock.json
       - run: npm ci
       - run: npm run test:integration
 

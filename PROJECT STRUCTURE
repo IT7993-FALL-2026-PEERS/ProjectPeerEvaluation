@@ -1,44 +1,77 @@
-peer-evaluation-system/
+ProjectPeerEvaluation/
+├── src/
+│   ├── backend/                  Self-contained Express API: its own
+│   │   ├── package.json          package.json, Dockerfile, tests, .env.
+│   │   ├── Dockerfile
+│   │   ├── .dockerignore
+│   │   ├── index.js
+│   │   ├── config/
+│   │   ├── controllers/
+│   │   ├── middleware/
+│   │   ├── models/
+│   │   ├── routes/
+│   │   ├── utils/
+│   │   ├── migrations/
+│   │   ├── scripts/               one-off/maintenance scripts, not CI
+│   │   └── tests/
+│   │       ├── unit/
+│   │       └── integration/
+│   └── frontend/                 Self-contained React (CRA) app, same
+│       ├── package.json          shape as src/backend/: its own
+│       ├── Dockerfile            package.json, Dockerfile, tests.
+│       ├── .dockerignore
+│       ├── nginx.conf             (deploy tooling, not app source --
+│       │                           sibling of Dockerfile, like the
+│       │                           Dockerfile itself, not under src/)
+│       ├── public/                CRA requires this next to package.json
+│       └── src/                   CRA requires this next to package.json
+│           ├── index.js           real entrypoint
+│           ├── setupTests.js
+│           ├── App.js
+│           ├── config.js
+│           ├── theme.js
+│           ├── components/
+│           ├── contexts/
+│           ├── pages/
+│           ├── services/
+│           ├── styles/
+│           └── tests/
+│               ├── unit/
+│               └── integration/
+├── scripts/                      Local dev/deploy helper scripts (not
+│   │                              part of either app): run-local.sh,
+│   │                              deploy-to-production.sh, ci-pipeline-tests/.
+│   └── ci-pipeline-tests/
 ├── docs/
 │   ├── requirements/
-│   │   ├── functional-requirements.md
-│   │   ├── non-functional-requirements.md
-│   │   └── user-stories.md
 │   ├── architecture/
-│   │   ├── system-architecture.md
-│   │   ├── database-schema.md
-│   │   └── api-documentation.md
 │   ├── user-manual/
-│   │   ├── professor-guide.md
-│   │   └── student-guide.md
 │   ├── research-report/
-│   │   └── tech-stack-analysis.md
-│   ├── designs/
-│   │   ├── ui-mockups/
-│   │   └── wireframes/
 │   ├── meeting-notes/
-│   │   └── weekly-meetings.md
-│   ├── reports/
-│   │   └── samples/
 │   └── gantt/
-│       └── project-schedule.gantt
-├── src/
-│   ├── backend/
-│   │   ├── api/
-│   │   ├── models/
-│   │   ├── services/
-│   │   ├── utils/
-│   │   └── config/
-│   └── frontend/
-│       ├── components/
-│       ├── pages/
-│       ├── services/
-│       ├── utils/
-│       └── styles/
 ├── .github/
-│   ├── issue_templates/
-│   └── pull_request_template.md
-├── LICENSE
-├── CONTRIBUTING.md
+│   └── workflows/                 backend-ci-cd.yml, frontend-ci-cd.yml,
+│                                   deploy-production.yml (see each file's
+│                                   header comment)
+├── docker-compose.yml             Local stack: mongo + both apps as
+│                                   containers, each built from its own
+│                                   Dockerfile above.
+├── render.yaml                    Render.com Blueprint documenting the
+│                                   4 live services (staging/production x
+│                                   backend/frontend).
+├── package.json                   Thin orchestration ONLY -- no app code
+│                                   or app dependencies. Provides `npm run
+│                                   dev`/`setup` etc., which shell out to
+│                                   src/backend and src/frontend. See its
+│                                   own "description" field.
+├── start.bat / start.ps1          Convenience wrappers around `npm run
+│                                   setup` + `npm run dev` above.
 ├── README.md
-└── public/
+└── DEPLOYMENT_GUIDE.md
+
+Both apps under src/ are deliberately parallel in shape: each owns its own
+package.json, Dockerfile, .dockerignore, and tests/{unit,integration}/.
+Nothing app-specific lives outside src/backend/ or src/frontend/ -- the
+root package.json exists only to make `npm run dev`/`setup` convenient from
+one place, and root-level files (docker-compose.yml, render.yaml, scripts/,
+docs/) are cross-cutting tooling/documentation, not part of either app.

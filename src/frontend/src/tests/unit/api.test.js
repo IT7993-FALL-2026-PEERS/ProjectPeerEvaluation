@@ -1,4 +1,4 @@
-// Unit tests for src/frontend/services/api.js. axios is fully mocked -- no
+// Unit tests for src/frontend/src/services/api.js. axios is fully mocked -- no
 // network, no real axios instance -- so these exercise only this project's
 // own glue code: the configured baseURL, the request interceptor that
 // attaches a bearer token, and the response interceptor that turns raw

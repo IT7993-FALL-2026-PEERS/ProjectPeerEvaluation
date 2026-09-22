@@ -1,10 +1,10 @@
 // Runs before every frontend test file (react-scripts wires this in
 // automatically because it lives at src/setupTests.js, a sibling of the
-// real CRA entrypoint src/index.js -- see that file's comment about
-// src/frontend/index.js being an unused duplicate).
+// real CRA entrypoint src/index.js -- both relative to src/frontend/
+// package.json, per CRA convention).
 //
 // jest-dom adds the toBeInTheDocument()/toHaveTextContent()/etc. matchers
-// used throughout src/frontend/tests/.
+// used throughout src/tests/.
 import '@testing-library/jest-dom';
 
 // react-router-dom v7 needs TextEncoder/TextDecoder (used internally by its
