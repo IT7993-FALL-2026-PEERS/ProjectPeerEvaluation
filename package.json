@@ -34,6 +34,7 @@
     "build": "react-scripts build",
     "test": "react-scripts test",
     "test:e2e": "playwright test",
+    "lint": "eslint src/frontend --ext .js,.jsx",
     "eject": "react-scripts eject",
     "start:backend": "cd src/backend && npm start",
     "start:frontend": "cross-env HOST=0.0.0.0 react-scripts start",

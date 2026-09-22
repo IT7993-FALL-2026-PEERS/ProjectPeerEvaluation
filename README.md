@@ -102,9 +102,9 @@ flowchart TB
     classDef endpoint fill:#dbeafe,stroke:#2563eb,color:#1e3a8a,stroke-width:3px
     linkStyle default stroke-width:2px
 
-    class BUILD_APP done
+    class BUILD_APP,LINT done
     class UNIT,E2E partial
-    class LINT,SEC,INTEG,REG,REPORT,ARTIFACTS,STG,SMOKE,HEALTH,RC,DREPORT planned
+    class SEC,INTEG,REG,REPORT,ARTIFACTS,STG,SMOKE,HEALTH,RC,DREPORT planned
     class GATE,APPROVE gate
     class DEV,PROD,PR,MERGE,FIX endpoint
 ```
@@ -138,7 +138,7 @@ The quality gate is enforced today. Production approval is manual.
 | Integration tests | Frontend, backend, database, authentication, and email, against a real MongoDB and an isolated email transport (never real student inboxes) | M4 / M5 | Planned, weeks of 12–19 Oct |
 | Functional regression tests | One automated test per critical business workflow | M5 | Planned, week of 19 Oct |
 | End-to-end tests | Playwright: student and instructor workflows | M4 / M5 | Smoke test live. Workflows planned, week of 26 Oct |
-| Static analysis | ESLint | M1 | Planned, week of 19 Oct |
+| Static analysis | ESLint (`npm run lint`) | M1 / M4 | Live |
 | Dependency validation and security scan | Dependabot and OWASP Dependency Check | M3 | Planned, week of 19 Oct |
 | Test report | Executed, passed, and failed tests, duration, and coverage | M4 | Planned, week of 16 Nov |
 | Quality gate | Branch ruleset on `main`: a pull request and passing required checks before merge | M1 | Live. Required checks grow as jobs are added, week of 26 Oct |
@@ -220,13 +220,14 @@ Not yet on `main` as of this writing:
 ### Continuous Integration
 
 GitHub Actions (`.github/workflows/ci.yml`) runs on every pull request to `main` and on every push
-to `main`. It has four jobs: frontend tests and build, a backend syntax check, the Playwright smoke
-test, and a lint of the workflow files (`actionlint`). The `main` branch ruleset requires a pull
-request and all four checks to pass before merging. To reproduce the checks locally, use Node 24
-(see `.nvmrc`) and run:
+to `main`. It has four jobs: frontend lint, tests and build, a backend syntax check, the Playwright
+smoke test, and a lint of the workflow files (`actionlint`). The `main` branch ruleset requires a
+pull request and all four checks to pass before merging. To reproduce the checks locally, use
+Node 24 (see `.nvmrc`) and run:
 
 ```bash
 npm ci
+npm run lint
 npm test -- --watchAll=false
 npm run build
 npm run test:e2e
