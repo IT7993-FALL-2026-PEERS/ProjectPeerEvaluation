@@ -147,9 +147,10 @@ so the two are never confused.
   itself is a real implementation or a stub has not been checked as part of this pass.
 
 ## Open items before this feeds the RTM
-- Sponsor validation of the priorities above (Donald's sponsor session).
-- Decide whether CW-01's broken MFA (D-17) and CW-09's CSV/PDF export gap should block
-  Milestone 1 sign-off or carry forward as tracked defects.
+- Sponsor validation of the priorities above, from Donald's sponsor session.
+- Team leader (Khoa Ho) to decide, informed by that sponsor input, whether CW-01's broken MFA
+  (D-17) and CW-09's CSV/PDF export gap should block Milestone 1 sign-off or carry forward as
+  tracked defects.
 - Confirm whether professor account creation (`POST /auth/register`) is an in-scope workflow
   (self-service signup) or an out-of-band/admin action — no frontend registration page exists,
   so it is not listed as its own workflow above.
