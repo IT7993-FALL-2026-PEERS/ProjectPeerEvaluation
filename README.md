@@ -146,9 +146,9 @@ The quality gate is enforced today. Production approval is manual.
 | Test report | Executed, passed, and failed tests, duration, and coverage | M4 | Planned, week of 16 Nov |
 | Quality gate | Branch ruleset on `main`: a pull request and passing required checks before merge | M1 | Live. Required checks grow as jobs are added, week of 26 Oct |
 | Build artifacts and Docker images | Build the deployment artifacts and the frontend and backend images for the exact commit that passed CI | M2 | Planned, week of 2 Nov |
-| Staging deploy | Automatic deploy to Render.com staging | M2 | Planned, week of 9 Nov |
+| Staging deploy | Automatic deploy to Render.com staging | M2 | Partly live: Render deploys `main` after CI passes (`render.yaml`). CI-driven deploy of the tested commit planned, week of 9 Nov |
 | Smoke tests | Verify the deployment after each release | M5 | Planned, week of 9 Nov |
-| Deployment health check | Poll `/api/health` after deploy | M1 | Planned, week of 16 Nov |
+| Deployment health check | Poll `/api/health` after deploy | M1 | Partly live: Render checks `/api/health` before switching traffic to a new deploy. CI polling after deploy planned, week of 16 Nov |
 | Release candidate | Produce a release candidate after staging passes | M1 | Planned, week of 16 Nov |
 | Build and deployment reports | Build history and deployment status | M2 | Planned, week of 16 Nov |
 | Production deploy | Manual sponsor approval. Not automated | Sponsor | By design |
