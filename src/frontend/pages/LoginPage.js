@@ -8,6 +8,7 @@ function LoginPage() {
   const [isRegistering, setIsRegistering] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   // Clear fields when switching between login and registration
   useEffect(() => {
     if (isRegistering) {
@@ -122,15 +123,26 @@ function LoginPage() {
         </div>
         <div style={{ marginBottom: '10px' }}>
           <label htmlFor="login-password" style={{ display: 'block', marginBottom: '4px' }}>Password:</label>
-          <input
-            id="login-password"
-            type="password"
-            placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            style={{ width: '100%', padding: '8px' }}
-          />
+          <div style={{ display: 'flex', gap: '6px' }}>
+            <input
+              id="login-password"
+              type={showPassword ? 'text' : 'password'}
+              placeholder="Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              style={{ flex: 1, minWidth: 0, padding: '8px' }}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((shown) => !shown)}
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+              aria-pressed={showPassword}
+              style={{ padding: '8px 12px' }}
+            >
+              {showPassword ? 'Hide' : 'Show'}
+            </button>
+          </div>
         </div>
         <button
           type="submit"
