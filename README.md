@@ -106,8 +106,8 @@ flowchart TB
     linkStyle default stroke-width:2px
 
     class BUILD_APP,LINT done
-    class UNIT,E2E partial
-    class SEC,INTEG,REG,REPORT,ARTIFACTS,STG,SMOKE,HEALTH,RC,DREPORT planned
+    class UNIT,E2E,STG,HEALTH partial
+    class SEC,INTEG,REG,REPORT,ARTIFACTS,SMOKE,RC,DREPORT planned
     class GATE,APPROVE gate
     class DEV,PROD,PR,MERGE,FIX endpoint
 ```
