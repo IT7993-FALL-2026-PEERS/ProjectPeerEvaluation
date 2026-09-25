@@ -453,8 +453,9 @@ exports.submitEvaluation = async (req, res, next) => {
       return next(err);
     }
 
-    // Process each evaluation
-    const savedEvaluations = [];
+    // Validate every evaluation before saving any, so a bad one later in the list
+    // cannot leave a partial submission that the duplicate check then locks in.
+    const newEvaluations = [];
     for (const evalData of evaluations) {
       // Validate required fields
       const requiredRatings = ['professionalism', 'communication', 'work_ethic', 'content_knowledge_skills', 'overall_contribution', 'participation'];
@@ -492,8 +493,18 @@ exports.submitEvaluation = async (req, res, next) => {
         evaluation_token: token
       });
 
+      const validationError = evaluation.validateSync();
+      if (validationError) {
+        const err = new Error(validationError.message);
+        err.code = 'VALIDATION_ERROR';
+        err.status = 400;
+        return next(err);
+      }
+      newEvaluations.push(evaluation);
+    }
+
+    for (const evaluation of newEvaluations) {
       await evaluation.save();
-      savedEvaluations.push(evaluation);
     }
 
     // Mark student as having completed evaluation
@@ -501,7 +512,7 @@ exports.submitEvaluation = async (req, res, next) => {
 
     res.status(201).json({
       message: 'Evaluation submitted successfully.',
-      evaluations_count: savedEvaluations.length,
+      evaluations_count: newEvaluations.length,
       submitted_at: new Date()
     });
 

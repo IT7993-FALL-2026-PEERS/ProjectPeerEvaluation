@@ -86,6 +86,9 @@ jobs:
       - name: Health endpoint tests
         run: npm run test:health
 
+      - name: Evaluation submission tests
+        run: npm run test:submit
+
   e2e-smoke:
     name: E2E smoke (Playwright)
     runs-on: ubuntu-latest
