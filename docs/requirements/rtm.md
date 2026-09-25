@@ -24,7 +24,7 @@ Column structure as specified in `requirements.md`'s "Next step" section:
 | FR4.1 | FR-13 | CW-07 | TBD | Unit | Defective (D-19) — participation capped at 1-4, other criteria at 1-5 |
 | FR4.2 | FR-14 | CW-07 | TBD | Unit | **Defective** *(corrected from "Needs verification")* — code enforces a 10-char minimum and no maximum (`evaluationController.js:471`), against a spec of 50-500 |
 | FR4.3 | FR-15 | CW-07 | TBD | Unit | **Validated** *(corrected from "Needs verification")* — `Evaluation.submitted_at` exists (`models/Evaluation.js:16`) |
-| FR4.4 | FR-16 | CW-07 | TBD | Integration | **Validated** *(corrected from "Needs verification")* — duplicate-submission guard exists (`evaluationController.js:436-446`). Two gaps, see note below the table |
+| FR4.4 | FR-16 | CW-07 | TBD | Integration | **Validated** *(corrected from "Needs verification")* — duplicate-submission guard exists (`evaluationController.js:436-446`). One open gap, see note below the table |
 | FR5.1 | FR-17 | CW-09 | TBD | Integration | Validated |
 | FR5.2 | FR-18 | CW-09 | TBD | Unit | Validated |
 | FR5.3 | FR-19 | CW-09 | TBD | Integration | **Partial** *(corrected from "Unsupported")* — CSV export works (`reportController.js:338-397`, D-20 is wrong on this point); PDF export is still missing |
@@ -39,12 +39,12 @@ Column structure as specified in `requirements.md`'s "Next step" section:
 **FR-16 gaps.** The guard blocks the normal repeat submission, but:
 - **Concurrent submits:** it checks and then inserts, and the index on `Evaluation.js:21` is not
   `unique`, so two simultaneous submits (double-click, two tabs) can both get through.
-- **Partial save lockout:** evaluations are validated and saved one at a time in a loop
-  (`evaluationController.js:457-497`). If a later one fails validation, the earlier ones are
-  already saved. When the student retries, the guard returns 409 `ALREADY_COMPLETED`, so they
-  are locked out with a half-saved submission and are never marked complete.
-
-Both need an integration test. The partial-save lockout should get its own defect number.
+  Still open; needs an integration test and a unique index (check existing data for
+  duplicates first).
+- **Partial save lockout (fixed in PR #27):** evaluations used to be validated and saved one at
+  a time, so a later invalid one left the earlier ones saved and a retry hit 409
+  `ALREADY_COMPLETED`. All evaluations are now validated before any is saved, covered by
+  `src/backend/tests/submitEvaluation.test.js`.
 
 ## Corrections to `requirements.md` found while building this matrix
 
