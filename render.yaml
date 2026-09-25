@@ -25,6 +25,16 @@ services:
     # Deploy only commits whose GitHub checks passed. Switch to `off` once CI deploys
     # with the Render CLI and runs smoke tests itself.
     autoDeployTrigger: checksPass
+    # Build minutes are limited (500/month), so only rebuild when code the running
+    # backend uses changes. Paths are relative to the repo root. Manual deploys and
+    # render.yaml changes always deploy regardless of this filter.
+    buildFilter:
+      paths:
+        - src/backend/**
+      ignoredPaths:
+        - src/backend/tests/**
+        - src/backend/.env.example
+        - "**/*.md"
     envVars:
       - key: NODE_VERSION
         value: "24" # keep in sync with .nvmrc
@@ -63,6 +73,19 @@ services:
     buildCommand: npm ci && npm run build
     staticPublishPath: ./build
     autoDeployTrigger: checksPass
+    # Only rebuild when files that go into the React bundle change, so docs, tests,
+    # CI and backend-only merges don't spend build minutes on this site.
+    buildFilter:
+      paths:
+        - src/index.js
+        - src/frontend/**
+        - public/**
+        - package.json
+        - package-lock.json
+      ignoredPaths:
+        - src/frontend/**/__tests__/**
+        - "**/*.test.js"
+        - "**/*.md"
     # React Router handles paths like /evaluate/:token in the browser.
     routes:
       - type: rewrite
