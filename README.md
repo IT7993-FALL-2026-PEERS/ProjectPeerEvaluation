@@ -38,9 +38,12 @@ stack, a commercial production hosting environment, or migrating databases.
 
 **Render.com only** — proposed by the team and approved by the sponsor; other platforms (Vercel, Railway,
 etc.) are not used for this project even though `DEPLOYMENT_GUIDE.md` documents them as
-historical alternatives. Continuous Integration already runs on every pull request (see
-[CI/CD Pipeline](#cicd-pipeline)). Automated staging deployment is planned for Milestone 3, and
-production deployment always stays a manual sponsor approval.
+historical alternatives. Continuous Integration runs on every pull request (see
+[CI/CD Pipeline](#cicd-pipeline)). A staging environment is live on Render, defined in `render.yaml`:
+once CI passes on `main`, Render deploys the frontend and backend automatically. Staging uses
+MongoDB Atlas and a Mailtrap test inbox, so no real student ever receives an email from it. A
+CI-driven deploy step with smoke tests comes in Milestone 3, and production deployment always
+stays a manual sponsor approval.
 
 ---
 
