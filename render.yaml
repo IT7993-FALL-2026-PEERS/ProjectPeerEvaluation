@@ -1,0 +1,72 @@
+# Render Blueprint for the PEERS staging environment.
+# Schema: https://render.com/schema/render.yaml.json
+#
+# Two services, built from `main`:
+#   peers-frontend-staging  React static site (free)
+#   peers-backend-staging   Express API (Starter plan, so it doesn't sleep and can send SMTP;
+#                           free web services block outbound ports 25/465/587)
+# The database is MongoDB Atlas (Render doesn't host MongoDB). Allow Render's outbound IPs
+# for this region in Atlas > Network Access rather than 0.0.0.0/0.
+#
+# Secrets marked `sync: false` are entered once in the Render dashboard when the Blueprint
+# is first applied, and are never stored in this file.
+
+services:
+  - type: web
+    name: peers-backend-staging
+    runtime: node
+    plan: starter
+    region: virginia # closest to an Atlas cluster in AWS us-east-1
+    branch: main
+    rootDir: src/backend
+    buildCommand: npm ci
+    startCommand: node index.js
+    healthCheckPath: /api/health
+    # Deploy only commits whose GitHub checks passed. Switch to `off` once CI deploys
+    # with the Render CLI and runs smoke tests itself.
+    autoDeployTrigger: checksPass
+    envVars:
+      - key: NODE_VERSION
+        value: "24" # keep in sync with .nvmrc
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true
+      - key: MONGODB_URI
+        sync: false
+      # Links in invitation and reset emails point here.
+      - key: FRONTEND_URL
+        value: https://peers-frontend-staging.onrender.com
+      # Staging must never email real students: point these at a test inbox
+      # (e.g. a Mailtrap sandbox), not a real mail account.
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: SMTP_FROM
+        sync: false
+
+  - type: web
+    name: peers-frontend-staging
+    runtime: static
+    branch: main
+    buildCommand: npm ci && npm run build
+    staticPublishPath: ./build
+    autoDeployTrigger: checksPass
+    # React Router handles paths like /evaluate/:token in the browser.
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: NODE_VERSION
+        value: "24" # keep in sync with .nvmrc
+      # Baked into the bundle at build time (see src/frontend/services/apiUrl.js).
+      # fromService only exposes a bare host, so the full URL is written out here;
+      # check it matches the backend's URL after the first deploy.
+      - key: REACT_APP_API_URL
+        value: https://peers-backend-staging.onrender.com/api
