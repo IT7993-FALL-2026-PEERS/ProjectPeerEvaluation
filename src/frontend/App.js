@@ -7,17 +7,18 @@ import StudentEvaluation from './pages/StudentEvaluation';
 import Reports from './pages/Reports';
 import ResetPassword from './pages/ResetPassword';
 import Settings from './pages/Settings';
+import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
     return (
         <Router>
             <Routes>
                 <Route path="/" element={<LoginPage />} />
-                <Route path="/course-management" element={<CourseManagement />} />
-                <Route path="/reports" element={<Reports />} />
+                <Route path="/course-management" element={<ProtectedRoute><CourseManagement /></ProtectedRoute>} />
+                <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
                 <Route path="/evaluate/:token" element={<StudentEvaluation />} />
                 <Route path="/reset-password/:token" element={<ResetPassword />} />
-                <Route path="/settings" element={<Settings />} />
+                <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
                 {/* Catch-all route for debugging */}
                 <Route path="*" element={
                     <div style={{padding: '20px'}}>

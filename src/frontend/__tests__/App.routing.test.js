@@ -27,4 +27,16 @@ describe('App routing for emailed links', () => {
     renderAt('/');
     expect(screen.getByRole('heading', { name: 'Professor Login' })).toBeInTheDocument();
   });
+
+  // Anyone with the link used to get the dashboard shell (with failing API calls)
+  // instead of the login page.
+  test.each(['/course-management', '/reports', '/settings'])(
+    'a logged-out visit to %s goes to the login page',
+    (path) => {
+      localStorage.clear();
+      sessionStorage.clear();
+      renderAt(path);
+      expect(screen.getByRole('heading', { name: 'Professor Login' })).toBeInTheDocument();
+    }
+  );
 });
