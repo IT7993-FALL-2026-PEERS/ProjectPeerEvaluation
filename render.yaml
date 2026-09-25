@@ -49,6 +49,10 @@ services:
         sync: false
       - key: SMTP_FROM
         sync: false
+      # Wait between emails in a batch; Mailtrap's free sandbox rejects more than
+      # about one per second ("550 Too many emails per second").
+      - key: EMAIL_SEND_INTERVAL_MS
+        value: "1500"
 
   - type: web
     name: peers-frontend-staging

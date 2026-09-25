@@ -92,6 +92,9 @@ jobs:
       - name: Server timeout tests
         run: npm run test:timeouts
 
+      - name: Email pacing tests
+        run: npm run test:email
+
   e2e-smoke:
     name: E2E smoke (Playwright)
     runs-on: ubuntu-latest
