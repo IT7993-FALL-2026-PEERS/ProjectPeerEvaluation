@@ -40,7 +40,7 @@
     "start:frontend": "cross-env HOST=0.0.0.0 react-scripts start",
     "dev": "concurrently \"npm run start:backend\" \"npm run start:frontend\"",
     "setup": "npm install && cd src/backend && npm install",
-    "postinstall": "cd src/backend && npm install"
+    "postinstall": "cd src/backend && npm ci"
   },
   "eslintConfig": {
     "extends": [
