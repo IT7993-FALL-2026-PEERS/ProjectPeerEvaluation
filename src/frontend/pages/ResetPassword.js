@@ -7,6 +7,7 @@ function ResetPassword() {
   const { token } = useParams();
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPasswords, setShowPasswords] = useState(false);
   const [status, setStatus] = useState('');
   const navigate = useNavigate();
 
@@ -42,21 +43,30 @@ function ResetPassword() {
       <h2>Reset Your Password</h2>
       <form onSubmit={handleSubmit}>
         <input
-          type="password"
+          type={showPasswords ? 'text' : 'password'}
           placeholder="New Password"
           value={newPassword}
           onChange={e => setNewPassword(e.target.value)}
           required
-          style={{ width: '100%', marginBottom: '10px', padding: '8px' }}
+          style={{ width: '100%', boxSizing: 'border-box', marginBottom: '10px', padding: '8px' }}
         />
         <input
-          type="password"
+          type={showPasswords ? 'text' : 'password'}
           placeholder="Confirm New Password"
           value={confirmPassword}
           onChange={e => setConfirmPassword(e.target.value)}
           required
-          style={{ width: '100%', marginBottom: '10px', padding: '8px' }}
+          style={{ width: '100%', boxSizing: 'border-box', marginBottom: '10px', padding: '8px' }}
         />
+        <button
+          type="button"
+          onClick={() => setShowPasswords((shown) => !shown)}
+          aria-label={showPasswords ? 'Hide passwords' : 'Show passwords'}
+          aria-pressed={showPasswords}
+          style={{ marginBottom: '10px', padding: '6px 12px' }}
+        >
+          {showPasswords ? 'Hide passwords' : 'Show passwords'}
+        </button>
         <button type="submit" style={{ width: '100%', padding: '10px' }}>
           Update Password
         </button>

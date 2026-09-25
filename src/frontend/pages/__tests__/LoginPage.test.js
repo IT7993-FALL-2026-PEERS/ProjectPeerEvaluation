@@ -8,6 +8,43 @@ import { AuthProvider } from '../../contexts/AuthContext';
 
 jest.mock('axios');
 
+function renderLoginPage() {
+  render(
+    <AuthProvider>
+      <MemoryRouter>
+        <LoginPage />
+      </MemoryRouter>
+    </AuthProvider>
+  );
+}
+
+describe('LoginPage show/hide password', () => {
+  afterEach(() => jest.clearAllMocks());
+
+  test('the password is hidden until "Show password" is clicked, then can be hidden again', async () => {
+    renderLoginPage();
+    const field = screen.getByLabelText('Password:');
+    expect(field).toHaveAttribute('type', 'password');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Show password' }));
+    expect(field).toHaveAttribute('type', 'text');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Hide password' }));
+    expect(field).toHaveAttribute('type', 'password');
+  });
+
+  test('toggling the password does not submit the form', async () => {
+    renderLoginPage();
+    await userEvent.type(screen.getByLabelText('Email:'), 'prof@example.com');
+    await userEvent.type(screen.getByLabelText('Password:'), 'secret-123');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Show password' }));
+
+    expect(axios.post).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('Password:')).toHaveValue('secret-123');
+  });
+});
+
 describe('LoginPage errors', () => {
   afterEach(() => jest.clearAllMocks());
 
