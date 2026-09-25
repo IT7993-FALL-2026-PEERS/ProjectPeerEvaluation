@@ -27,14 +27,13 @@ function ResetPassword() {
         token,
         password: newPassword
       });
-      if (res.data.success) {
-        setStatus('Password updated successfully! You can now log in.');
-        setTimeout(() => navigate('/'), 2000);
-      } else {
-        setStatus(res.data.message || 'Failed to update password.');
-      }
+      // A 2xx response means the password changed; failures arrive as errors below.
+      setStatus(res.data?.message || 'Password updated successfully! You can now log in.');
+      setTimeout(() => navigate('/'), 2000);
     } catch (err) {
-      setStatus('Failed to update password.');
+      // The backend's error handler sends { error: { code, message } }.
+      const data = err.response?.data;
+      setStatus(data?.error?.message || data?.message || 'Failed to update password.');
     }
   };
 

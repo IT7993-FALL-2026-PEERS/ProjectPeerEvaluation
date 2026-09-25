@@ -78,11 +78,9 @@ function LoginPage() {
         navigate('/course-management');
       }
     } catch (err) {
-      if (err.response && err.response.data && err.response.data.message) {
-        setError(err.response.data.message);
-      } else {
-        setError('Something went wrong');
-      }
+      // The backend's error handler sends { error: { code, message } }.
+      const data = err.response?.data;
+      setError(data?.error?.message || data?.message || 'Something went wrong');
     }
   };
 
