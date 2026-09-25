@@ -61,7 +61,13 @@ code-verified corrections (file/line evidence given in the Status column), not n
 - **FR-22**: should read Defective, not Validated — the acceptance criterion requires the
   professor's configured word list, but flagging uses a hardcoded list and never reads it.
 
-`requirements.md` itself has not been edited — these corrections should go to Laeticia along
+Separately, `requirements.md`'s Summary table miscounted its own statuses (it said 11
+Validated and 5 Needs verification; the per-FR statuses give 10 and 6). That arithmetic has
+been fixed in place, since it changes no requirement's status. With the five corrections
+above applied, the counts would become: Validated 11, Needs verification 3, Defective 6,
+Unsupported 2, Partial 1 (23 total).
+
+Apart from that Summary fix, `requirements.md` has not been edited — these corrections should go to Laeticia along
 with the existing D-20 / FR-15-equivalent fix already queued for the technical assessment
 report, rather than being silently overwritten here.
 

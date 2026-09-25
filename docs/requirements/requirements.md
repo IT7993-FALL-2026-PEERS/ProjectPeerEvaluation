@@ -26,7 +26,9 @@ refer to them, so they must not be renumbered once this document is merged.
 |---|---|
 | **Validated** | Implementation found in the codebase and consistent with the requirement |
 | **Defective** | Implemented, but behaviour contradicts the requirement (linked defect ID) |
+| **Partial** | Part of the requirement is implemented and consistent with it; the rest is missing (e.g. CSV export exists, PDF export does not) |
 | **Unsupported** | No implementation found |
+| **Planned** | No implementation yet, but the gap is tracked (linked defect ID) and awaiting scheduling or a sponsor scope decision |
 | **Needs verification** | Implementation found, but correctness could not be confirmed by code reading alone; requires a runtime check during Milestone 2 testing |
 
 ### Method and limits
@@ -47,8 +49,8 @@ Once it exists, a Critical column will be added here and used to prioritise test
 
 | Status | Count |
 |---|---|
-| Validated | 11 |
-| Needs verification | 5 |
+| Validated | 10 |
+| Needs verification | 6 |
 | Defective | 4 |
 | Unsupported | 3 |
 | **Total** | **23** |
