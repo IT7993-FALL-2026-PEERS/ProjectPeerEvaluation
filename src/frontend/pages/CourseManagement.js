@@ -53,6 +53,7 @@ import BarChartIcon from '@mui/icons-material/BarChart';
 import DescriptionIcon from '@mui/icons-material/Description';
 import { useNavigate } from 'react-router-dom';
 import api, { getCourseById } from '../services/api';
+import { getApiBaseUrl } from '../services/apiUrl';
 import { useAuth } from '../contexts/AuthContext';
 import styles from '../styles/CourseManagement.module.css';
 import '../App.css';
@@ -1121,9 +1122,7 @@ function CourseManagement() {
     try {
       console.log('Testing backend connectivity...');
       // Test with the root endpoint that we know exists
-      const testUrl = window.location.hostname.includes('onrender.com') 
-        ? 'https://peer-evaluation-backend.onrender.com/' 
-        : 'http://localhost:5000/';
+      const testUrl = getApiBaseUrl().replace(/\/api$/, '/');
       console.log('Testing backend URL:', testUrl);
       const testResponse = await fetch(testUrl);
       if (!testResponse.ok) {
@@ -2657,10 +2656,7 @@ function CourseManagement() {
                             <Button
                               size="small"
                               onClick={() => {
-                                const frontendURL = process.env.NODE_ENV === 'production'
-                                  ? 'https://peer-evaluation-frontend.onrender.com'
-                                  : 'http://localhost:3000';
-                                window.open(`${frontendURL}/evaluate/${student.evaluation_token}`, '_blank');
+                                window.open(`${window.location.origin}/evaluate/${student.evaluation_token}`, '_blank');
                               }}
                             >
                               Test

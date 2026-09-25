@@ -89,6 +89,9 @@ jobs:
       - name: Evaluation submission tests
         run: npm run test:submit
 
+      - name: Server timeout tests
+        run: npm run test:timeouts
+
   e2e-smoke:
     name: E2E smoke (Playwright)
     runs-on: ubuntu-latest

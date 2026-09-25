@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { getApiBaseUrl } from '../services/apiUrl';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -31,10 +32,7 @@ function LoginPage() {
       return;
     }
     try {
-      // Replace with your actual backend endpoint for password reset
-      const baseURL = process.env.NODE_ENV === 'production'
-        ? 'https://peer-evaluation-backend.onrender.com/api'
-        : 'http://localhost:5000/api';
+      const baseURL = getApiBaseUrl();
       await axios.post(`${baseURL}/auth/reset-password`, { email: resetEmail });
       setResetStatus('If your email is registered, you will receive password reset instructions.');
     } catch (err) {
@@ -51,10 +49,8 @@ function LoginPage() {
     e.preventDefault();
     setError('');
 
-    const baseURL = process.env.NODE_ENV === 'production'
-      ? 'https://peer-evaluation-backend.onrender.com/api'
-      : 'http://localhost:5000/api';
-      
+    const baseURL = getApiBaseUrl();
+
     const endpoint = isRegistering
       ? `${baseURL}/auth/register`
       : `${baseURL}/auth/login`;
