@@ -18,6 +18,9 @@ export const AuthProvider = ({ children }) => {
 
   const logout = () => {
     localStorage.removeItem('user');
+    // The token is what the backend accepts, so it has to go too.
+    localStorage.removeItem('peer_eval_token');
+    sessionStorage.removeItem('peer_eval_session');
     setCurrentUser(null);
   };
 

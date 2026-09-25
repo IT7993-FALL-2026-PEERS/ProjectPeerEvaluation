@@ -62,4 +62,18 @@ describe('AuthContext', () => {
     expect(screen.getByTestId('user')).toHaveTextContent('none');
     expect(localStorage.getItem('user')).toBeNull();
   });
+
+  // The token is what the backend accepts. Leaving it behind means the next person
+  // on a shared computer is still signed in as the professor who logged out.
+  it('logout() also removes the login token', async () => {
+    const user = userEvent.setup();
+    localStorage.setItem('peer_eval_token', 'jwt-abc');
+    sessionStorage.setItem('peer_eval_session', 'jwt-abc');
+    renderWithProvider();
+
+    await user.click(screen.getByText('Log out'));
+
+    expect(localStorage.getItem('peer_eval_token')).toBeNull();
+    expect(sessionStorage.getItem('peer_eval_session')).toBeNull();
+  });
 });
