@@ -16,7 +16,7 @@ validated with the sponsor — that requires Donald's sponsor session (scheduled
 - **Priority**: proposed only, pending sponsor validation
 
 **Note on naming — CW vs. WF:** the README's `WF01`–`WF12` IDs label stages of the CI/CD
-*pipeline* (checkout, build, deploy, etc.). The `CW-01`–`CW-10` IDs below label the
+*pipeline* (checkout, build, deploy, etc.). The `CW-01`–`CW-11` IDs below label the
 *application's* business workflows (a professor logging in, a student submitting an
 evaluation, and so on) — an unrelated numbering scheme, deliberately given a different prefix
 so the two are never confused.
@@ -30,7 +30,9 @@ so the two are never confused.
 - **Requirements:** FR1.1 (secure login), FR1.3 (MFA), FR1.4 (session timeout)
 - **Implementation:** `LoginPage.js` → `POST /auth/login`, `POST /auth/logout`,
   `POST /auth/refresh` (`authController.js`, `authRoutes: auth.js`)
-- **Status:** Partial — login/logout/refresh work; MFA is advertised (`mfa_required: true`) but
+- **Status:** Partial — login works. Logout is a server-side no-op (it returns 200; the client
+  just discards the token, so tokens stay valid until expiry). Refresh is a stub that returns
+  501 `NOT_IMPLEMENTED` (`authController.js:98-104`). MFA is advertised (`mfa_required: true`) but
   `verifyMfa` is unimplemented, so a professor with MFA enabled cannot complete login (tracked
   as **D-17**, High, in the technical assessment report). Session timeout is also 1 hour, not
   the 30 minutes FR1.4 specifies (**D-18**).
@@ -88,7 +90,8 @@ so the two are never confused.
 - **Requirements:** FR3.1, FR3.2
 - **Implementation:** `POST /courses/:course_id/evaluations/send`,
   `POST /courses/:course_id/teams/:team_id/evaluations/send` (`evaluationController.js`)
-- **Status:** Implemented
+- **Status:** Partial — links are generated and sent, but email delivery (FR3.2) is unverified:
+  it depends on SMTP config and `FRONTEND_URL` at deploy time.
 
 ## CW-07: Student Evaluation Submission
 - **Actor:** Student
@@ -102,7 +105,9 @@ so the two are never confused.
 - **Implementation:** `StudentEvaluation.js` → `GET /evaluate/:token`,
   `POST /evaluate/:token`, `GET /evaluate/:token/status` (`evaluationController.js`,
   public route `evaluate.js`)
-- **Status:** Implemented
+- **Status:** Partial — the flow works end to end, but participation is rated 1-4 instead of
+  1-5 (FR4.1, **D-19**), and feedback only requires 10 characters with no maximum, against a
+  spec of 50-500 (FR4.2). The duplicate guard (FR4.4) has two gaps; see FR-16 in `rtm.md`.
 
 ## CW-08: Evaluation Tracking and Reminders
 - **Actor:** Professor
@@ -113,8 +118,9 @@ so the two are never confused.
 - **Requirements:** FR3.3 (track completion), FR3.4 (automated reminders)
 - **Implementation:** `GET /courses/:course_id/evaluations/status`,
   `POST /courses/:course_id/evaluations/remind` (`evaluationController.js`)
-- **Status:** Implemented (reminders are professor-triggered, not yet scheduled/automatic —
-  worth confirming with the sponsor whether "automated" in FR3.4 requires no human trigger)
+- **Status:** Partial — completion tracking (FR3.3) works. Reminders are professor-triggered
+  only; no scheduler exists, so FR3.4 ("automated") is defective as written. Worth confirming
+  with the sponsor whether a manual trigger is acceptable.
 
 ## CW-09: Report Generation and Review
 - **Actor:** Professor
@@ -123,7 +129,8 @@ so the two are never confused.
 - **Steps:** generate aggregated report → view course/team/student breakdowns → download as
   CSV
 - **Requirements:** FR5.1 (aggregated reports), FR5.2 (average scores), FR5.3 (downloadable
-  reports), FR5.4 (outlier highlighting)
+  reports), FR5.4 (outlier highlighting), FR6.2 (flag concerning language — the flagging
+  actually runs here, during report generation, not in CW-10)
 - **Implementation:** `Reports.js` → `POST /courses/:course_id/reports/generate`,
   `GET /courses/:course_id/reports`, `GET /courses/:course_id/reports/student/:student_id`,
   `GET /courses/:course_id/reports/team/:team_id`,
@@ -131,7 +138,9 @@ so the two are never confused.
 - **Status:** Partial — CSV export exists (`downloadReport`), contradicting the technical
   assessment report's D-20 finding that no export exists; that finding needs correcting. PDF
   export (also specified by FR5.3) is not implemented. Outlier/discrepancy highlighting (FR5.4)
-  needs verification against `getCourseReport`'s actual output.
+  needs verification against `getCourseReport`'s actual output. Concerning-language flagging
+  uses a hardcoded word list (`reportController.js:183`) and ignores the professor's configured
+  list (`Professor.aiConcerningWords`), so FR6.2 is defective.
 
 ## CW-10: AI-Assisted Feedback Analysis (optional, FR6)
 - **Actor:** Professor
@@ -139,18 +148,33 @@ so the two are never confused.
 - **Trigger:** Professor reviews submitted feedback and wants a summary or flag for concerning
   language
 - **Steps:** submit feedback text → receive a summary, flagged terms, or sentiment
-- **Requirements:** FR6.1 (summarization), FR6.2 (flagging), FR6.3 (sentiment)
+- **Requirements:** FR6.1 (summarization), FR6.3 (sentiment). FR6.2 (flagging) is traced to
+  CW-09, where the flagging actually happens.
 - **Implementation:** `POST /ai/summarize`, `POST /ai/red-flags`, `POST /ai/sentiment`
   (`aiController.js`); configurable flagged-word list via `GET|POST /professor/ai-words`
-  (`professorController.js`, surfaced in `Settings.js`)
+  (`professorController.js`, surfaced in `Settings.js`). The saved list is never read by
+  the flagging code in CW-09.
 - **Status:** Needs verification — routes and a UI settings surface exist; whether the AI logic
   itself is a real implementation or a stub has not been checked as part of this pass.
+
+## CW-11: Professor Self-Registration
+- **Actor:** Anyone with access to the login page
+- **Priority (proposed):** Pending sponsor — see open items
+- **Trigger:** A new user wants a professor account
+- **Steps:** toggle the login page into "Professor Registration" mode → submit details →
+  account is created → log in
+- **Requirements:** none — not in the inherited FR list
+- **Implementation:** `LoginPage.js` (`isRegistering` mode) → `POST /auth/register`
+  (`authController.js`, `routes/auth.js`)
+- **Status:** Implemented, but unrestricted — the route is public, so anyone who can reach the
+  app can create a professor account. Whether that is intended is an open question below.
 
 ## Open items before this feeds the RTM
 - Sponsor validation of the priorities above, from Donald's sponsor session.
 - Team leader (Khoa Ho) to decide, informed by that sponsor input, whether CW-01's broken MFA
   (D-17) and CW-09's CSV/PDF export gap should block Milestone 1 sign-off or carry forward as
   tracked defects.
-- Confirm whether professor account creation (`POST /auth/register`) is an in-scope workflow
-  (self-service signup) or an out-of-band/admin action — no frontend registration page exists,
-  so it is not listed as its own workflow above.
+- Confirm with the sponsor whether open professor self-registration (CW-11) is intended. As
+  built, anyone who can reach the login page can create a professor account. If signup should
+  be restricted (invite-only, admin-created, or limited to university email), CW-11 is a
+  security defect and needs a D-number.
