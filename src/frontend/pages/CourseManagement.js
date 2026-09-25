@@ -54,6 +54,7 @@ import DescriptionIcon from '@mui/icons-material/Description';
 import { useNavigate } from 'react-router-dom';
 import api, { getCourseById } from '../services/api';
 import { getApiBaseUrl } from '../services/apiUrl';
+import { describeEmailResult } from '../services/emailResult';
 import { useAuth } from '../contexts/AuthContext';
 import styles from '../styles/CourseManagement.module.css';
 import '../App.css';
@@ -68,8 +69,11 @@ function CourseManagement() {
     const teamId = team._id || team.id;
     setSendingTeamEvaluations((prev) => ({ ...prev, [teamId]: true }));
     try {
-      await api.post(`/courses/${teamsCourse._id || teamsCourse.id}/teams/${teamId}/evaluations/send`, {});
-      setAlert({ severity: 'success', message: `Evaluation invitations sent to team "${team.team_name}".` });
+      const response = await api.post(`/courses/${teamsCourse._id || teamsCourse.id}/teams/${teamId}/evaluations/send`, {});
+      setAlert(describeEmailResult(
+        { sent: response.data.emails_sent, total: response.data.total_students, failed: response.data.failed },
+        `Evaluation invitations sent to team "${team.team_name}".`
+      ));
       fetchCoursesWithCounts();
     } catch (error) {
       setAlert({ severity: 'error', message: error.userMessage || `Failed to send evaluations to team "${team.team_name}".` });
@@ -1147,10 +1151,10 @@ function CourseManagement() {
       console.log('Full URL:', `${api.defaults.baseURL}/courses/${courseId}/evaluations/send`);
       
       const response = await api.post(`/courses/${courseId}/evaluations/send`);
-      setAlert({ 
-        severity: 'success', 
-        message: `✅ ${response.data.message} - Emails sent to ${response.data.emails_sent || 'all'} students`
-      });
+      setAlert(describeEmailResult(
+        { sent: response.data.emails_sent, total: response.data.total_students, failed: response.data.failed },
+        `✅ ${response.data.message} - Emails sent to ${response.data.emails_sent || 'all'} students`
+      ));
       // Close the evaluation status dialog if open
       setEvaluationStatusOpen(false);
       // Refresh the evaluation status after sending
@@ -1231,10 +1235,10 @@ function CourseManagement() {
   const handleSendReminders = async (courseId) => {
     try {
       const response = await api.post(`/courses/${courseId}/evaluations/remind`);
-      setAlert({ 
-        severity: 'success', 
-        message: response.data.message 
-      });
+      setAlert(describeEmailResult(
+        { sent: response.data.reminders_sent, total: response.data.total_reminded, failed: response.data.failed },
+        response.data.message
+      ));
       
       // Refresh evaluation status if dialog is open
       if (evaluationStatusOpen && (selectedCourseForEval?._id || selectedCourseForEval?.id) === courseId) {

@@ -4,6 +4,7 @@ const Team = require('../models/Team');
 const Evaluation = require('../models/Evaluation');
 const EVALUATION_RUBRIC = require('../config/rubric');
 const { sendEvaluationInvitation, sendEvaluationReminder } = require('../utils/emailUtils');
+const { createEmailPacer } = require('../utils/emailPacer');
 
 /**
  * Send evaluation invitations to all students in a specific team
@@ -45,7 +46,8 @@ exports.sendTeamEvaluations = async (req, res, next) => {
 
     console.log(`Starting to send evaluations to ${students.length} students for team ${team_id} in course ${course_id}`);
 
-    // Send email to each student
+    // Send email to each student, spaced out so the mail provider doesn't reject a burst
+    const waitTurn = createEmailPacer();
     for (const student of students) {
       try {
         // Generate evaluation token if student doesn't have one
@@ -55,6 +57,7 @@ exports.sendTeamEvaluations = async (req, res, next) => {
           student.evaluation_token = evaluationToken;
         }
 
+        await waitTurn();
         const result = await sendEvaluationInvitation(
           student,
           course,
@@ -119,7 +122,8 @@ exports.sendEvaluations = async (req, res, next) => {
 
     console.log(`Starting to send evaluations to ${students.length} students for course ${course_id}`);
 
-    // Send email to each student
+    // Send email to each student, spaced out so the mail provider doesn't reject a burst
+    const waitTurn = createEmailPacer();
     for (const student of students) {
       try {
         console.log(`Processing student: ${student.name} (${student.email})`);
@@ -133,6 +137,7 @@ exports.sendEvaluations = async (req, res, next) => {
         }
 
         console.log(`Sending email to: ${student.email}`);
+        await waitTurn();
         const result = await sendEvaluationInvitation(
           student, 
           course, 
@@ -305,9 +310,11 @@ exports.remindEvaluations = async (req, res, next) => {
     let remindersSent = 0;
     let failedReminders = [];
 
-    // Send reminders
+    // Send reminders, spaced out so the mail provider doesn't reject a burst
+    const waitTurn = createEmailPacer();
     for (const student of studentsToRemind) {
       try {
+        await waitTurn();
         const result = await sendEvaluationReminder(
           student,
           course,
