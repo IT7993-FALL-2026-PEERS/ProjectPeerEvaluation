@@ -1,7 +1,7 @@
 # Requirements Traceability Matrix
 
 **Status:** Draft — seeded from `docs/requirements/requirements.md` (FR-01..FR-23) and
-`docs/requirements/critical-workflows.md` (CW-01..CW-11). Test case IDs are not yet
+`docs/requirements/critical-workflows.md` (CW-01..CW-12). Test case IDs are not yet
 available; they land in Milestone 2 as M4/M5 write tests. Sponsor validation of workflow
 priority (see `critical-workflows.md`) is still pending Donald's sponsor session.
 
@@ -34,6 +34,7 @@ Column structure as specified in `requirements.md`'s "Next step" section:
 | FR6.3 | FR-23 | CW-10 | TBD | — | Unsupported |
 | *(none — implementation only, not in the inherited FR list)* | — | CW-02 (Password Reset) | TBD | Integration | Validated |
 | *(none — implementation only, not in the inherited FR list)* | — | CW-11 (Professor Self-Registration) | TBD | Integration | Needs verification — public signup is live; sponsor must confirm it is intended |
+| *(none — sponsor spec only, not in the inherited FR list)* | — | CW-12 (Rubric Management) | TBD | — | Planned (D-09) — rubric is hardcoded; sponsor must confirm whether per-course editing is expected |
 
 **FR-16 gaps.** The guard blocks the normal repeat submission, but:
 - **Concurrent submits:** it checks and then inserts, and the index on `Evaluation.js:21` is not

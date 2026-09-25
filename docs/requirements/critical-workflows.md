@@ -16,7 +16,7 @@ validated with the sponsor — that requires Donald's sponsor session (scheduled
 - **Priority**: proposed only, pending sponsor validation
 
 **Note on naming — CW vs. WF:** the README's `WF01`–`WF12` IDs label stages of the CI/CD
-*pipeline* (checkout, build, deploy, etc.). The `CW-01`–`CW-11` IDs below label the
+*pipeline* (checkout, build, deploy, etc.). The `CW-01`–`CW-12` IDs below label the
 *application's* business workflows (a professor logging in, a student submitting an
 evaluation, and so on) — an unrelated numbering scheme, deliberately given a different prefix
 so the two are never confused.
@@ -168,6 +168,20 @@ so the two are never confused.
   (`authController.js`, `routes/auth.js`)
 - **Status:** Implemented, but unrestricted — the route is public, so anyone who can reach the
   app can create a professor account. Whether that is intended is an open question below.
+
+## CW-12: Rubric Management
+- **Actor:** Professor
+- **Priority (proposed):** Pending sponsor — see open question 8 in `requirements.md`
+- **Trigger:** Professor wants to create or adjust the criteria students evaluate each other on
+- **Steps:** create or edit a rubric → assign it to a course → students see it on their
+  evaluation form
+- **Requirements:** none — not in the inherited FR list, but the sponsor specification lists
+  rubric management as a core workflow
+- **Implementation:** none. A single fixed rubric lives in `src/backend/config/rubric.js` and is
+  sent with every evaluation form (`evaluationController.js:403`). There is no Rubric model, no
+  endpoint, and no UI for editing it.
+- **Status:** Planned — tracked as **D-09**. If the sponsor confirms a fixed rubric is enough,
+  this becomes "Implemented as fixed configuration" and D-09 closes.
 
 ## Open items before this feeds the RTM
 - Sponsor validation of the priorities above, from Donald's sponsor session.
