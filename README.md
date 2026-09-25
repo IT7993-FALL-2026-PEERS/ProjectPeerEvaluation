@@ -36,7 +36,7 @@ stack, a commercial production hosting environment, or migrating databases.
 
 ## Deployment
 
-**Render.com only** — this is the sponsor's explicit choice; other platforms (Vercel, Railway,
+**Render.com only** — proposed by the team and approved by the sponsor; other platforms (Vercel, Railway,
 etc.) are not used for this project even though `DEPLOYMENT_GUIDE.md` documents them as
 historical alternatives. Continuous Integration already runs on every pull request (see
 [CI/CD Pipeline](#cicd-pipeline)). Automated staging deployment is planned for Milestone 3, and
