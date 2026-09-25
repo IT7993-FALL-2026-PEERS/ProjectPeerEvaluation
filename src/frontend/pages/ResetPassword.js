@@ -48,7 +48,7 @@ function ResetPassword() {
           value={newPassword}
           onChange={e => setNewPassword(e.target.value)}
           required
-          style={{ width: '100%', marginBottom: '10px', padding: '8px' }}
+          style={{ width: '100%', boxSizing: 'border-box', marginBottom: '10px', padding: '8px' }}
         />
         <input
           type={showPasswords ? 'text' : 'password'}
@@ -56,7 +56,7 @@ function ResetPassword() {
           value={confirmPassword}
           onChange={e => setConfirmPassword(e.target.value)}
           required
-          style={{ width: '100%', marginBottom: '10px', padding: '8px' }}
+          style={{ width: '100%', boxSizing: 'border-box', marginBottom: '10px', padding: '8px' }}
         />
         <button
           type="button"
