@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import axios from 'axios';
+import { getApiBaseUrl } from '../services/apiUrl';
 import { useParams, useNavigate } from 'react-router-dom';
 
 function ResetPassword() {
@@ -21,9 +22,7 @@ function ResetPassword() {
       return;
     }
     try {
-      const baseURL = process.env.NODE_ENV === 'production'
-        ? 'https://peer-evaluation-backend.onrender.com/api'
-        : 'http://localhost:5000/api';
+      const baseURL = getApiBaseUrl();
       const res = await axios.post(`${baseURL}/auth/update-password`, {
         token,
         password: newPassword
