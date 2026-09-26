@@ -3,6 +3,7 @@ const Student = require('../models/Student');
 const Course = require('../models/Course');
 const Team = require('../models/Team');
 const Evaluation = require('../models/Evaluation');
+const { toCsv } = require('../utils/csv');
 
 /**
  * Calculate mean score for a student across all evaluation criteria
@@ -373,13 +374,10 @@ exports.downloadReport = async (req, res, next) => {
           student.improvement || 0
         ]);
         
-        const csvContent = [
-          csvHeaders.join(','),
-          ...csvRows.map(row => row.join(','))
-        ].join('\n');
+        const csvContent = toCsv([csvHeaders, ...csvRows]);
         
         // Send CSV file
-        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
         res.setHeader('Content-Disposition', `attachment; filename="course_${course_id}_report.csv"`);
         res.status(200).send(csvContent);
       }
