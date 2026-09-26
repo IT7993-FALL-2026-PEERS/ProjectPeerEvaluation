@@ -29,3 +29,15 @@ test('response includes a timestamp', () => {
   assert.ok(h.timestamp);
   assert.doesNotThrow(() => new Date(h.timestamp).toISOString());
 });
+
+// Render sets RENDER_GIT_COMMIT to the deployed commit. Reporting it lets anyone
+// (and later the CD pipeline) confirm exactly which version is live.
+test('response includes the deployed commit from RENDER_GIT_COMMIT', () => {
+  const h = getHealth({ readyState: 1 }, { RENDER_GIT_COMMIT: '2ddc590abc' });
+  assert.equal(h.commit, '2ddc590abc');
+});
+
+test('commit is null when not running on Render', () => {
+  const h = getHealth({ readyState: 1 }, {});
+  assert.equal(h.commit, null);
+});
