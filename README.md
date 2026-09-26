@@ -36,11 +36,14 @@ stack, a commercial production hosting environment, or migrating databases.
 
 ## Deployment
 
-**Render.com only** — this is the sponsor's explicit choice; other platforms (Vercel, Railway,
+**Render.com only** — proposed by the team and approved by the sponsor; other platforms (Vercel, Railway,
 etc.) are not used for this project even though `DEPLOYMENT_GUIDE.md` documents them as
-historical alternatives. Continuous Integration already runs on every pull request (see
-[CI/CD Pipeline](#cicd-pipeline)). Automated staging deployment is planned for Milestone 3, and
-production deployment always stays a manual sponsor approval.
+historical alternatives. Continuous Integration runs on every pull request (see
+[CI/CD Pipeline](#cicd-pipeline)). A staging environment is live on Render, defined in `render.yaml`:
+once CI passes on `main`, Render deploys the frontend and backend automatically. Staging uses
+MongoDB Atlas and a Mailtrap test inbox, so no real student ever receives an email from it. A
+CI-driven deploy step with smoke tests comes in Milestone 3, and production deployment always
+stays a manual sponsor approval.
 
 ---
 
@@ -103,8 +106,8 @@ flowchart TB
     linkStyle default stroke-width:2px
 
     class BUILD_APP,LINT done
-    class UNIT,E2E partial
-    class SEC,INTEG,REG,REPORT,ARTIFACTS,STG,SMOKE,HEALTH,RC,DREPORT planned
+    class UNIT,E2E,STG,HEALTH partial
+    class SEC,INTEG,REG,REPORT,ARTIFACTS,SMOKE,RC,DREPORT planned
     class GATE,APPROVE gate
     class DEV,PROD,PR,MERGE,FIX endpoint
 ```
@@ -143,9 +146,9 @@ The quality gate is enforced today. Production approval is manual.
 | Test report | Executed, passed, and failed tests, duration, and coverage | M4 | Planned, week of 16 Nov |
 | Quality gate | Branch ruleset on `main`: a pull request and passing required checks before merge | M1 | Live. Required checks grow as jobs are added, week of 26 Oct |
 | Build artifacts and Docker images | Build the deployment artifacts and the frontend and backend images for the exact commit that passed CI | M2 | Planned, week of 2 Nov |
-| Staging deploy | Automatic deploy to Render.com staging | M2 | Planned, week of 9 Nov |
+| Staging deploy | Automatic deploy to Render.com staging | M2 | Partly live: Render deploys `main` after CI passes (`render.yaml`). CI-driven deploy of the tested commit planned, week of 9 Nov |
 | Smoke tests | Verify the deployment after each release | M5 | Planned, week of 9 Nov |
-| Deployment health check | Poll `/api/health` after deploy | M1 | Planned, week of 16 Nov |
+| Deployment health check | Poll `/api/health` after deploy | M1 | Partly live: Render checks `/api/health` before switching traffic to a new deploy. CI polling after deploy planned, week of 16 Nov |
 | Release candidate | Produce a release candidate after staging passes | M1 | Planned, week of 16 Nov |
 | Build and deployment reports | Build history and deployment status | M2 | Planned, week of 16 Nov |
 | Production deploy | Manual sponsor approval. Not automated | Sponsor | By design |
