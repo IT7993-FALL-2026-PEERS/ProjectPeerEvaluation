@@ -8,7 +8,7 @@ const Team = require('../models/Team');
 async function createTestData() {
   try {
     // Connect to MongoDB
-    await mongoose.connect('mongodb://localhost:27017/peer-eval');
+    await mongoose.connect(require('./mongoUri'));
     console.log('✅ Connected to MongoDB (peer-eval database)');
 
     // Use Preston Jordan's account (pbj2711@gmail.com)

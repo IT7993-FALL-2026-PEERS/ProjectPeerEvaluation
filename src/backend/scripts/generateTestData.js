@@ -201,9 +201,8 @@ if (require.main === module) {
   }
 
   // Connect to MongoDB
-  const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/peer_evaluation';
   
-  mongoose.connect(MONGO_URI)
+  mongoose.connect(require('./mongoUri'))
     .then(() => {
       console.log('✅ Connected to MongoDB');
       return generateTestData(professorEmail);

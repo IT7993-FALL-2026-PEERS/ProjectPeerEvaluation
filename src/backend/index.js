@@ -61,8 +61,6 @@ app.use('/api/courses', require('./routes/courses'));
 app.use('/api/evaluate', require('./routes/evaluate'));
 app.use('/api/ai', require('./routes/ai'));
 app.use('/api/professor', require('./routes/professor'));
-app.use('/api/professor', require('./routes/professor'));
-
 
 // Global error handler (must be last)
 const errorHandler = require('./middleware/errorHandler');

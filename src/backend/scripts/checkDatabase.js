@@ -5,8 +5,7 @@ const Course = require('../models/Course');
 async function checkDatabase() {
   try {
     // Connect to MongoDB
-    const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/peer_evaluation';
-    await mongoose.connect(MONGO_URI);
+    await mongoose.connect(require('./mongoUri'));
     console.log('✅ Connected to MongoDB');
 
     // Check all professors

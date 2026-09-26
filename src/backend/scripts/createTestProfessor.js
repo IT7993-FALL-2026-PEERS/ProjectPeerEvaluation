@@ -1,6 +1,5 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
-require('dotenv').config();
 
 // Import the Professor model
 const Professor = require('../models/Professor');
@@ -8,7 +7,7 @@ const Professor = require('../models/Professor');
 async function createTestProfessor() {
     try {
         // Connect to MongoDB
-        await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/peerevaluation');
+        await mongoose.connect(require('./mongoUri'));
         console.log('✅ Connected to MongoDB');
 
         // Check if test professor already exists
