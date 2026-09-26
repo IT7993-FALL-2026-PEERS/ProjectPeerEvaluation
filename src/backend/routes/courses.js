@@ -9,11 +9,17 @@ const evaluationController = require('../controllers/evaluationController');
 
 const reportController = require('../controllers/reportController');
 const { authenticateToken } = require('../middleware/auth');
+const { requireCourseOwner } = require('../middleware/courseOwner');
 
 // Course management endpoints
 router.get('/', authenticateToken, courseController.listCourses);
 router.post('/', authenticateToken, courseController.createCourse);
 router.post('/migrate', authenticateToken, courseController.migrateCourses); // Migration endpoint
+
+// Everything below takes a course id: only the course's own professor gets through.
+// Keep this after the fixed paths above ('/migrate' would otherwise match ':course_id').
+router.use('/:course_id', authenticateToken, requireCourseOwner);
+
 router.get('/:course_id', authenticateToken, courseController.getCourse);
 router.put('/:course_id', authenticateToken, courseController.updateCourse);
 router.delete('/:course_id', authenticateToken, courseController.deleteCourse);
