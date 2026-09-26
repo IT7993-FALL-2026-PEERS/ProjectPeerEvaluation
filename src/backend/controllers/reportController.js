@@ -3,6 +3,7 @@ const Student = require('../models/Student');
 const Course = require('../models/Course');
 const Team = require('../models/Team');
 const Evaluation = require('../models/Evaluation');
+const Professor = require('../models/Professor');
 const { toCsv } = require('../utils/csv');
 
 /**
@@ -181,9 +182,14 @@ exports.getCourseReport = async (req, res, next) => {
     }
 
     // AI flagging logic
-    const concerningWords = [
-      'cheat', 'abuse', 'bully', 'inappropriate', 'unfair', 'disrespect', 'threat', 'harass', 'plagiar', 'violence', 'unsafe', 'hostile', 'ignore', 'exclude', 'rude', 'lazy', 'fail', 'problem', 'issue', 'concern', 'complain', 'uncooperative', 'unresponsive', 'unacceptable', 'dishonest', 'lie', 'steal', 'aggressive', 'argument', 'conflict', 'discriminate', 'bias', 'racist', 'sexist', 'toxic', 'unprofessional'
-    ];
+    const professor = await Professor.findById(course.professor_id);
+    const configuredWords = professor
+      ? professor.aiConcerningWords
+      : Professor.schema.path('aiConcerningWords').getDefault(null);
+    const concerningWords = configuredWords
+      .filter(word => typeof word === 'string')
+      .map(word => word.trim().toLowerCase())
+      .filter(Boolean);
 
     function flagEvaluation(evaluation) {
       // Flag if all ratings are 5 (except participation)
