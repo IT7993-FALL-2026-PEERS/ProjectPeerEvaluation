@@ -15,10 +15,6 @@ const EMAIL_CONFIG = {
   connectionTimeout: 60000, // 60 seconds
   greetingTimeout: 30000,   // 30 seconds
   socketTimeout: 60000,     // 60 seconds
-  // Add TLS options for better Gmail compatibility
-  tls: {
-    rejectUnauthorized: false
-  }
 };
 
 // Create transporter
