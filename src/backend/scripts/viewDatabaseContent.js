@@ -7,7 +7,7 @@ const Team = require('../models/Team');
 async function viewDatabaseContent() {
   try {
     // Connect to MongoDB
-    await mongoose.connect('mongodb://localhost:27017/peer-eval', {
+    await mongoose.connect(require('./mongoUri'), {
       useNewUrlParser: true,
       useUnifiedTopology: true
     });

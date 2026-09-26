@@ -1,4 +1,3 @@
-require('dotenv').config();
 const mongoose = require('mongoose');
 const Course = require('../models/Course');
 const Professor = require('../models/Professor');
@@ -52,7 +51,7 @@ function generateRandomCourse(professorId) {
 async function addRandomCourses() {
   try {
     console.log('🚀 Connecting to MongoDB...');
-    await mongoose.connect(process.env.MONGO_URI);
+    await mongoose.connect(require('./mongoUri'));
     console.log('✅ Connected to MongoDB');
 
     // Get the first professor from the database

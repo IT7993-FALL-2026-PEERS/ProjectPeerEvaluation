@@ -4,8 +4,7 @@ const Professor = require('../models/Professor');
 async function getCurrentProfessor() {
   try {
     // Connect to MongoDB
-    const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/peer_evaluation';
-    await mongoose.connect(MONGO_URI);
+    await mongoose.connect(require('./mongoUri'));
     console.log('✅ Connected to MongoDB');
 
     // Find the most recently created professor (assuming that's you)

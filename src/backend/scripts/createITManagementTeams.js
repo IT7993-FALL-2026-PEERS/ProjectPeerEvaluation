@@ -1,6 +1,5 @@
 const mongoose = require('mongoose');
 const { v4: uuidv4 } = require('uuid');
-require('dotenv').config();
 
 // Import models
 const Course = require('../models/Course');
@@ -8,7 +7,7 @@ const Student = require('../models/Student');
 const Team = require('../models/Team');
 
 // Connect to MongoDB
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/peer-eval');
+mongoose.connect(require('./mongoUri'));
 
 // Generate realistic student names
 const firstNames = [

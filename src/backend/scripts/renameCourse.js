@@ -1,11 +1,10 @@
 const mongoose = require('mongoose');
-require('dotenv').config();
 
 // Import models
 const Course = require('../models/Course');
 
 // Connect to MongoDB
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/peer-eval');
+mongoose.connect(require('./mongoUri'));
 
 async function renameCourse() {
   try {
