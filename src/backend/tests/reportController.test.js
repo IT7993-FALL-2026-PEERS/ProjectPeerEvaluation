@@ -5,6 +5,7 @@ const Course = require('../models/Course');
 const Student = require('../models/Student');
 const Team = require('../models/Team');
 const Evaluation = require('../models/Evaluation');
+const Professor = require('../models/Professor');
 const controller = require('../controllers/reportController');
 
 const courseId = new mongoose.Types.ObjectId();
@@ -12,6 +13,7 @@ const teamId = new mongoose.Types.ObjectId();
 test.beforeEach((t) => {
   t.mock.method(console, 'log', () => {});
   t.mock.method(console, 'error', () => {});
+  t.mock.method(Professor, 'findById', async () => new Professor());
 });
 
 function fixture(scores = [60, 80]) {
@@ -30,10 +32,11 @@ function fixture(scores = [60, 80]) {
       content_knowledge_skills: score / 20, overall_contribution: score / 20, participation: score / 25 },
     overall_feedback: 'Reliable teammate.', evaluation_token: 'token-' + i
   }));
-  return { course, team, students, evaluations };
+  return { course, team, students, evaluations, professor: new Professor() };
 }
 
 function stubCourse(t, data) {
+  Professor.findById.mock.mockImplementation(async () => data.professor);
   t.mock.method(Course, 'findById', async () => data.course);
   t.mock.method(Student, 'find', () => ({ populate: async () => data.students }));
   t.mock.method(Evaluation, 'find', async () => data.evaluations);
@@ -233,4 +236,55 @@ test('getTeamReport: returns member scores and teamAverage', async (t) => {
 test('generateReport: returns the same report as getCourseReport', async (t) => {
   stubCourse(t, fixture());
   assert.deepEqual(ok(await call('generateReport')), ok(await call('getCourseReport')));
+});
+
+for (const scenario of [
+  { name: 'custom word', words: ['stonewall'], feedback: 'They stonewall discussions.', concerning: true },
+  { name: 'removed default word', words: ['stonewall'], feedback: 'They cheat.', concerning: false },
+  { name: 'case on both sides', words: ['Cheat'], feedback: 'They CHEAT.', concerning: true },
+  { name: 'trimmed words', words: ['  stonewall  '], feedback: 'They stonewall.', concerning: true },
+  { name: 'non-string and empty entries', words: [null, undefined, 123, false, {}, '', '  '],
+    feedback: '123 false null undefined [object Object]', concerning: false }
+]) {
+  test('getCourseReport: professor list handles ' + scenario.name, async (t) => {
+    const data = fixture([80]);
+    // Plain object preserves malformed entries instead of Mongoose casting them to strings.
+    data.professor = { aiConcerningWords: scenario.words };
+    data.evaluations[0].overall_feedback = scenario.feedback;
+    stubCourse(t, data);
+    const flags = ok(await call('getCourseReport')).students[0].evaluationDetails[0].aiFlags;
+    assert.deepEqual(flags, { allFive: false, concerning: scenario.concerning, flagged: scenario.concerning });
+  });
+}
+
+test('getCourseReport: an empty word list leaves only the all-five rule', async (t) => {
+  const data = fixture([80, 100]);
+  data.professor = new Professor({ aiConcerningWords: [] });
+  data.evaluations.forEach(evaluation => { evaluation.overall_feedback = 'They cheat.'; });
+  stubCourse(t, data);
+  const students = ok(await call('getCourseReport')).students;
+  assert.deepEqual(students.map(student => student.evaluationDetails[0].aiFlags), [
+    { allFive: false, concerning: false, flagged: false },
+    { allFive: true, concerning: false, flagged: true }
+  ]);
+});
+
+test('getCourseReport: looks up the course owner by professor_id', async (t) => {
+  const data = fixture();
+  stubCourse(t, data);
+  ok(await call('getCourseReport'));
+  assert.equal(Professor.findById.mock.callCount(), 1);
+  assert.deepEqual(Professor.findById.mock.calls[0].arguments, [data.course.professor_id]);
+});
+
+test('getCourseReport: missing professor uses the schema default list', async (t) => {
+  const data = fixture([80]);
+  data.professor = null;
+  const defaults = Professor.schema.path('aiConcerningWords').getDefault(null);
+  const word = defaults.find(value => typeof value === 'string' && value.trim());
+  assert.ok(word, 'schema provides a default concerning word');
+  data.evaluations[0].overall_feedback = word;
+  stubCourse(t, data);
+  assert.deepEqual(ok(await call('getCourseReport')).students[0].evaluationDetails[0].aiFlags,
+    { allFive: false, concerning: true, flagged: true });
 });
