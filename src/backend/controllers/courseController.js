@@ -154,7 +154,11 @@ exports.getCourse = async (req, res, next) => {
 exports.updateCourse = async (req, res, next) => {
 	try {
 		const { course_id } = req.params;
-		const updates = req.body;
+		// Only what the edit form sends; never professor_id or the system counts.
+		const updates = {};
+		for (const field of ['course_name', 'course_number', 'course_section', 'semester', 'course_status']) {
+			if (req.body[field] !== undefined) updates[field] = req.body[field];
+		}
 		if (!mongoose.Types.ObjectId.isValid(course_id)) {
 			const err = new Error('Invalid course ID.');
 			err.code = 'VALIDATION_ERROR';

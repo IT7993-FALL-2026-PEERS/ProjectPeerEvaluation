@@ -121,20 +121,9 @@ for (const action of ['getCourse', 'updateCourse', 'deleteCourse']) {
     assert.equal(find.mock.callCount(), 1);
     assert.equal(find.mock.calls[0].arguments[0].toString(), courseId);
   });
-
-  // These assertions intentionally fail until each controller enforces ownership.
-  test(`${action}: rejects another professor's course`, { todo: 'no ownership check yet' }, async (t) => {
-    const course = makeCourse({ professor_id: new mongoose.Types.ObjectId() });
-    t.mock.method(Course, method, async () => course);
-    t.mock.method(Student, 'countDocuments', async () => 0);
-    const result = await call(action, { body: { course_name: 'Unauthorized change' } });
-    assert.equal(result.errors.length, 1, 'another professor must not access this course');
-    assert.ok([403, 404].includes(result.errors[0].status));
-    assert.ok(['FORBIDDEN', 'AUTH_ERROR', 'NOT_FOUND'].includes(result.errors[0].code));
-    assert.equal(result.res.statusCode, undefined);
-    assert.equal(result.res.body, undefined);
-  });
 }
+// Ownership (another professor's course → 404) is enforced in routes/courses.js
+// for every :course_id route; see tests/courseOwnership.test.js.
 
 test('getCourse: returns the course with the current student count', async (t) => {
   const course = makeCourse();
@@ -158,6 +147,17 @@ test('updateCourse: applies updates and returns 200', async (t) => {
   assert.deepEqual(update.mock.calls[0].arguments, [courseId, updates, { new: true }]);
   assert.equal(course.course_name, updates.course_name);
   assert.equal(course.semester, updates.semester);
+});
+
+test('updateCourse: only saves the editable fields', async (t) => {
+  const update = t.mock.method(Course, 'findByIdAndUpdate', async () => makeCourse());
+  const body = {
+    ...fields, course_status: 'Inactive',
+    professor_id: new mongoose.Types.ObjectId().toString(), // would hand the course to someone else
+    student_count: 999, team_count: 999, evaluation_status: { total: 1 }, _id: 'x'
+  };
+  success(await call('updateCourse', { body }), 200, { message: 'Course updated.' });
+  assert.deepEqual(update.mock.calls[0].arguments[1], { ...fields, course_status: 'Inactive' });
 });
 
 test('deleteCourse: marks the course Inactive without removing it', async (t) => {
