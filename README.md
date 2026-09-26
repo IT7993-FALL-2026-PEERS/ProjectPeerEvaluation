@@ -69,7 +69,7 @@ flowchart TB
         end
         subgraph TESTS["Automated tests"]
             direction TB
-            UNIT["Unit tests<br/>Jest"]
+            UNIT["Unit tests<br/>Jest (frontend)<br/>node:test (backend)"]
             INTEG["Integration tests<br/>real MongoDB"]
             REG["Functional regression<br/>tests"]
             E2E["End-to-end tests<br/>Playwright"]
@@ -106,8 +106,8 @@ flowchart TB
     linkStyle default stroke-width:2px
 
     class BUILD_APP,LINT done
-    class UNIT,E2E,STG,HEALTH partial
-    class SEC,INTEG,REG,REPORT,ARTIFACTS,SMOKE,RC,DREPORT planned
+    class UNIT,E2E,SEC,STG,HEALTH partial
+    class INTEG,REG,REPORT,ARTIFACTS,SMOKE,RC,DREPORT planned
     class GATE,APPROVE gate
     class DEV,PROD,PR,MERGE,FIX endpoint
 ```
@@ -137,18 +137,18 @@ The quality gate is enforced today. Production approval is manual.
 |---|---|---|---|
 | Install dependencies and build | `npm ci` and the production build | M1 / M4 | Live (`.github/workflows/ci.yml`) |
 | Workflow lint | `actionlint` checks the workflow files themselves | M1 / M4 | Live |
-| Unit tests | Jest and React Testing Library for the frontend; Jest for the backend | M4 / M5 | Frontend live. Backend planned, weeks of 5–12 Oct |
+| Unit tests | Jest and React Testing Library for the frontend; Node's built-in test runner (`node:test`) for the backend | M4 / M5 | Live for both in CI on every pull request. Coverage still growing, weeks of 5–12 Oct |
 | Integration tests | Frontend, backend, database, authentication, and email, against a real MongoDB and an isolated email transport (never real student inboxes) | M4 / M5 | Planned, weeks of 12–19 Oct |
 | Functional regression tests | One automated test per critical business workflow | M5 | Planned, week of 19 Oct |
 | End-to-end tests | Playwright: student and instructor workflows | M4 / M5 | Smoke test live. Workflows planned, week of 26 Oct |
 | Static analysis | ESLint (`npm run lint`) | M1 / M4 | Live |
-| Dependency validation and security scan | Dependabot and OWASP Dependency Check | M3 | Planned, week of 19 Oct |
+| Dependency validation and security scan | Dependabot and OWASP Dependency Check | M3 | Partly live: Dependabot opens weekly update pull requests (`.github/dependabot.yml`); OWASP Dependency-Check runs on every pull request, on `main`, and weekly, report-only (`.github/workflows/security.yml`). Triage, failing on high-severity findings, and making it a required check planned, week of 19 Oct |
 | Test report | Executed, passed, and failed tests, duration, and coverage | M4 | Planned, week of 16 Nov |
 | Quality gate | Branch ruleset on `main`: a pull request and passing required checks before merge | M1 | Live. Required checks grow as jobs are added, week of 26 Oct |
 | Build artifacts and Docker images | Build the deployment artifacts and the frontend and backend images for the exact commit that passed CI | M2 | Planned, week of 2 Nov |
 | Staging deploy | Automatic deploy to Render.com staging | M2 | Partly live: Render deploys `main` after CI passes (`render.yaml`). CI-driven deploy of the tested commit planned, week of 9 Nov |
 | Smoke tests | Verify the deployment after each release | M5 | Planned, week of 9 Nov |
-| Deployment health check | Poll `/api/health` after deploy | M1 | Partly live: Render checks `/api/health` before switching traffic to a new deploy. CI polling after deploy planned, week of 16 Nov |
+| Deployment health check | Poll `/api/health` after deploy | M1 | Partly live: Render checks `/api/health` before switching traffic to a new deploy, and the endpoint reports the deployed commit. CI polling after deploy planned, week of 16 Nov |
 | Release candidate | Produce a release candidate after staging passes | M1 | Planned, week of 16 Nov |
 | Build and deployment reports | Build history and deployment status | M2 | Planned, week of 16 Nov |
 | Production deploy | Manual sponsor approval. Not automated | Sponsor | By design |
@@ -168,12 +168,12 @@ flowchart TB
         direction TB
         WF02["WF02 Test setup<br/>isolated DB + fixtures"]
         WF03["★ WF03 Install deps + static checks (ESLint)"]
-        UNIT["Unit tests<br/>frontend live · backend planned"]
+        UNIT["Unit tests<br/>frontend + backend live · coverage growing"]
         INTEG["Integration tests"]
         REG["Functional regression tests"]
         BUILD["Build"]
         E2E["End-to-end tests<br/>smoke live · workflows planned"]
-        WF05["WF05 Dependency & security scan"]
+        WF05["WF05 Dependency & security scan<br/>report-only live · gate planned"]
         WF06["WF06 Publish results<br/>Playwright reports live · full coverage planned"]
         WF02 --> WF03 --> UNIT --> INTEG --> REG --> BUILD --> E2E --> WF05 --> WF06
     end
@@ -210,8 +210,8 @@ flowchart TB
 
     class BUILD done
     class WF03 highlight
-    class UNIT,E2E,WF06 partial
-    class WF01,WF02,INTEG,REG,WF05,WF07,WF08,WF09,BLOCK,WF10,WF11 planned
+    class UNIT,E2E,WF05,WF06 partial
+    class WF01,WF02,INTEG,REG,WF07,WF08,WF09,BLOCK,WF10,WF11 planned
     class GATE,APPROVE,WF09 gate
     class DEV,PROD,PR,MERGE,FIX endpoint
 ```
@@ -311,17 +311,16 @@ Full per-person, per-week breakdown (sponsor-approved):
 - `npm run start:backend` / `npm run start:frontend` — start one side only
 - `npm test` — frontend unit tests (Jest + React Testing Library)
 - `npm run test:e2e` — end-to-end tests (Playwright)
-
-Not yet on `main` as of this writing:
-- `npm run test:backend` — backend unit tests
+- `cd src/backend && npm test` — backend unit tests (`node:test`)
 
 ### Continuous Integration
 
 GitHub Actions (`.github/workflows/ci.yml`) runs on every pull request to `main` and on every push
-to `main`. It has four jobs: frontend lint, tests and build, a backend syntax check, the Playwright
-smoke test, and a lint of the workflow files (`actionlint`). The `main` branch ruleset requires a
-pull request and all four checks to pass before merging. To reproduce the checks locally, use
-Node 24 (see `.nvmrc`) and run:
+to `main`. It has four jobs: frontend lint, tests and build; a backend syntax check and tests; the
+Playwright smoke test; and a lint of the workflow files (`actionlint`). A separate workflow
+(`.github/workflows/security.yml`) runs the OWASP Dependency-Check scan; it reports findings but
+does not block merging yet. The `main` branch ruleset requires a pull request and all four CI
+checks to pass before merging. To reproduce the checks locally, use Node 24 (see `.nvmrc`) and run:
 
 ```bash
 npm ci
@@ -329,6 +328,7 @@ npm run lint
 npm test -- --watchAll=false
 npm run build
 npm run test:e2e
+cd src/backend && npm test
 ```
 
 Commit `package.json` and `package-lock.json` together. `npm ci` fails if they are out of sync.
@@ -410,8 +410,8 @@ docker-compose.yml  # currently non-functional — see docs/technical-assessment
 
 - **Frontend**: React 19, Create React App, MUI, React Router, Formik/Yup, Chart.js/Recharts
 - **Backend**: Node.js, Express, MongoDB via Mongoose, JWT auth, Nodemailer
-- **Testing**: Jest + React Testing Library (frontend unit), Playwright (end-to-end); backend unit
-  tests are planned (Milestone 2)
+- **Testing**: Jest + React Testing Library (frontend unit), `node:test` (backend unit),
+  Playwright (end-to-end)
 - **CI/CD**: GitHub Actions (CI is live), deploying to Render.com (CD is planned, Milestone 3)
 - **Containerization**: Docker / Docker Compose (planned, see Milestone 2; the current
   `docker-compose.yml` does not work)
