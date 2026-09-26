@@ -1,0 +1,91 @@
+name: Security scan
+
+# OWASP Dependency-Check against both package-lock.json files (frontend at the
+# repo root, backend in src/backend). Weekly as well, because new CVEs are
+# published against dependencies that haven't changed.
+#
+# Report-only for now: the first scan found existing high/critical findings
+# (mostly through react-scripts), so failing on them would block every PR.
+# Once they're triaged, add `--failOnCVSS 7` plus a suppressions file for
+# accepted risks, and make this job a required check on main.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  schedule:
+    - cron: "0 11 * * 1" # Mondays 11:00 UTC, after Dependabot's weekly run
+  workflow_dispatch:
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  dependency-check:
+    name: OWASP Dependency-Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      # The action's image is rebuilt nightly with the vulnerability database
+      # included, so no NVD API key or database download is needed. Pinned to a
+      # commit because the action has no maintained release tags.
+      # RetireJS is off: it would scan the stale bundle in the tracked build/
+      # folder; the npm analyzers already cover our dependencies. No quotes or
+      # globs in args, because the action word-splits them in a shell.
+      - name: Run OWASP Dependency-Check
+        uses: dependency-check/Dependency-Check_Action@1e54355a8b4c8abaa8cc7d0b70aa655a3bb15a6c # main, 2025-12-10
+        with:
+          project: ProjectPeerEvaluation
+          path: .
+          format: HTML
+          out: reports
+          args: --format JSON --disableRetireJS
+
+      - name: Summarize findings
+        if: ${{ !cancelled() }}
+        run: |
+          node - <<'EOF' >> "$GITHUB_STEP_SUMMARY"
+          const fs = require('fs');
+          const file = 'reports/dependency-check-report.json';
+          if (!fs.existsSync(file)) {
+            console.log('## OWASP Dependency-Check\n\nNo JSON report was produced.');
+            process.exit(0);
+          }
+          const deps = JSON.parse(fs.readFileSync(file, 'utf8')).dependencies || [];
+          const counts = {};
+          const packages = new Map();
+          for (const dep of deps) {
+            for (const v of dep.vulnerabilities || []) {
+              const sev = (v.severity || 'UNKNOWN').toUpperCase();
+              counts[sev] = (counts[sev] || 0) + 1;
+              if (sev === 'CRITICAL' || sev === 'HIGH') packages.set(dep.fileName, sev);
+            }
+          }
+          const order = ['CRITICAL', 'HIGH', 'MODERATE', 'MEDIUM', 'LOW', 'UNKNOWN'];
+          const rows = order.filter((s) => counts[s]).map((s) => `| ${s} | ${counts[s]} |`);
+          console.log('## OWASP Dependency-Check (report only, not blocking)\n');
+          console.log(rows.length ? ['| Severity | Findings |', '|---|---|', ...rows].join('\n') : 'No known vulnerabilities found.');
+          if (packages.size) {
+            console.log(`\n**Packages with critical or high findings (${packages.size}):**\n`);
+            for (const [name, sev] of [...packages].sort()) console.log(`- ${name} (${sev})`);
+          }
+          console.log('\nFull details: download the `dependency-check-report` artifact and open the HTML file.');
+          EOF
+
+      - name: Upload report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: dependency-check-report
+          path: reports/
+          retention-days: 30
+          if-no-files-found: warn
