@@ -1,0 +1,46 @@
+# Dependabot version updates: frontend, backend and GitHub Actions.
+# Minor and patch updates are grouped into one PR per area each week, because
+# every merge that touches package.json/package-lock.json triggers a Render build
+# and the workspace only has 500 build minutes a month. Major updates still come
+# as separate PRs so breaking changes are reviewed one at a time.
+# Security updates are separate: turn on "Dependabot security updates" in the
+# repository settings (Code security) to get those as soon as an advisory lands.
+version: 2
+updates:
+  # Frontend (React app at the repo root)
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: America/New_York
+    open-pull-requests-limit: 5
+    groups:
+      frontend-minor-and-patch:
+        update-types: [minor, patch]
+
+  # Backend (Express API)
+  - package-ecosystem: npm
+    directory: /src/backend
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: America/New_York
+    open-pull-requests-limit: 5
+    groups:
+      backend-minor-and-patch:
+        update-types: [minor, patch]
+
+  # Actions used in .github/workflows
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: America/New_York
+    groups:
+      github-actions:
+        patterns: ["*"]
