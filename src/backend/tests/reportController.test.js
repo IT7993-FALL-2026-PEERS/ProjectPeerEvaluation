@@ -145,15 +145,14 @@ test('getCourseReport: curved scores move toward the mean below the protection t
     classStats: { mean: 70, standardDeviation: 18.71, boostFactor: 0.5, protectionThreshold: 80 } });
 });
 
-test('getCourseReport: team averages include populated team members',
-  { todo: 'populated team ids are compared as plain objects' }, async (t) => {
-    const data = fixture([60, 80]);
-    stubCourse(t, data);
-    const body = ok(await call('getCourseReport'));
-    assert.equal(body.teams[0].students.length, 2);
-    assert.equal(body.teams[0].averageScore, 70);
-    assert.equal(body.teams[0].letterGrade, 'C');
-  });
+test('getCourseReport: team averages include populated team members', async (t) => {
+  const data = fixture([60, 80]);
+  stubCourse(t, data);
+  const body = ok(await call('getCourseReport'));
+  assert.equal(body.teams[0].students.length, 2);
+  assert.equal(body.teams[0].averageScore, 70);
+  assert.equal(body.teams[0].letterGrade, 'C');
+});
 
 for (const kind of ['allFive', 'concerning']) {
   test('getCourseReport: AI flags ' + kind, async (t) => {

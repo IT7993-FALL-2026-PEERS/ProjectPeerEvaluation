@@ -275,7 +275,8 @@ exports.getCourseReport = async (req, res, next) => {
     const teams = await Team.find({ course_id: courseObjectId });
     const teamStats = teams.map(team => {
       const teamStudents = studentsWithGrades.filter(
-        student => student.team_id && student.team_id.toString() === team._id.toString()
+        // team_id is populated, so after toObject() it's a plain object, not an id
+        student => student.team_id && String(student.team_id._id || student.team_id) === team._id.toString()
       );
       
       const teamScores = teamStudents.map(s => s.finalScore).filter(score => score > 0);
