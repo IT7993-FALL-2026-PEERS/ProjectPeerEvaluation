@@ -35,12 +35,18 @@ jobs:
         with:
           persist-credentials: false
 
+      # build/ is a stale compiled bundle that's still tracked in git; scanning it
+      # would report libraries from an old build, not what we ship. Removed from
+      # this job's checkout only, not from the repo.
+      - name: Skip the stale build/ bundle
+        run: rm -rf build
+
       # The action's image is rebuilt nightly with the vulnerability database
       # included, so no NVD API key or database download is needed. Pinned to a
-      # commit because the action has no maintained release tags.
-      # RetireJS is off: it would scan the stale bundle in the tracked build/
-      # folder; the npm analyzers already cover our dependencies. No quotes or
-      # globs in args, because the action word-splits them in a shell.
+      # commit because the action has no maintained release tags. Keep args to
+      # standard options: the image's CLI rejected the advanced
+      # --disableRetireJS flag. No quotes or globs in args either, because the
+      # action word-splits them in a shell.
       - name: Run OWASP Dependency-Check
         uses: dependency-check/Dependency-Check_Action@1e54355a8b4c8abaa8cc7d0b70aa655a3bb15a6c # main, 2025-12-10
         with:
@@ -48,7 +54,7 @@ jobs:
           path: .
           format: HTML
           out: reports
-          args: --format JSON --disableRetireJS
+          args: --format JSON
 
       - name: Summarize findings
         if: ${{ !cancelled() }}
