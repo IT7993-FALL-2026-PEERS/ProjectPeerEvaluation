@@ -144,7 +144,7 @@ The quality gate is enforced today. Production approval is manual.
 | Static analysis | ESLint (`npm run lint`) | M1 / M4 | Live |
 | Dependency validation and security scan | Dependabot and OWASP Dependency Check | M3 | Partly live: Dependabot opens weekly update pull requests (`.github/dependabot.yml`); OWASP Dependency-Check runs on every pull request, on `main`, and weekly, report-only (`.github/workflows/security.yml`). Triage, failing on high-severity findings, and making it a required check planned, week of 19 Oct |
 | Test report | Executed, passed, and failed tests, duration, and coverage | M4 | Planned, week of 16 Nov |
-| Quality gate | Branch ruleset on `main`: a pull request and passing required checks before merge. No approval required, so authors merge their own pull requests | M1 | Live. Required checks grow as jobs are added, week of 26 Oct |
+| Quality gate | `main-protection` ruleset: a pull request, passing required checks and an up-to-date branch before merge. No approval required, so authors merge their own pull requests | M1 | Live. Required checks grow as jobs are added, week of 26 Oct |
 | Build artifacts and Docker images | Build the deployment artifacts and the frontend and backend images for the exact commit that passed CI | M2 | Planned, week of 2 Nov |
 | Staging deploy | Automatic deploy to Render.com staging | M2 | Partly live: Render deploys `main` after CI passes (`render.yaml`). CI-driven deploy of the tested commit planned, week of 9 Nov |
 | Smoke tests | Verify the deployment after each release | M5 | Planned, week of 9 Nov |

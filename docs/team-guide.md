@@ -16,9 +16,21 @@ A few short working habits for PEERS. They are adapted from Matt Pocock's
 ## Merging your own pull request
 
 You can merge your own pull request once the required checks pass. No approval is needed. The
-`main` ruleset requires a pull request and the four CI checks, but 0 approvals and no code-owner
-review, so nobody waits on a reviewer to ship. Reviews are still welcome: CODEOWNERS requests one
-automatically, and for a one-way door, ask someone to look before you merge.
+`main-protection` ruleset requires a pull request, the four CI checks, and a branch that is up to
+date with `main`, but 0 approvals and no code-owner review, so nobody waits on a reviewer to ship.
+Reviews are still welcome: CODEOWNERS requests one automatically, and for a one-way door, ask
+someone to look before you merge.
+
+If GitHub says the branch is out of date, click **Update branch** (or run
+`gh pr update-branch <number>`), wait for the checks to pass again, then merge.
+
+### Emergency bypass
+
+The ruleset lets the **Repository admin** role bypass it. Today that is **dgobin-ksu** (Donald,
+M1) and **KhoaHo-kho6** (Khoa, M4). Use the bypass only when `main` is broken or blocked and a
+normal pull request can't fix it, for example when a required check is stuck. Merge the fix
+through a pull request anyway if you can. Afterwards, say in the team channel what was bypassed and
+why, and link the commit. Don't use the bypass to skip failing checks.
 
 ## Reviewing a pull request
 
