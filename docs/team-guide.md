@@ -24,13 +24,14 @@ someone to look before you merge.
 If GitHub says the branch is out of date, click **Update branch** (or run
 `gh pr update-branch <number>`), wait for the checks to pass again, then merge.
 
-### Emergency bypass
+### No bypass
 
-The ruleset lets the **Repository admin** role bypass it. Today that is **dgobin-ksu** (Donald,
-M1) and **KhoaHo-kho6** (Khoa, M4). Use the bypass only when `main` is broken or blocked and a
-normal pull request can't fix it, for example when a required check is stuck. Merge the fix
-through a pull request anyway if you can. Afterwards, say in the team channel what was bypassed and
-why, and link the commit. Don't use the bypass to skip failing checks.
+Nobody can bypass `main-protection`, admins included: every change to `main` goes through a pull
+request with passing checks, and a direct push is rejected (`GH013: Changes must be made through a
+pull request`). If a required check is broken and blocks every merge, fix the check in a pull
+request. If even that can't pass, a repository admin (**dgobin-ksu** or **KhoaHo-kho6**) can
+change the ruleset in Settings → Rules → Rulesets. Say in the team channel what was changed and
+why, and put the setting back straight after.
 
 ## Reviewing a pull request
 
