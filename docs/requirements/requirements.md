@@ -4,7 +4,7 @@
 **Milestone:** 1 — Assessment & Planning (14 Sep – 4 Oct 2026), review 28 Sep
 **Gantt task:** Requirements Validation & RTM — *"Document required functionality, acceptance criteria & defects"*
 **Status:** Draft — critical-workflow marking pending M1's sponsor session
-**Last updated:** 21 September 2026
+**Last updated:** 27 September 2026
 
 ## Purpose and method
 
@@ -30,30 +30,43 @@ refer to them, so they must not be renumbered once this document is merged.
 | **Unsupported** | No implementation found |
 | **Planned** | No implementation yet, but the gap is tracked (linked defect ID) and awaiting scheduling or a sponsor scope decision |
 | **Needs verification** | Implementation found, but correctness could not be confirmed by code reading alone; requires a runtime check during Milestone 2 testing |
+| **Partial** | Part of the requirement is implemented and part is not |
 
 ### Method and limits
 
-Statuses were determined by reading the `main` branch on 21 September 2026 — routes,
-controllers, models and configuration — and by cross-referencing M4's containerization
-and test-coverage review and M5's database schema review. No requirement has been
-confirmed against a running instance yet, so anything marked *Validated* means "correctly
-implemented as far as the code shows", not "observed working". Runtime confirmation
-happens in Milestone 2, when the unit, integration and end-to-end tests are written
-against these criteria.
+Statuses were determined by reading the `main` branch — routes, controllers, models and
+configuration — and by cross-referencing M4's containerization and test-coverage review
+and M5's database schema review. No requirement has been confirmed against a running
+instance yet, so anything marked *Validated* means "correctly implemented as far as the
+code shows", not "observed working". Runtime confirmation happens in Milestone 2, when the
+unit, integration and end-to-end tests are written against these criteria.
 
-**Criticality is not yet assigned.** M1 is holding the critical-workflow session with the
-sponsor in the week of 21 Sep; output goes to `docs/requirements/critical-workflows.md`.
-Once it exists, a Critical column will be added here and used to prioritise test coverage.
+**Revision history.** First pass 21 September 2026. Second pass 27 September, after
+`docs/requirements/rtm.md` surfaced several statuses that a deeper read of the backend
+controllers contradicted. Four entries changed — FR-14, FR-15, FR-16 and FR-19 — and each
+records what changed and why. The lesson worth carrying into Milestone 2: a dependency or
+route search is not sufficient evidence that a feature is absent, and reading the
+controller is.
+
+**Criticality is not yet assigned.** `docs/requirements/critical-workflows.md` now exists
+and defines twelve workflows (CW-01 to CW-12), but their priority ranking is still a
+proposal pending the sponsor session. Once priorities are confirmed, a Critical column is
+added here and used to prioritise test coverage.
 
 ### Summary
 
 | Status | Count |
 |---|---|
-| Validated | 10 |
-| Needs verification | 6 |
-| Defective | 4 |
-| Unsupported | 3 |
+| Validated | 12 |
+| Defective | 5 |
+| Needs verification | 3 |
+| Partial | 1 |
+| Unsupported | 2 |
 | **Total** | **23** |
+
+*Counts revised 27 Sep after a second pass over the backend controllers. Four statuses
+changed: FR-14 to Defective, FR-15 and FR-16 to Validated, FR-19 to Partial. Each revised
+entry says what changed and why.*
 
 ---
 
@@ -296,7 +309,7 @@ and one of them must change.
 `min: 1, max: 5` for the other five criteria.
 
 ### FR-14 — Textual feedback with length limits
-*Inherited: FR4.2* · **Status: Needs verification**
+*Inherited: FR4.2* · **Status: Defective** · **Defect: D-22**
 
 **Required functionality.** Students provide written feedback, at least 50 and at most 500
 characters.
@@ -306,13 +319,18 @@ maximum,
 **when** they submit,
 **then** the submission is rejected with a message stating the permitted length.
 
-*Why verification is needed.* No `minlength` or `maxlength` constraint was found on
-`Evaluation.overall_feedback` in the schema. If the limits are enforced only in the
-frontend, the rule can be bypassed by calling the API directly — which would make this
-Defective. Confirm before Milestone 2 testing.
+**Current behaviour.** The enforced minimum is **10 characters, not 50**, and there is
+**no maximum at all** — so a one-word response is accepted and an unbounded one is stored.
+The schema carries no `minlength` or `maxlength` on `Evaluation.overall_feedback` either.
+
+*Evidence.* `src/backend/controllers/evaluationController.js:479` —
+`evalData.overall_feedback.trim().length < 10`; `src/backend/models/Evaluation.js:15`.
+
+*Revised 27 Sep — previously recorded as "Needs verification"; confirmed defective on
+re-reading the controller.*
 
 ### FR-15 — Timestamp all submissions
-*Inherited: FR4.3* · **Status: Needs verification**
+*Inherited: FR4.3* · **Status: Validated**
 
 **Required functionality.** Every submission records when it was made.
 
@@ -320,11 +338,12 @@ Defective. Confirm before Milestone 2 testing.
 **when** it is stored,
 **then** the record carries the submission date and time.
 
-*Why verification is needed.* Confirm whether `Evaluation` uses Mongoose `timestamps` or an
-explicit field; M5's schema summary does not list one.
+*Evidence.* `Evaluation.submitted_at` in `src/backend/models/Evaluation.js`.
+
+*Revised 27 Sep — previously "Needs verification".*
 
 ### FR-16 — Prevent duplicate submissions
-*Inherited: FR4.4* · **Status: Needs verification**
+*Inherited: FR4.4* · **Status: Validated, with a concurrency gap**
 
 **Required functionality.** A student cannot submit more than one evaluation for the same
 teammate in the same round.
@@ -333,9 +352,14 @@ teammate in the same round.
 **when** they attempt to submit again using the same link,
 **then** the second submission is refused and the first is preserved unchanged.
 
-*Why verification is needed.* Duplicate handling was found for roster entries and teams,
-but no equivalent guard was confirmed for evaluation submissions. This is a data-integrity
-requirement and should be tested explicitly in Milestone 2.
+*Evidence.* Duplicate-submission guard in
+`src/backend/controllers/evaluationController.js:436-446`.
+
+*Open gap.* The guard checks and then inserts, and the database index does not enforce
+uniqueness, so two requests arriving at the same moment could both pass the check. Worth an
+explicit concurrency test in Milestone 2 rather than assuming the guard is sufficient.
+
+*Revised 27 Sep — previously "Needs verification".*
 
 ---
 
@@ -362,16 +386,26 @@ requirement and should be tested explicitly in Milestone 2.
 *Evidence.* Aggregation logic in `controllers/reportController.js`.
 
 ### FR-19 — Downloadable reports (PDF, CSV)
-*Inherited: FR5.3* · **Status: Unsupported** · **Defect: D-20**
+*Inherited: FR5.3* · **Status: Partial** · **Defect: D-20**
 
 **Required functionality.** A professor can download reports as PDF and CSV files.
 
 **Given** a generated course report,
-**when** the professor chooses to download it as PDF or as CSV,
-**then** a file in that format is produced containing the report contents.
+**when** the professor chooses to download it as CSV,
+**then** a CSV file is produced containing the report contents.
 
-**Current behaviour.** No PDF or CSV generation library is installed, and no export route
-or handler exists. Reports can be viewed but not exported.
+**Given** a generated course report,
+**when** the professor chooses to download it as PDF,
+**then** a PDF file is produced containing the report contents.
+
+**Current behaviour.** CSV export **works** — `downloadReport` is implemented in
+`src/backend/controllers/reportController.js:346`. **PDF export does not exist**: no PDF
+generation library is installed and no PDF handler is defined. So half the requirement is
+met.
+
+*Revised 27 Sep — previously recorded as "Unsupported" on the basis of a dependency and
+route search. That was wrong: the CSV export is implemented in the report controller. D-20
+has been corrected to cover PDF only.*
 
 ### FR-20 — Highlight outliers and discrepancies
 *Inherited: FR5.4* · **Status: Needs verification**

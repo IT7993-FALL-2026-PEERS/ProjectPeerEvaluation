@@ -4,7 +4,7 @@
 **Milestone:** 1 — Assessment & Planning (14 Sep – 4 Oct 2026), review 28 Sep
 **Gantt task:** Technical Assessment — *"Log known defects/limitations; compile technical assessment report"*
 **Status:** Draft — sections 1 and 11 pending teammate input (see markers below)
-**Last updated:** 21 September 2026
+**Last updated:** 27 September 2026
 
 ## Purpose
 
@@ -241,13 +241,24 @@ behaviour with a workaround; **Low** — hygiene, documentation or maintainabili
 | D-17 | Multi-factor authentication is advertised by the data model and the login flow but is not implemented — the verification endpoint returns an error | `src/backend/controllers/authController.js`, `src/backend/routes/auth.js` | High | `Professor.mfa_enabled` exists and login returns `mfa_required: true`, but `verifyMfa` throws `'MFA verification not implemented.'`; a professor with MFA enabled cannot log in | Open |
 | D-18 | Session lifetime does not match the documented requirement — tokens are issued with a one-hour expiry, but the inherited requirement specifies a 30-minute timeout | `src/backend/controllers/authController.js`, `docs/requirements/functional-requirements.md` | Low | `const JWT_EXPIRES_IN = '1h'`; FR1.4 specifies 30 minutes | Open |
 | D-19 | The participation criterion uses a 1–4 rating scale while every other criterion uses 1–5, contradicting the inherited requirement that all ratings are 1–5 | `src/backend/models/Evaluation.js` | Medium | `participation: { min: 1, max: 4 }` with an inline comment noting the difference; all five other criteria are `min: 1, max: 5` | Open |
-| D-20 | No report export capability exists — no PDF or CSV generation library is installed and no export route is defined, although downloadable reports are an inherited requirement | `src/backend/`, `package.json` | Medium | Repository search for PDF/CSV export libraries and export handlers returns no results; FR5.3 specifies PDF and CSV downloads | Open |
+| D-20 | **PDF report export does not exist.** CSV export works, but FR5.3 specifies both formats, so half the requirement is unmet | `src/backend/controllers/reportController.js`, `package.json` | Medium | `downloadReport` (CSV) is implemented at `reportController.js:346`; no PDF generation library is installed and no PDF handler is defined | Open — *corrected 27 Sep, see revision note* |
+| D-22 | Written-feedback length is not enforced as specified — the minimum is 10 characters rather than 50, and there is no maximum at all, so a one-word response is accepted and an unbounded one is stored | `src/backend/controllers/evaluationController.js`, `src/backend/models/Evaluation.js` | Medium | `evalData.overall_feedback.trim().length < 10` at `evaluationController.js:479`; no `minlength`/`maxlength` on `Evaluation.overall_feedback` at `models/Evaluation.js:15`; FR4.2 specifies 50–500 | Open |
 | D-21 | The deployment review document's header labels it "Milestone 2, task 1.2", but it is a Milestone 1 deliverable | `docs/deployment-review.md` | Low | Line 3 of the document | Open — M2 to correct |
 
-**Summary:** 21 defects logged — 1 critical, 4 high, 10 medium, 6 low. The critical and
+**Summary:** 22 defects logged — 1 critical, 4 high, 11 medium, 6 low. The critical and
 high items cluster around two themes: secrets and configuration hygiene (D-01, D-02,
 D-03), and features that are documented or partially scaffolded but not actually
 implemented (D-05, D-17).
+
+**Revision note, 27 September.** D-20 originally read "no report export capability exists."
+That was wrong. It was based on a dependency and route search that missed `downloadReport`
+in the report controller — CSV export is implemented and works; only PDF export is
+missing. D-20 has been narrowed accordingly, and the corresponding requirement (FR-19 in
+`docs/requirements/requirements.md`) has moved from *Unsupported* to *Partial*.
+
+The error was surfaced by `docs/requirements/rtm.md`. The same re-reading added D-22 and
+corrected three other requirement statuses. Carried forward as a working rule: absence of
+a dependency is not evidence that a feature is absent — the controller has to be read.
 
 ## 12. Next steps
 
