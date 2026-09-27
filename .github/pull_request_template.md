@@ -1,12 +1,14 @@
-## Summary
+## What changed
 
 <!-- What changed and why, in a few sentences. -->
 
-## Milestone task
+## Linked issue
 
-<!-- Which Gantt / milestone task is this for? Example: "Milestone 1, M3: technical assessment report". -->
+<!-- "Closes #123" closes the issue when this merges; use "Refs #123" if it should stay open. Also name the Gantt / milestone task, e.g. "Milestone 1, M3: technical assessment report". -->
 
-## How I checked it
+Closes #
+
+## How it was tested
 
 <!-- Tick what applies. Delete lines that do not apply to this change. -->
 
