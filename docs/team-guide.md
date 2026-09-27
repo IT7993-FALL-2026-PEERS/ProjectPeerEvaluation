@@ -13,6 +13,26 @@ A few short working habits for PEERS. They are adapted from Matt Pocock's
   until `JWT_SECRET` is set on Render.
 - Show that it works: a screenshot, or the test that failed before and passes now.
 
+## Merging your own pull request
+
+You can merge your own pull request once the required checks pass. No approval is needed. The
+`main-protection` ruleset requires a pull request, the four CI checks, and a branch that is up to
+date with `main`, but 0 approvals and no code-owner review, so nobody waits on a reviewer to ship.
+Reviews are still welcome: CODEOWNERS requests one automatically, and for a one-way door, ask
+someone to look before you merge.
+
+If GitHub says the branch is out of date, click **Update branch** (or run
+`gh pr update-branch <number>`), wait for the checks to pass again, then merge.
+
+### No bypass
+
+Nobody can bypass `main-protection`, admins included: every change to `main` goes through a pull
+request with passing checks, and a direct push is rejected (`GH013: Changes must be made through a
+pull request`). If a required check is broken and blocks every merge, fix the check in a pull
+request. If even that can't pass, a repository admin (**dgobin-ksu** or **KhoaHo-kho6**) can
+change the ruleset in Settings → Rules → Rulesets. Say in the team channel what was changed and
+why, and put the setting back straight after.
+
 ## Reviewing a pull request
 
 Ask two separate questions and answer them separately:
