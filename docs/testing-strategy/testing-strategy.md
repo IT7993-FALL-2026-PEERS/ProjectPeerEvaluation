@@ -3,7 +3,7 @@
 **Owner:** Laeticia Neno Aloyem (M3) — Requirements, QA, security & documentation
 **Milestone:** 1 — Assessment & Planning (14 Sep – 4 Oct 2026), review 28 Sep
 **Gantt task:** CI/CD & Testing Strategy Design — *"Draft automated testing strategy (unit / integration / regression / e2e / smoke)"*
-**Status:** Draft for team review — decisions marked **[DECISION]** need agreement before Milestone 2 starts on 5 Oct
+**Status:** Draft for team review — decisions marked **[DECISION]** need agreement before Milestone 2 starts on 5 Oct. Revised 27 Sep in response to M4's review on PR #66.
 **Last updated:** 27 September 2026
 
 ## Purpose and scope
@@ -145,9 +145,16 @@ rather than by a user.
 application shell; one unauthenticated read-only endpoint responds. Three checks, under thirty
 seconds total.
 
-**Note.** `/api/health` already exists in `src/backend/index.js` and nothing currently calls
-it. Per M2's deployment review this is the smallest gap in the whole pipeline — the endpoint
-is ready, it just needs to be invoked after deploy.
+**Current state.** `/api/health` exists in `src/backend/index.js` and **Render already polls
+it** — `render.yaml` sets `healthCheckPath: /api/health`, so the platform will not route
+traffic to an instance that fails its health check. M2's deployment review predates that
+configuration.
+
+What is still missing is a **dedicated post-deploy smoke job in the pipeline**: Render's
+health check tells the platform the process is up, but it does not assert that the frontend
+serves, that a read-only endpoint responds, or that the deploy is fit to be tagged a release
+candidate. That job is the remaining gap, and it is smaller than "no health check exists"
+would have implied.
 
 ## 3. What the pipeline enforces
 
@@ -156,15 +163,25 @@ backend syntax check, backend unit tests, Playwright, workflow lint.
 
 Proposed additions, in the order they should land:
 
+Schedule follows the sponsor's own placement of integration, regression and end-to-end
+implementation in Milestone 2. Nothing here proposes moving that.
+
 | Addition | Gate | When | Owner |
 |---|---|---|---|
-| Coverage collection and reporting on every PR | Report only at first | Milestone 2, early | M3 |
-| Coverage threshold enforced | Fails the PR below the agreed floor | Milestone 2, once a baseline is measured | M3 |
+| Coverage collection and reporting on every PR | Report only at first | Milestone 2, early | M4 implements, M3 sets policy |
+| Coverage threshold enforced | Fails the PR below the agreed floor | Milestone 2, once a baseline is measured | M3 owns the threshold |
 | Integration tests | Required check | Milestone 2 | M1 wires, M4/M5 write |
-| Regression tests | Required check | Milestone 2–3 | M1 wires, M5 writes |
-| E2E against a running app | Required check | Milestone 3 | M1 wires, M4/M5 write |
-| Post-deploy smoke tests | Blocks release-candidate tagging | Milestone 3 | M2/M5 |
+| Regression tests | Required check | Milestone 2 | M1 wires, M5 writes |
+| E2E against a running app | Required check | Milestone 2 | M1 wires, M4/M5 write |
+| Post-deploy smoke job | Blocks release-candidate tagging | Milestone 3, with the CD pipeline | M2/M5 |
 | OWASP Dependency-Check with `--failOnCVSS 7` | Required check | Milestone 2, after triage | M3 |
+
+**On the reporting / policy split.** The README assigns automated test reporting to M4, and
+that stands: M4 builds the reporting mechanics — the JUnit and coverage reporters, the CI
+step that collects them, and where the artifacts are published. M3 owns the QA policy those
+reports feed: what the threshold is, when it is raised, and whether a run below it blocks a
+merge. One person builds the instrument, the other decides what reading is acceptable. If
+the team would rather one person do both, say so and this document follows.
 
 The last one needs saying plainly: `security.yml` already runs OWASP Dependency-Check and
 Dependabot is configured, but the scan is report-only because the first run surfaced existing
@@ -174,13 +191,19 @@ it is larger than it looks.
 
 ## 4. Coverage
 
-**Proposed floor: 70% of lines and branches on both frontend and backend, enforced per pull
-request** — with the threshold ratcheted upward as coverage rises, never downward. [DECISION 2]
+**70% of lines and branches is the target, not the opening threshold.** [DECISION 2] The
+two are separate numbers and conflating them is how coverage gates get disabled in week one.
 
-Why 70 rather than a higher number: the baseline has not been measured yet, and a threshold
-set above where the code actually sits fails every pull request on day one, at which point
-someone disables it. The honest sequence is measure first, set the floor just below the
-measurement, then raise it.
+The sequence:
+
+1. **Measure.** Add coverage collection to CI, reporting only, and record the baseline for
+   frontend and backend separately.
+2. **Set the opening floor just below that baseline** — low enough that it passes on the day
+   it is switched on, high enough that coverage cannot silently fall.
+3. **Ratchet upward** as tests land, never downward, until the 70% target is reached.
+
+So the enforced minimum on day one is whatever step 1 measures, minus a small margin. 70%
+is where we are heading, and neither number is meaningful until the baseline exists.
 
 Coverage is a floor, not a goal. A suite at 90% that never asserts the acceptance criteria in
 `requirements.md` is worth less than one at 60% that does. The RTM, not the coverage number,
@@ -217,8 +240,8 @@ sits with the backend and database work.
    frontend), or standardise on one? Two is workable but means merging two coverage formats.
    Recommendation: keep both, and have CI merge the reports — switching runners mid-project
    costs more than it saves.
-2. **[DECISION 2]** Is 70% the agreed coverage floor, measured per package and ratcheted
-   upward only?
+2. **[DECISION 2]** Is 70% the agreed coverage *target*, with the enforced floor set just
+   below the measured baseline and ratcheted upward only?
 3. **[DECISION 3]** Adopt `TC-<FR>-<sequence>` as the test naming convention, so test names
    trace to requirement IDs?
 4. **[DECISION 4]** Who owns the shared test-data seed module, and is a single shared fixture
@@ -228,14 +251,16 @@ sits with the backend and database work.
 
 ## 8. Open items carried from M4's frontend strategy
 
-Two of M4's open questions affect more than the frontend and belong to the team:
+One of M4's open questions affects more than the frontend and belongs to the team:
 
-- `ProtectedRoute` is currently a passthrough with no real guard logic, so route protection
-  is untested because it does not exist. This is an authorization gap, not only a testing
-  one, and should be raised with the sponsor alongside the MFA question (D-17).
 - `CourseManagement.js` is 2,687 lines. Testing it meaningfully means splitting it first.
   That is refactoring work nobody currently owns, and it will otherwise become the reason
   the coverage threshold cannot be met.
+
+**Resolved since M4's document was written.** `ProtectedRoute` is no longer a passthrough —
+it reads the stored token and redirects to the login page when there is none
+(`src/frontend/components/ProtectedRoute.js`), and it has three tests. Route protection is
+implemented and covered; it is not an open gap.
 
 ## Related documents
 
