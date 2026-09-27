@@ -6,14 +6,14 @@ the functional requirements it implements (`docs/requirements/functional-require
 to the actual routes/controllers that carry it out, so the mapping reflects what the code does
 today rather than what was originally specified.
 
-**Status of this document:** workflows and requirement/code traceability below were identified
-from the current codebase. Business-criticality ranking and priority order have not yet been
-validated with the sponsor — that requires Donald's sponsor session (scheduled ahead of the
-28 Sep milestone review). Priorities marked below are a starting proposal, not sponsor-confirmed.
+**Status of this document:** approved. The workflows and requirement/code traceability below
+were identified from the current codebase, and the sponsor approved the critical workflows
+(CW-01 to CW-12) on 27 September 2026. The Requirements Traceability Matrix
+(`docs/requirements/rtm.md`) maps every requirement to these workflows.
 
 ## Legend
 - **Status**: Implemented / Partial / Broken / Planned
-- **Priority**: proposed only, pending sponsor validation
+- **Priority**: as approved by the sponsor, 27 Sep 2026
 
 **Note on naming — CW vs. WF:** the README's `WF01`–`WF12` IDs label stages of the CI/CD
 *pipeline* (checkout, build, deploy, etc.). The `CW-01`–`CW-12` IDs below label the
@@ -23,7 +23,7 @@ so the two are never confused.
 
 ## CW-01: Professor Authentication
 - **Actor:** Professor
-- **Priority (proposed):** Critical — every other workflow requires an authenticated session
+- **Priority:** Critical — every other workflow requires an authenticated session
 - **Trigger:** Professor opens the app and needs access to their courses
 - **Steps:** submit credentials → server issues JWT → session persists client-side → protected
   routes accept the token until expiry or logout
@@ -39,7 +39,7 @@ so the two are never confused.
 
 ## CW-02: Password Reset
 - **Actor:** Professor
-- **Priority (proposed):** High
+- **Priority:** High
 - **Trigger:** Professor forgets their password
 - **Steps:** request reset → receive token → submit new password via `ResetPassword.js`
 - **Requirements:** FR1.1 (secure login, implicit)
@@ -49,7 +49,7 @@ so the two are never confused.
 
 ## CW-03: Course Setup
 - **Actor:** Professor
-- **Priority (proposed):** Critical — nothing downstream (rosters, teams, evaluations) exists
+- **Priority:** Critical — nothing downstream (rosters, teams, evaluations) exists
   without a course
 - **Trigger:** Start of semester / new section
 - **Steps:** create course → set name, code, section, semester → course appears on dashboard
@@ -60,7 +60,7 @@ so the two are never confused.
 
 ## CW-04: Roster Management
 - **Actor:** Professor
-- **Priority (proposed):** Critical
+- **Priority:** Critical
 - **Trigger:** Professor needs to populate a course with students
 - **Steps:** bulk upload CSV/Excel (with validation and error handling) or add/edit/remove
   students individually or in bulk
@@ -72,7 +72,7 @@ so the two are never confused.
 
 ## CW-05: Team Assignment
 - **Actor:** Professor
-- **Priority (proposed):** Critical — evaluations are scoped to teams
+- **Priority:** Critical — evaluations are scoped to teams
 - **Trigger:** Roster is in place and teams need to be formed
 - **Steps:** create teams → auto-assign students or move them manually between teams
 - **Requirements:** FR2.4
@@ -84,7 +84,7 @@ so the two are never confused.
 
 ## CW-06: Evaluation Distribution
 - **Actor:** Professor (initiates), Student (receives)
-- **Priority (proposed):** Critical — this is the core function of the product
+- **Priority:** Critical — this is the core function of the product
 - **Trigger:** Professor is ready to open a round of peer evaluations for a course or team
 - **Steps:** system generates a unique evaluation form/link per student → sends email invitation
 - **Requirements:** FR3.1, FR3.2
@@ -95,7 +95,7 @@ so the two are never confused.
 
 ## CW-07: Student Evaluation Submission
 - **Actor:** Student
-- **Priority (proposed):** Critical — this is the only workflow that does not require a login,
+- **Priority:** Critical — this is the only workflow that does not require a login,
   per FR1.2, and is the primary data-collection path
 - **Trigger:** Student opens their unique evaluation link
 - **Steps:** load form by token (no login) → rate teammates numerically → provide written
@@ -112,7 +112,7 @@ so the two are never confused.
 
 ## CW-08: Evaluation Tracking and Reminders
 - **Actor:** Professor
-- **Priority (proposed):** High
+- **Priority:** High
 - **Trigger:** A round of evaluations is in progress
 - **Steps:** view completion status per student/team → send reminder emails to students who
   have not submitted
@@ -125,7 +125,7 @@ so the two are never confused.
 
 ## CW-09: Report Generation and Review
 - **Actor:** Professor
-- **Priority (proposed):** Critical — this is how the evaluation data becomes usable
+- **Priority:** Critical — this is how the evaluation data becomes usable
 - **Trigger:** Evaluations for a course, team, or student are complete (or in progress)
 - **Steps:** generate aggregated report → view course/team/student breakdowns → download as
   CSV
@@ -145,7 +145,7 @@ so the two are never confused.
 
 ## CW-10: AI-Assisted Feedback Analysis (optional, FR6)
 - **Actor:** Professor
-- **Priority (proposed):** Low — functional requirements mark this whole category optional
+- **Priority:** Low — functional requirements mark this whole category optional
 - **Trigger:** Professor reviews submitted feedback and wants a summary or flag for concerning
   language
 - **Steps:** submit feedback text → receive a summary, flagged terms, or sentiment
@@ -160,7 +160,7 @@ so the two are never confused.
 
 ## CW-11: Professor Self-Registration
 - **Actor:** Anyone with access to the login page
-- **Priority (proposed):** Pending sponsor — see open items
+- **Priority:** Pending sponsor — see open items
 - **Trigger:** A new user wants a professor account
 - **Steps:** toggle the login page into "Professor Registration" mode → submit details →
   account is created → log in
@@ -172,7 +172,7 @@ so the two are never confused.
 
 ## CW-12: Rubric Management
 - **Actor:** Professor
-- **Priority (proposed):** Pending sponsor — see open question 8 in `requirements.md`
+- **Priority:** Pending sponsor — see open question 8 in `requirements.md`
 - **Trigger:** Professor wants to create or adjust the criteria students evaluate each other on
 - **Steps:** create or edit a rubric → assign it to a course → students see it on their
   evaluation form
