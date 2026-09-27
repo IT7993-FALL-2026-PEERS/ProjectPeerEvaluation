@@ -28,7 +28,8 @@
   - the backend had 8 vulnerable dependencies.
   All are fixed and verified.
 - **Still open this week (due by 4 Oct):**
-  - development environment validation and the containerization recommendations (M2);
+  - M2's development-environment review and containerization recommendations: drafted
+    26 Sep, to be merged, and the environment review needs one live run on a clean machine;
   - the automated testing strategy and the final technical assessment report (M3);
   - sponsor confirmation of the critical-workflow priorities.
 - **Needed from the sponsor:** answers to 8 questions in [section 7](#7-questions-for-the-sponsor),
@@ -48,8 +49,8 @@ The deliverables listed in the sponsor's project description, with where each on
 | 3 | Requirements validation | 🟡 Draft | [requirements.md](../requirements/requirements.md): 23 functional requirements with acceptance criteria (PR #18) | M3 |
 | 4 | Critical workflow identification | 🟡 Awaiting sponsor | [critical-workflows.md](../requirements/critical-workflows.md): CW-01 to CW-12, each traced to code and requirements, with proposed priorities (PR #26) | M1 |
 | 5 | Requirements Traceability Matrix | 🟡 Skeleton | [rtm.md](../requirements/rtm.md): every requirement mapped to its workflow; the test-case column is filled in as tests land (PR #26) | M3 |
-| 6 | Development environment validation | ⏳ Due 4 Oct | Local setup works (`npm run setup`, `npm run dev`); the written validation is this week's task | M2 |
-| 7 | Containerization assessment | 🟡 Assessment done, recommendations due 4 Oct | [containerization-and-test-coverage-review.md](../technical-assessment/containerization-and-test-coverage-review.md) (PR #3), [deployment-review.md](../deployment-review.md) | M4, M2 |
+| 6 | Development environment validation | 🟡 Drafted 26 Sep | `docs/dev-environment-review.md` (PR #54, closed before merging; to be resubmitted): setup traced end to end, 7 manual steps and 6 quick fixes listed. One live run on a clean machine still to do | M2 |
+| 7 | Containerization assessment | 🟡 Assessment done, recommendations drafted 26 Sep | [containerization-and-test-coverage-review.md](../technical-assessment/containerization-and-test-coverage-review.md) (PR #3), [deployment-review.md](../deployment-review.md), and `docs/containerization-recommendations.md` (PR #54, to be resubmitted): Dockerfiles, a MongoDB-based Compose file, health checks, environment and startup docs | M4, M2 |
 | 8 | CI/CD architecture design | ✅ Done, sponsor-approved 25 Sep | README [CI/CD Pipeline](../../README.md#cicd-pipeline) section, with overview and detailed (WF01–WF12) diagrams (PRs #10, #24, #51) | M1 |
 | 9 | Automated testing strategy | 🟡 Frontend part done; full strategy due 4 Oct | [frontend-testing-strategy.md](../testing-strategy/frontend-testing-strategy.md) (PR #2) | M3 (M4 frontend input) |
 
@@ -60,7 +61,8 @@ The deliverables listed in the sponsor's project description, with where each on
 
 **Gantt timing:** the architecture review (#1) finished on 26 Sep, a week after its planned
 week of 14 Sep. Every other open item is scheduled for the week of 28 Sep, so it's on time
-if finished by 4 Oct.
+if finished by 4 Oct. M2's two drafts (#6, #7) were written on 26 Sep and only need to be
+merged.
 
 ---
 
@@ -158,7 +160,7 @@ Resolved defects from the log:
 
 | Risk | Impact | Mitigation |
 |---|---|---|
-| Containerization has not started (no Dockerfiles yet) | The planned CD design builds Docker images once and deploys them; Milestone 3 depends on it | M2's Dockerfile and Compose tasks start 5 Oct; the containerization recommendations due this week set the plan |
+| No Dockerfiles yet | The planned CD design builds Docker images once and deploys them; Milestone 3 depends on it | M2's recommendations (drafted 26 Sep) give the plan; the Dockerfile and Compose tasks start 5 Oct |
 | Integration tests need a real MongoDB in CI | Blocks the integration and regression tests (weeks of 12–19 Oct) | Decide by 5 Oct between a MongoDB container in CI and an in-memory MongoDB |
 | Testing workload | M5 owns 6 testing tasks in Milestone 2, and the student and team code has the least test coverage (5–8%) | Rebalance at the Milestone 2 kickoff; the frontend and CI owners can take some |
 | Email limits on staging | Mailtrap's free plan allows 50 emails a month, one every 10 seconds, so a send covers about 16 students before the page times out | End-to-end tests will not send real email; background sending is a Milestone 3 improvement |
@@ -205,9 +207,13 @@ Parts of the 19 and 26 October work are already live (section 4), so the team wi
 use that time to finish the security gate, add coverage reporting and fix the
 grade-integrity defects the sponsor approves.
 
-**Decisions needed by 5 Oct:** the MongoDB approach for integration tests; the Docker
-plan, since Render services must be recreated to deploy Docker images; the testing
-workload split.
+**Decisions needed by 5 Oct:**
+- **The MongoDB approach for integration tests.**
+- **What Docker is for.** M2's draft recommends scoping Docker to local development. The
+  sponsor's CD requirement (§7) asks the pipeline to build Docker images, and the approved
+  design deploys those images to Render, which means recreating the Render services.
+  The team needs to settle this before the Dockerfiles are written.
+- **The testing workload split.**
 
 ---
 
