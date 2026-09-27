@@ -3,7 +3,7 @@
 **Task:** 3.1 — Validate the development environment runs end-to-end locally
 **Owner:** Aaron Simpson (M2) — Environment, containerization & delivery
 **Objective:** confirm a brand-new clone can get running with minimal manual steps; friction found here feeds Milestone 2's "finalize development environment" work.
-**Last updated:** 26 September 2026
+**Last updated:** 27 September 2026 (live clean-clone run added in §3.1)
 
 ## Method
 
@@ -34,6 +34,43 @@ This review traced every script and every config file the app reads, and the fal
 - the console warning for the missing `JWT_SECRET` actually appears as described
 - total first-time setup time, to sanity-check against whatever time budget Milestone 2 sets for "finalize development environment"
 
+### 3.1 Live run, 27 September 2026
+
+Done on a Windows 10 machine with network access, from a brand-new `git clone` of `main` at
+`e25d3b6`, following the README's Getting Started steps exactly, with MongoDB started in
+Docker because it is not otherwise available (the §2, row 2 gap).
+
+Environment: Node 24.21.0, npm 11.19.0, Git 2.54.0, Docker 29.4.3.
+
+| Step | Command | Result | Time |
+|---|---|---|---|
+| Clone | `git clone https://github.com/IT7993-FALL-2026-PEERS/ProjectPeerEvaluation.git` | OK | 1 s |
+| Install (README step 2) | `npm run setup` | OK, 0 vulnerabilities | 59 s |
+| Configure (README step 3) | copy `src/backend/.env.example` to `src/backend/.env` | Overwrites the committed `.env` (§2, row 3); the copied file already points at `mongodb://localhost:27017/peer-eval` | — |
+| Database (not in the README) | `docker run -d --name peers-dev-mongo -p 27017:27017 mongo:7` | MongoDB 7.0.43 accepting connections | 37 s, including the first image download |
+| Start (README step 4) | `npm run dev` | Backend on 5000 (`✅ MongoDB connected`), frontend on 3000 (`webpack compiled successfully`) | 14 s |
+
+Checks, all passed:
+- `GET http://localhost:5000/api/health` returned 200 with `"database":"connected"`.
+- Through the API: register a test professor (201), log in (token issued), create a course,
+  add a student with a team (201, team "Team A" created), list the students (1), and a
+  request without a token was refused (401). The data landed in the `peer-eval` database
+  (collections `courses`, `evaluations`, `professors`, `students`, `teams`).
+- `http://localhost:3000` rendered the Professor Login page with no browser console errors.
+
+What the run showed about §3's questions:
+- **Both ports came up with the README's steps**, once MongoDB was running. MongoDB is the
+  only undocumented step, as §2 predicted.
+- **No `JWT_SECRET` warning appeared**, because README step 3 copies `.env.example`, which sets a
+  placeholder secret. The development fallback in `config/env.js` is only reached when the
+  variable is missing entirely.
+- **First-time setup took about 2 minutes of machine time** (install 59 s, MongoDB 37 s,
+  start 14 s), plus reading the README.
+- Email was not exercised: the copied SMTP values are placeholders, so invitations fail until
+  real SMTP settings are added (§2, row 4).
+- Startup logs only deprecation notices from Create React App's development server, which
+  are harmless.
+
 ## 4. Recommended quick fixes (feeds Milestone 2)
 
 - [ ] Remove the redundant backend install in the `setup` script (rely on `postinstall`)
@@ -47,5 +84,5 @@ This review traced every script and every config file the app reads, and the fal
 
 - [x] Documented setup and start scripts traced end-to-end via source inspection
 - [x] Every manual step found (automated or not) listed in §2, each backed by a specific file/line
-- [ ] Full local run confirmed from an actual clean clone with network access (see §3 — needs a live run on a networked machine before this box is checked)
-- [ ] This file committed to `docs/dev-environment-review.md`
+- [x] Full local run confirmed from an actual clean clone with network access (§3.1, 27 Sep)
+- [x] This file committed to `docs/dev-environment-review.md` (PR #56)

@@ -3,7 +3,7 @@
 **Owner:** Laeticia Neno Aloyem (M3) — Requirements, QA, security & documentation
 **Milestone:** 1 — Assessment & Planning (14 Sep – 4 Oct 2026), review 28 Sep
 **Gantt task:** Requirements Validation & RTM — *"Document required functionality, acceptance criteria & defects"*
-**Status:** Draft — critical-workflow marking pending M1's sponsor session
+**Status:** Complete for Milestone 1 — critical workflows approved by the sponsor (27 Sep); requirements presented for sponsor sign-off at the 28 Sep review
 **Last updated:** 27 September 2026
 
 ## Purpose and method
@@ -48,10 +48,10 @@ records what changed and why. The lesson worth carrying into Milestone 2: a depe
 route search is not sufficient evidence that a feature is absent, and reading the
 controller is.
 
-**Criticality is not yet assigned.** `docs/requirements/critical-workflows.md` now exists
-and defines twelve workflows (CW-01 to CW-12), but their priority ranking is still a
-proposal pending the sponsor session. Once priorities are confirmed, a Critical column is
-added here and used to prioritise test coverage.
+**Criticality.** `docs/requirements/critical-workflows.md` defines twelve workflows (CW-01
+to CW-12), which the sponsor approved on 27 September 2026. Each requirement's workflow, its
+existing tests and its planned coverage are recorded in the Requirements Traceability Matrix
+(`docs/requirements/rtm.md`), which is used to prioritise test coverage.
 
 ### Summary
 
@@ -507,11 +507,11 @@ Milestone 2 security-scanning work.
 
 ## Next step
 
-The Requirements Traceability Matrix skeleton (`docs/requirements/rtm.md`) is due in the
-week of 28 Sep and will seed one row per requirement ID above, with these columns:
+The Requirements Traceability Matrix (`docs/requirements/rtm.md`) has one row per
+requirement ID above. Its columns started from this set:
 
 | Business requirement ID | Functional requirement ID | Workflow | Test case ID | Test type | Status |
 
-Test case IDs will be filled in during Milestone 2 as M4 and M5 write the unit,
-integration and end-to-end tests. The Workflow column will be populated from
-`docs/requirements/critical-workflows.md` once M1's sponsor session has taken place.
+As of 27 September every row names its existing automated tests or the test level and
+Milestone 2 week that will cover it, and the Workflow column follows the sponsor-approved
+`docs/requirements/critical-workflows.md`.

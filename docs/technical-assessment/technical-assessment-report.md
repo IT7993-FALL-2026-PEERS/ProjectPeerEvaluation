@@ -3,7 +3,7 @@
 **Owner:** Laeticia Neno Aloyem (M3) — Requirements, QA, security & documentation
 **Milestone:** 1 — Assessment & Planning (14 Sep – 4 Oct 2026), review 28 Sep
 **Gantt task:** Technical Assessment — *"Log known defects/limitations; compile technical assessment report"*
-**Status:** Draft — sections 1 and 11 pending teammate input (see markers below)
+**Status:** Final for Milestone 1 — every section is complete; findings are reviewed with the sponsor at the 28 Sep milestone review
 **Last updated:** 27 September 2026
 
 ## Purpose
@@ -12,35 +12,35 @@ This report compiles the Milestone 1 assessment findings from all five team memb
 one document, so the sponsor and the team share a single, evidenced picture of the
 inherited PEERS application before any implementation work begins.
 
-Each section below either summarises a teammate's committed review (with a link to the
-full document) or is marked pending with an owner and a due date. Section 11 is the
-consolidated defects and limitations log, owned by M3.
+Each section below summarises a teammate's committed review, with a link to the full
+document. Section 11 is the consolidated defects and limitations log, owned by M3.
 
 ### Contributing reviews
 
 | Section | Source document | Owner | State |
 |---|---|---|---|
-| Software architecture | `docs/architecture/system-architecture.md` | M1 Donald | **Pending — due 25 Sep** (file is a 2-line stub) |
-| Technology stack | `docs/stack-review-output.txt` | M1 Donald | Raw output committed; write-up pending |
+| Software architecture | `docs/architecture/system-architecture.md`, `docs/architecture/api-documentation.md` | M1 (written by M4, PR #52) | Committed |
+| Technology stack | `docs/research-report/tech-stack-analysis.md` (raw output: `docs/stack-review-output.txt`) | M1 (written by M4, PR #52) | Committed |
 | Repository organization & deployment | `docs/deployment-review.md` | M2 Aaron | Committed |
 | Configuration management | `docs/deployment-review.md`, `docs/architecture/database-schema.md` | M2 / M5 | Committed |
 | External dependencies | `docs/architecture/database-schema.md` | M5 Kylee | Committed |
 | Database architecture | `docs/architecture/database-schema.md` | M5 Kylee | Committed |
 | Containerization status | `docs/technical-assessment/containerization-and-test-coverage-review.md` | M4 Khoa | Committed |
 | Existing testing | `docs/technical-assessment/containerization-and-test-coverage-review.md` | M4 Khoa | Committed |
-| Critical business workflows | `docs/requirements/critical-workflows.md` | M1 Donald | **Pending — sponsor session, week of 21 Sep** |
+| Critical business workflows | `docs/requirements/critical-workflows.md` | M1 | Committed; approved by the sponsor 27 Sep |
+| Repository, dependency and workflow audit | `docs/technical-assessment/repo-cicd-audit.md` | M1 Donald | Committed (PR #58) |
+| Development environment | `docs/dev-environment-review.md` | M2 Aaron | Committed (PR #56) |
+| Containerization recommendations | `docs/containerization-recommendations.md` | M2 Aaron | Committed (PR #56) |
 | Defects & limitations | This document, section 11 | M3 Laeticia | Committed |
 
 ---
 
 ## 1. Software architecture
 
-**Pending — owner: M1 Donald Gobin, due 25 Sep.**
-`docs/architecture/system-architecture.md` is currently a two-line stub. The write-up
-should turn `docs/stack-review-output.txt` into prose describing the frontend, backend,
-database and hosting, and how the pieces communicate.
-
-What is confirmed so far from the repository itself:
+Full detail in `docs/architecture/system-architecture.md` and
+`docs/architecture/api-documentation.md` (PR #52), which describe the frontend, backend,
+database and hosting, how they communicate, all 47 API endpoints, the security model and
+eight architecture findings. Summary:
 
 - **Frontend** — React 19.1.1 on Create React App, source under `src/frontend/`, with a
   pre-built `build/` directory also committed to the repository (see D-04).
@@ -52,12 +52,15 @@ What is confirmed so far from the repository itself:
   frontend Static Site).
 - **Client/server contract** — the frontend calls the backend over HTTP; CORS in
   `src/backend/index.js` is hard-coded to a specific `onrender.com` origin (see D-13).
-- **Health endpoint** — `/api/health` exists in `src/backend/index.js` and returns a JSON
-  status. Nothing currently polls it.
+- **Health endpoint** — `/api/health` checks the database and reports the deployed commit.
+  Render polls it before switching traffic to a new staging deploy.
 
 ## 2. Technology stack
 
-Recorded by M1 in `docs/stack-review-output.txt` on 16 September.
+Recorded by M1 in `docs/stack-review-output.txt` on 16 September. Current versions, audit results and
+recommendations are in `docs/research-report/tech-stack-analysis.md` (PR #52); since the review,
+Express is 4.22.3, Mongoose 8.24.4 and Nodemailer 10.0.10, and ten unused frontend packages,
+including Chart.js, Recharts, Formik and Yup, were removed (PR #53).
 
 | Layer | Technology | Version |
 |---|---|---|
@@ -203,16 +206,21 @@ end-to-end Playwright smoke job, and a workflow lint. The backend job's "syntax 
 step is explicitly a placeholder until real backend tests exist. Branch protection
 requires these checks to pass before merge.
 
-**Coverage baseline:** no coverage threshold is configured or enforced anywhere. Setting
-one is an M3 task in Milestone 2.
+**Update, 27 September.** 140 backend tests (`node --test`) and 30 frontend tests (Jest and
+React Testing Library) now run in CI on every pull request (PRs #41 and #44–#50), so the
+backend job is no longer a placeholder (D-15 resolved). The Requirements Traceability Matrix
+maps each test to its requirement.
+
+**Coverage baseline:** no coverage threshold is configured or enforced yet. The testing
+strategy (`docs/testing-strategy/testing-strategy.md`) sets a 70% target, with the floor
+measured first and ratcheted upward, in Milestone 2.
 
 ## 10. Critical business workflows
 
-**Pending — owner: M1 Donald Gobin, sponsor session in the week of 21 Sep.**
-Output will be committed to `docs/requirements/critical-workflows.md`. Once available,
-each requirement in `docs/requirements/requirements.md` will be marked critical or
-non-critical against that list, and the Requirements Traceability Matrix will use it to
-prioritise test coverage.
+Twelve workflows, CW-01 to CW-12, are documented in `docs/requirements/critical-workflows.md`,
+each traced to its requirements and code. The sponsor approved them on 27 September 2026.
+The Requirements Traceability Matrix (`docs/requirements/rtm.md`) maps every requirement to
+its workflow and its tests.
 
 ## 11. Known defects and limitations
 
@@ -228,24 +236,29 @@ behaviour with a workaround; **Low** — hygiene, documentation or maintainabili
 | D-04 | The compiled frontend `build/` directory is committed to version control and is not listed in `.gitignore` | `build/`, `.gitignore` | Medium | `build/404.html`, `build/asset-manifest.json` etc. are tracked files | Open |
 | D-05 | No `Dockerfile` exists anywhere in the repository, although `docker-compose.yml` declares `build: ./src/backend` and `build: ./src/frontend`; `docker-compose up` fails immediately | `docker-compose.yml`, repository-wide search | High | Full-tree search for `Dockerfile*` returns no results | Open |
 | D-06 | `docker-compose.yml` provisions PostgreSQL 14 and a `DATABASE_URL`, but the application runs on MongoDB via Mongoose and never reads that variable | `docker-compose.yml` vs `src/backend/index.js`, `src/backend/models/*.js` | High | Compose defines a `postgres` service; every model uses `mongoose.Schema`; `package.json` depends on `mongoose` | Open |
-| D-07 | `.nvmrc` pins Node 24, but the Milestone 1 stack review recorded Node 20.12.2; the two records of the supported runtime disagree | `.nvmrc`, `docs/stack-review-output.txt` | Medium | `.nvmrc` contains `24`; stack review output line 2 reads `v20.12.2` | Open |
-| D-08 | Five inherited documentation files are two-line placeholder stubs, including the system architecture document a Milestone 1 deliverable depends on | `docs/architecture/system-architecture.md`, `docs/architecture/api-documentation.md`, `docs/requirements/non-functional-requirements.md`, `docs/research-report/tech-stack-analysis.md`, `docs/meeting-notes/weekly-meetings.md`, `docs/user-manual/professor-guide.md` | Medium | Each file is between 48 and 75 bytes and contains only a heading and a parenthetical placeholder line | Open |
+| D-07 | `.nvmrc` pins Node 24, but the Milestone 1 stack review recorded Node 20.12.2; the two records of the supported runtime disagree | `.nvmrc`, `docs/stack-review-output.txt` | Medium | `.nvmrc` contains `24`; stack review output line 2 reads `v20.12.2` | Resolved — `.nvmrc`, `engines`, CI and Render all use Node 24; 20.12.2 was the reviewer's machine |
+| D-08 | Five inherited documentation files are two-line placeholder stubs, including the system architecture document a Milestone 1 deliverable depends on | `docs/architecture/system-architecture.md`, `docs/architecture/api-documentation.md`, `docs/requirements/non-functional-requirements.md`, `docs/research-report/tech-stack-analysis.md`, `docs/meeting-notes/weekly-meetings.md`, `docs/user-manual/professor-guide.md` | Medium | Each file is between 48 and 75 bytes and contains only a heading and a parenthetical placeholder line | Partly resolved — architecture, API and tech-stack documents written (PR #52); non-functional requirements, weekly meetings and professor guide remain stubs |
 | D-09 | The evaluation rubric is hardcoded in a configuration file with no Rubric model and no per-course customisation, although rubric management is listed as a core workflow in the sponsor specification | `src/backend/config/rubric.js` | Medium | File comment reads "This is the hardcoded rubric provided by sponsors"; no Rubric model exists in `src/backend/models/` | Open |
 | D-10 | Team membership is stored in two places — `Team.students[]` and `Student.team_id` — with no visible synchronisation, so the two can drift apart | `src/backend/models/Team.js`, `src/backend/models/Student.js` | Medium | Both fields exist; M5's schema review found no sync mechanism in the model files | Open |
 | D-11 | `Report.team_reports`, `Report.student_reports` and `Report.ai_insights` are typed as generic `Object` / `[Object]` with no schema enforcement, which will complicate testing report generation | `src/backend/models/Report.js` | Low | Field types are untyped `Object` in the schema definition | Open |
-| D-12 | `multer` and `csv-parser`, both server-side packages, are declared as dependencies in the root (frontend) `package.json` as well as the backend's | Root `package.json` | Low | Both appear in the root dependency list in `docs/stack-review-output.txt` | Open |
+| D-12 | `multer` and `csv-parser`, both server-side packages, are declared as dependencies in the root (frontend) `package.json` as well as the backend's | Root `package.json` | Low | Both appear in the root dependency list in `docs/stack-review-output.txt` | Resolved — removed from the root `package.json` (PR #53) |
 | D-13 | CORS configuration is hard-coded to a specific `onrender.com` origin rather than read from configuration, so a change of deployment URL requires a code change | `src/backend/index.js` | Medium | Documented in `docs/deployment-review.md` §2.2 | Open |
 | D-14 | There is no migration framework — one historical one-off script plus eleven unstructured ad-hoc scripts for seeding and inspecting data, with no test-fixture system | `src/backend/migrations/migrateCourses.js`, `src/backend/scripts/` | Low | Eleven scripts present, including `addRandomCourses.js`, `createTestData.js`, `viewDatabaseContent.js` | Open |
-| D-15 | The backend has no unit tests of application logic; CI substitutes a syntax check as an explicit placeholder, so backend regressions are not caught | `src/backend/tests/`, `.github/workflows/ci.yml` | Medium | Only `env.test.js` (a configuration check) exists; the CI step comment reads "Placeholder until backend tests exist" | Open |
+| D-15 | The backend has no unit tests of application logic; CI substitutes a syntax check as an explicit placeholder, so backend regressions are not caught | `src/backend/tests/`, `.github/workflows/ci.yml` | Medium | Only `env.test.js` (a configuration check) exists; the CI step comment reads "Placeholder until backend tests exist" | Resolved — 140 backend tests run in CI (PRs #41, #44–#50) |
 | D-16 | No test coverage threshold is configured or enforced in CI, so coverage can silently regress | `.github/workflows/ci.yml`, `package.json` | Medium | No `coverageThreshold` in Jest configuration; no coverage step in the workflow | Open |
 | D-17 | Multi-factor authentication is advertised by the data model and the login flow but is not implemented — the verification endpoint returns an error | `src/backend/controllers/authController.js`, `src/backend/routes/auth.js` | High | `Professor.mfa_enabled` exists and login returns `mfa_required: true`, but `verifyMfa` throws `'MFA verification not implemented.'`; a professor with MFA enabled cannot log in | Open |
 | D-18 | Session lifetime does not match the documented requirement — tokens are issued with a one-hour expiry, but the inherited requirement specifies a 30-minute timeout | `src/backend/controllers/authController.js`, `docs/requirements/functional-requirements.md` | Low | `const JWT_EXPIRES_IN = '1h'`; FR1.4 specifies 30 minutes | Open |
 | D-19 | The participation criterion uses a 1–4 rating scale while every other criterion uses 1–5, contradicting the inherited requirement that all ratings are 1–5 | `src/backend/models/Evaluation.js` | Medium | `participation: { min: 1, max: 4 }` with an inline comment noting the difference; all five other criteria are `min: 1, max: 5` | Open |
 | D-20 | **PDF report export does not exist.** CSV export works, but FR5.3 specifies both formats, so half the requirement is unmet | `src/backend/controllers/reportController.js`, `package.json` | Medium | `downloadReport` (CSV) is implemented at `reportController.js:346`; no PDF generation library is installed and no PDF handler is defined | Open — *corrected 27 Sep, see revision note* |
 | D-22 | Written-feedback length is not enforced as specified — the minimum is 10 characters rather than 50, and there is no maximum at all, so a one-word response is accepted and an unbounded one is stored | `src/backend/controllers/evaluationController.js`, `src/backend/models/Evaluation.js` | Medium | `evalData.overall_feedback.trim().length < 10` at `evaluationController.js:479`; no `minlength`/`maxlength` on `Evaluation.overall_feedback` at `models/Evaluation.js:15`; FR4.2 specifies 50–500 | Open |
+| D-23 | The evaluation deadline is only shown in the invitation email; it is never stored or enforced, so late submissions are accepted. The sponsor specification lists deadline validation among expected unit tests | `src/backend/controllers/evaluationController.js` (`deadline` passed to the email only) | Medium | `deadline` is read from the request and sent in the email; no model field or check exists | Open |
 | D-21 | The deployment review document's header labels it "Milestone 2, task 1.2", but it is a Milestone 1 deliverable | `docs/deployment-review.md` | Low | Line 3 of the document | Open — M2 to correct |
 
-**Summary:** 22 defects logged — 1 critical, 4 high, 11 medium, 6 low. The critical and
+**Summary:** 23 defects logged — 1 critical, 4 high, 12 medium, 6 low; three resolved
+(D-07, D-12, D-15) and one partly resolved (D-08) by 27 September. Further findings are in
+`docs/architecture/api-documentation.md` §13 (API-1 to API-8),
+`docs/architecture/system-architecture.md` §8 and `docs/technical-assessment/repo-cicd-audit.md`
+§7 (A-01 to A-17). The critical and
 high items cluster around two themes: secrets and configuration hygiene (D-01, D-02,
 D-03), and features that are documented or partially scaffolded but not actually
 implemented (D-05, D-17).
@@ -262,13 +275,11 @@ a dependency is not evidence that a feature is absent — the controller has to 
 
 ## 12. Next steps
 
-1. M1 to complete `docs/architecture/system-architecture.md` and
-   `docs/requirements/critical-workflows.md`; both are folded into sections 1 and 10 on
-   arrival.
-2. M3 to complete `docs/requirements/requirements.md` (required functionality and
-   acceptance criteria) in the week of 21 Sep, then the Requirements Traceability Matrix
-   skeleton in the week of 28 Sep.
-3. This report to be reviewed with the sponsor before implementation work begins, as the
-   specification requires.
-4. Defects to be triaged with the sponsor at the 28 Sep review: which are in scope for
-   this capstone, and which are recorded and deferred.
+1. **Done:** architecture, API and tech-stack documents (PR #52), critical workflows
+   (sponsor-approved 27 Sep), required functionality and acceptance criteria
+   (`requirements.md`), and the Requirements Traceability Matrix (`rtm.md`).
+2. **28 Sep review:** walk the sponsor through these findings, as the specification
+   requires, and triage the defects: which are fixed in this capstone, and which are
+   recorded and deferred.
+3. **Milestone 2:** defects the sponsor places in scope are fixed with a regression test
+   and marked Resolved here.

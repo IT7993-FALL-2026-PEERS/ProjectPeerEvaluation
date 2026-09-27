@@ -1,80 +1,86 @@
 # Requirements Traceability Matrix
 
-**Status:** Draft — seeded from `docs/requirements/requirements.md` (FR-01..FR-23) and
-`docs/requirements/critical-workflows.md` (CW-01..CW-12). Test case IDs are not yet
-available; they land in Milestone 2 as M4/M5 write tests. Sponsor validation of workflow
-priority (see `critical-workflows.md`) is still pending Donald's sponsor session.
+**Status:** Milestone 1 baseline, complete — every functional requirement (FR-01..FR-23) and
+every critical workflow (CW-01..CW-12) is traced to its existing automated tests, or to the
+test level and Gantt week that will cover it. Statuses match `docs/requirements/requirements.md`.
+The critical workflows were approved by the sponsor (27 Sep 2026).
+**Last updated:** 27 September 2026, against `main` at `e25d3b6`.
 
-Column structure as specified in `requirements.md`'s "Next step" section:
+**How to read the test column.** Test cases are named by file and test title until the
+`TC-<FR>-<n>` naming convention in `docs/testing-strategy/testing-strategy.md` is adopted;
+the rows will then switch to those IDs. `BE` = `src/backend/tests/`, `FE` =
+`src/frontend/**/__tests__/`. Counts are executed test cases (140 backend, 30 frontend, 1
+end-to-end smoke test on 27 Sep). All of them run in CI on every pull request.
 
-| Business requirement ID | Functional requirement ID | Workflow | Test case ID | Test type | Status |
-|---|---|---|---|---|---|
-| FR1.1 | FR-01 | CW-01 | TBD | Integration | Needs verification — sponsor must confirm university-credential vs. local-password login is intended |
-| FR1.2 | FR-02 | CW-07 | TBD | Integration | Validated |
-| FR1.3 | FR-03 | CW-01 | TBD | Integration | Defective (D-17) |
-| FR1.4 | FR-04 | CW-01 | TBD | Unit | Defective (D-18) |
-| FR2.1 | FR-05 | CW-03 | TBD | Unit + Integration | Validated |
-| FR2.2 | FR-06 | CW-04 | TBD | Integration | Validated |
-| FR2.3 | FR-07 | CW-04 | TBD | Unit | Validated |
-| FR2.4 | FR-08 | CW-05 | TBD | Integration | Validated (see D-10 — dual-storage drift risk, needs an explicit integration test) |
-| FR3.1 | FR-09 | CW-06 | TBD | Integration | Validated |
-| FR3.2 | FR-10 | CW-06 | TBD | Integration / Manual | Needs verification — depends on SMTP config and `FRONTEND_URL` at deploy time |
-| FR3.3 | FR-11 | CW-08 | TBD | Integration | Validated |
-| FR3.4 | FR-12 | CW-08 | TBD | Integration | Defective — reminders are on-demand only, no scheduler exists |
-| FR4.1 | FR-13 | CW-07 | TBD | Unit | Defective (D-19) — participation capped at 1-4, other criteria at 1-5 |
-| FR4.2 | FR-14 | CW-07 | TBD | Unit | **Defective** *(corrected from "Needs verification")* — code enforces a 10-char minimum and no maximum (`evaluationController.js:471`), against a spec of 50-500 |
-| FR4.3 | FR-15 | CW-07 | TBD | Unit | **Validated** *(corrected from "Needs verification")* — `Evaluation.submitted_at` exists (`models/Evaluation.js:16`) |
-| FR4.4 | FR-16 | CW-07 | TBD | Integration | **Validated** *(corrected from "Needs verification")* — duplicate-submission guard exists (`evaluationController.js:436-446`). One open gap, see note below the table |
-| FR5.1 | FR-17 | CW-09 | TBD | Integration | Validated |
-| FR5.2 | FR-18 | CW-09 | TBD | Unit | Validated |
-| FR5.3 | FR-19 | CW-09 | TBD | Integration | **Partial** *(corrected from "Unsupported")* — CSV export works (`reportController.js:338-397`, D-20 is wrong on this point); PDF export is still missing |
-| FR5.4 | FR-20 | CW-09 | TBD | Integration | Needs verification — statistic is computed, whether it's surfaced in the frontend view is unconfirmed |
-| FR6.1 | FR-21 | CW-10 | TBD | — | Unsupported |
-| FR6.2 | FR-22 | CW-09 | TBD | Unit | **Defective** *(corrected from "Validated")* — flagging uses a hardcoded word list (`reportController.js:183`); the professor's configured list (`Professor.aiConcerningWords`) is saved but never read |
-| FR6.3 | FR-23 | CW-10 | TBD | — | Unsupported |
-| *(none — implementation only, not in the inherited FR list)* | — | CW-02 (Password Reset) | TBD | Integration | Validated |
-| *(none — implementation only, not in the inherited FR list)* | — | CW-11 (Professor Self-Registration) | TBD | Integration | Needs verification — public signup is live; sponsor must confirm it is intended |
-| *(none — sponsor spec only, not in the inherited FR list)* | — | CW-12 (Rubric Management) | TBD | — | Planned (D-09) — rubric is hardcoded; sponsor must confirm whether per-course editing is expected |
+**Planned** rows name the test level and the Milestone 2 week from the approved Gantt chart
+(Milestone 2 runs 5 Oct – 1 Nov). A planned test that exposes a defect stays failing, or is
+marked `todo`, until the defect is fixed, so the matrix never reports a defect as covered.
 
-**FR-16 gaps.** The guard blocks the normal repeat submission, but:
-- **Concurrent submits:** it checks and then inserts, and the index on `Evaluation.js:21` is not
-  `unique`, so two simultaneous submits (double-click, two tabs) can both get through.
-  Still open; needs an integration test and a unique index (check existing data for
-  duplicates first).
-- **Partial save lockout (fixed in PR #27):** evaluations used to be validated and saved one at
-  a time, so a later invalid one left the earlier ones saved and a retry hit 409
-  `ALREADY_COMPLETED`. All evaluations are now validated before any is saved, covered by
-  `src/backend/tests/submitEvaluation.test.js`.
+| Business requirement ID | Functional requirement ID | Workflow | Test cases (existing) | Test type | Planned coverage | Status |
+|---|---|---|---|---|---|---|
+| FR1.1 | FR-01 Professor login | CW-01 | BE `authController.test.js`: login ×4, register ×6 · BE `authMiddleware.test.js` ×5 · BE `authRoutes.test.js` ×1 · FE `login.test.js` ×2, `LoginPage.test.js` ×3, `AuthContext.test.js` ×5, `ProtectedRoute.test.js` ×3, `App.routing.test.js` ×4 | Unit | Integration: auth against MongoDB (19 Oct); E2E instructor login (26 Oct) | Needs verification — sponsor to confirm local password login is intended |
+| FR1.2 | FR-02 Student access without login | CW-07 | BE `submitEvaluation.test.js` ×3 (token-based submission) | Unit | Integration: `/evaluate/:token` routes (12 Oct); E2E student workflow (26 Oct) | Validated |
+| FR1.3 | FR-03 Multi-factor authentication | CW-01 | BE `authController.test.js`: "login: MFA enabled requires verification", "verifyMfa: returns 501" | Unit | Replace the 501 test when D-17 is decided | Defective (D-17) — tests document the gap |
+| FR1.4 | FR-04 Session expiry | CW-01 | BE `authController.test.js`: login token expiry (asserts 1 h) · BE `authMiddleware.test.js`: expired token returns 401 | Unit | Update expiry assertion when D-18 is decided | Defective (D-18) — 1 h, requirement says 30 min |
+| FR2.1 | FR-05 Create and manage courses | CW-03 | BE `courseController.test.js` ×19 · BE `courseOwnership.test.js` ×32 (every course route rejects other professors) | Unit + route-level | Integration: course CRUD against MongoDB (12 Oct); E2E create course (26 Oct) | Validated |
+| FR2.2 | FR-06 Bulk roster upload | CW-04 | — | — | Unit: CSV parsing (12 Oct, M5); Integration: upload creates students and teams (12 Oct) | Validated (manually, staging 25 Sep) |
+| FR2.3 | FR-07 Roster validation and duplicates | CW-04 | — | — | Unit: CSV/row validation and duplicate handling (12 Oct, M5) | Validated (manually) |
+| FR2.4 | FR-08 Assign students to teams | CW-05 | BE `reportController.test.js`: team averages include populated team members | Unit | Integration: team assignment keeps `Team.students` and `Student.team_id` in step (D-10) (12 Oct) | Validated |
+| FR3.1 | FR-09 Per-student evaluation forms | CW-06 | — | — | Unit: evaluation token generation (12 Oct, M5); Integration: `GET /evaluate/:token` (12 Oct) | Validated |
+| FR3.2 | FR-10 Email invitations with secure links | CW-06 | BE `sendEvaluations.test.js` ×1 · BE `emailPacer.test.js` ×3 · BE `emailUtils.test.js` ×2 · FE `emailResult.test.js` ×4 | Unit | Integration: email service with a test SMTP transport (19 Oct, M5) | Needs verification — depends on SMTP and `FRONTEND_URL` at deploy time (verified on staging 25 Sep) |
+| FR3.3 | FR-11 Track completion status | CW-08 | — | — | Integration: `GET /evaluations/status` (19 Oct); E2E monitor completion (26 Oct) | Validated |
+| FR3.4 | FR-12 Reminders | CW-08 | — | — | Integration: `POST /evaluations/remind` (19 Oct) | Defective — on-demand only, no scheduler |
+| FR4.1 | FR-13 Ratings on a 1–5 scale | CW-07 | BE `submitEvaluation.test.js`: "fails schema validation" (participation 5 rejected) · BE `reportController.test.js`: participation scaled by 5/4 | Unit | Update when D-19 is decided | Defective (D-19) — participation is 1–4 |
+| FR4.2 | FR-14 Feedback length limits | CW-07 | BE `submitEvaluation.test.js`: "fails the feedback check" (10-character minimum) | Unit | Update when D-22 is decided | Defective (D-22) — 10-character minimum, no maximum; requirement says 50–500 |
+| FR4.3 | FR-15 Timestamp all submissions | CW-07 | — | — | Unit: `submitted_at` set on save (12 Oct) | Validated |
+| FR4.4 | FR-16 Prevent duplicate submissions | CW-07 | BE `submitEvaluation.test.js` ×3 (all-or-nothing save, PR #27) | Unit | Integration: repeat submission returns 409, and concurrent submissions (19 Oct) | Validated, with a concurrency gap |
+| FR5.1 | FR-17 Aggregated team reports | CW-09 | BE `reportController.test.js`: course report, team report, team averages | Unit | Integration: report from seeded data (19 Oct); E2E review results (26 Oct) | Validated |
+| FR5.2 | FR-18 Average score per criterion | CW-09 | BE `reportController.test.js`: scoring, letter grades, curved grading | Unit | Regression: report totals for a fixed fixture (19 Oct) | Validated |
+| FR5.3 | FR-19 Downloadable reports | CW-09 | BE `reportController.test.js`: CSV download ×3 · BE `csv.test.js` ×10 (quoting, formula protection) | Unit | PDF export has no test until it is built | Partial — CSV works, PDF missing |
+| FR5.4 | FR-20 Highlight outliers | CW-09 | — | — | Unit: outlier statistic (19 Oct) once its display is confirmed | Needs verification |
+| FR6.1 | FR-21 Summarise textual feedback | CW-10 | — | — | None — AI features are out of scope | Unsupported |
+| FR6.2 | FR-22 Flag concerning language | CW-09 | BE `reportController.test.js`: AI flags ×2, professor word list ×8 (PR #47) | Unit | Regression: flagged feedback in a fixed fixture (19 Oct) | Validated |
+| FR6.3 | FR-23 Sentiment trends | CW-10 | — | — | None — AI features are out of scope | Unsupported |
+| *(implementation only)* | — | CW-02 Password reset | BE `authController.test.js`: resetPassword ×3, updatePassword ×5 · BE `emailUtils.test.js`: reset email link · FE `ResetPassword.test.js` ×3 · FE `App.routing.test.js`: reset link opens the reset page | Unit | Integration: reset against MongoDB (19 Oct) | Validated |
+| *(implementation only)* | — | CW-11 Professor self-registration | BE `authController.test.js`: register ×6 | Unit | Integration: register + login (19 Oct) | Needs verification — sponsor to confirm public sign-up is intended |
+| *(sponsor spec only)* | — | CW-12 Rubric management | — | — | Unit: rubric validation (12 Oct, M5) once the scope is decided | Planned (D-09) — rubric is hardcoded |
 
-## Corrections to `requirements.md` found while building this matrix
+## Tests that cover non-functional requirements
 
-Five rows above disagree with the status currently recorded in `requirements.md`. These are
-code-verified corrections (file/line evidence given in the Status column), not new opinions:
+These tests have no FR row because they check how the system runs, not what it does. They
+trace to the sponsor's non-functional requirements (reliability, repeatable deployments,
+security) and to fixed defects.
 
-- **FR-14**: should read Defective, not Needs verification — the 10-char/no-max behavior is
-  confirmed, not merely suspected.
-- **FR-15**: should read Validated, not Needs verification — `submitted_at` exists.
-- **FR-16**: should read Validated, not Needs verification — the duplicate guard exists.
-- **FR-19**: should read Partial, not Unsupported — CSV export exists; this is the same
-  underlying mistake as **D-20** in `docs/technical-assessment/technical-assessment-report.md`,
-  now confirmed to appear in two documents.
-- **FR-22**: should read Defective, not Validated — the acceptance criterion requires the
-  professor's configured word list, but flagging uses a hardcoded list and never reads it.
+| Concern | Test cases | Traces to |
+|---|---|---|
+| Authorization: a professor can use only their own courses | BE `courseOwnership.test.js` ×32, `courseController.test.js`: "only saves the editable fields" | Security fix, PR #50 |
+| Deployment health check | BE `health.test.js` ×7 | `/api/health` used by Render and the planned CD pipeline |
+| Configuration safety | BE `env.test.js` ×4 (production refuses a missing or short `JWT_SECRET`) | D-03, PR #16 |
+| Server behind Render's load balancer | BE `serverTimeouts.test.js` ×2 | PR #30 |
+| Frontend API address | FE `apiUrl.test.js` ×5 | PR #30 |
+| CI can launch a browser | E2E `e2e/setup.spec.js` ×1 | Pipeline smoke; real E2E workflows planned 26 Oct |
 
-Separately, `requirements.md`'s Summary table miscounted its own statuses (it said 11
-Validated and 5 Needs verification; the per-FR statuses give 10 and 6). That arithmetic has
-been fixed in place, since it changes no requirement's status. With the five corrections
-above applied, the counts would become: Validated 11, Needs verification 3, Defective 6,
-Unsupported 2, Partial 1 (23 total).
+## Coverage summary (27 Sep)
 
-Apart from that Summary fix, `requirements.md` has not been edited — these corrections should go to Laeticia along
-with the existing D-20 / FR-15-equivalent fix already queued for the technical assessment
-report, rather than being silently overwritten here.
+| | Requirements |
+|---|---|
+| Covered by existing automated tests | 16 of 26 rows (FR-01..05, FR-08, FR-10, FR-13, FR-14, FR-16..19, FR-22, CW-02, CW-11) |
+| Planned for Milestone 2, with a test level and week | 8 rows (FR-06, FR-07, FR-09, FR-11, FR-12, FR-15, FR-20, CW-12), plus integration and E2E tests for most covered rows |
+| Out of scope | 2 rows (FR-21, FR-23: AI features) |
 
-## Open items
-- Test case IDs: none exist yet. Fill in as M4/M5 write unit, integration, and end-to-end
-  tests in Milestone 2 (per the README's testing timeline).
-- Workflow priorities (`critical-workflows.md`) are proposed, not sponsor-validated — revisit
-  this matrix once Donald's sponsor session happens.
-- FR-01, FR-10, FR-20: statuses depend on sponsor decisions or runtime checks not yet done;
-  do not treat "Needs verification" here as a defect until confirmed.
+Every **Validated** requirement without an existing automated test (FR-06, FR-07, FR-09,
+FR-11, FR-15) has a planned test in Milestone 2, which meets the sponsor's §9 requirement
+that each validated business requirement is verified by one or more automated tests once
+Milestone 2 closes.
+
+**FR-16 gaps.** The guard blocks the normal repeat submission, but two simultaneous
+submissions (double-click, two tabs) can both get through: the code checks and then inserts,
+and the index on `Evaluation.js:21` is not `unique`. The planned integration test covers it.
+The partial-save lockout was fixed in PR #27 and is covered by `submitEvaluation.test.js`.
+
+## Maintaining this matrix
+
+- Add the test file and title to the row when a test lands, and move the row out of
+  "Planned coverage" once the planned test exists.
+- Switch to `TC-<FR>-<n>` IDs once the testing strategy's naming decision is adopted.
+- Keep the Status column in step with `requirements.md`; correct both in the same PR.

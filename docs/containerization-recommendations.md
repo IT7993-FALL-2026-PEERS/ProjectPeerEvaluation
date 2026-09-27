@@ -40,5 +40,5 @@ Every action item above closes exactly one open gap from the assessment; none ar
 
 ## Done checklist
 
-- [ ] This file committed to `docs/containerization-recommendations.md`
+- [x] This file committed to `docs/containerization-recommendations.md` (PR #56)
 - [x] Every gap identified in the assessment (D-05, D-06, missing `.dockerignore`, missing health checks, missing env documentation, missing startup docs) has a corresponding action item above

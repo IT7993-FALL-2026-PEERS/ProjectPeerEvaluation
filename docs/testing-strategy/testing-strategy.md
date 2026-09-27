@@ -3,7 +3,7 @@
 **Owner:** Laeticia Neno Aloyem (M3) — Requirements, QA, security & documentation
 **Milestone:** 1 — Assessment & Planning (14 Sep – 4 Oct 2026), review 28 Sep
 **Gantt task:** CI/CD & Testing Strategy Design — *"Draft automated testing strategy (unit / integration / regression / e2e / smoke)"*
-**Status:** Draft for team review — decisions marked **[DECISION]** need agreement before Milestone 2 starts on 5 Oct. Revised 27 Sep in response to M4's review on PR #66.
+**Status:** Final for Milestone 1 — the four decisions in §7 were confirmed on 27 Sep 2026 by the team leader (M4), following this document's recommendations; the team can revisit any of them at the Milestone 2 kickoff on 5 Oct.
 **Last updated:** 27 September 2026
 
 ## Purpose and scope
@@ -46,7 +46,7 @@ falls, and nobody would see it. Closing that is an M3 task in Milestone 2.
 
 **Two test runners are in use.** The backend uses `node --test`; the frontend uses Jest via
 Create React App. That is workable — they test different codebases — but it means two
-different coverage mechanisms and two report formats to merge. See [DECISION 1].
+different coverage mechanisms and two report formats to merge. See [Decision 1, confirmed in §7].
 
 ## 2. Test levels
 
@@ -191,7 +191,7 @@ it is larger than it looks.
 
 ## 4. Coverage
 
-**70% of lines and branches is the target, not the opening threshold.** [DECISION 2] The
+**70% of lines and branches is the target, not the opening threshold.** [Decision 2, confirmed in §7] The
 two are separate numbers and conflating them is how coverage gates get disabled in week one.
 
 The sequence:
@@ -216,7 +216,7 @@ written, its ID goes in that requirement's row.
 
 **Test case ID convention: `TC-<FR number>-<sequence>`** — so the second test covering FR-06
 is `TC-06-02`, and the ID appears in the test's name. A failing test then points straight at
-the requirement it broke, without anyone having to go and look it up. [DECISION 3]
+the requirement it broke, without anyone having to go and look it up. [Decision 3, confirmed in §7]
 
 Seven of the twenty-three requirements cannot be given a passing test today: FR-03, FR-04,
 FR-12, FR-13 and FR-14 because the implementation contradicts the requirement, and FR-19,
@@ -231,23 +231,22 @@ assessment.
 
 Proposed: a single seed module that builds a known professor, course, team, roster and
 evaluation round, used by integration, regression and end-to-end tests alike, so every level
-starts from the same known state. [DECISION 4] Owner to be assigned; naturally M5's, as it
-sits with the backend and database work.
+starts from the same known state. [Decision 4, confirmed in §7] Owner: M5, since it sits
+with the backend and database work.
 
-## 7. Decisions needed before 5 October
+## 7. Decisions (confirmed 27 September 2026)
 
-1. **[DECISION 1]** Keep two test runners (`node --test` for the backend, Jest for the
-   frontend), or standardise on one? Two is workable but means merging two coverage formats.
-   Recommendation: keep both, and have CI merge the reports — switching runners mid-project
-   costs more than it saves.
-2. **[DECISION 2]** Is 70% the agreed coverage *target*, with the enforced floor set just
-   below the measured baseline and ratcheted upward only?
-3. **[DECISION 3]** Adopt `TC-<FR>-<sequence>` as the test naming convention, so test names
-   trace to requirement IDs?
-4. **[DECISION 4]** Who owns the shared test-data seed module, and is a single shared fixture
-   the right approach?
-5. Playwright is recorded as the E2E tool, superseding M4's open question 3. Objections before
-   5 Oct.
+1. **Test runners — keep both.** `node --test` for the backend and Jest for the frontend.
+   CI publishes both coverage reports; switching runners mid-project costs more than it saves.
+2. **Coverage — 70% is the target, not the opening threshold.** CI first measures the
+   baseline (reporting only), the enforced floor starts just below it, and it only ratchets
+   upward (see §4).
+3. **Test naming — `TC-<FR>-<sequence>`.** New tests use it from Milestone 2; existing tests
+   are renamed when they are next edited, and the RTM switches to these IDs as they appear.
+4. **Test data — one shared seed module, owned by M5.** It builds a known professor, course,
+   team, roster and evaluation round for integration, regression and end-to-end tests (see
+   §6). M4 covers the frontend and end-to-end fixtures.
+5. **End-to-end tool — Playwright**, superseding M4's open question 3.
 
 ## 8. Open items carried from M4's frontend strategy
 
