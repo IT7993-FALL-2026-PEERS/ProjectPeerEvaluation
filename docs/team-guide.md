@@ -13,6 +13,13 @@ A few short working habits for PEERS. They are adapted from Matt Pocock's
   until `JWT_SECRET` is set on Render.
 - Show that it works: a screenshot, or the test that failed before and passes now.
 
+## Merging your own pull request
+
+You can merge your own pull request once the required checks pass. No approval is needed. The
+`main` ruleset requires a pull request and the four CI checks, but 0 approvals and no code-owner
+review, so nobody waits on a reviewer to ship. Reviews are still welcome: CODEOWNERS requests one
+automatically, and for a one-way door, ask someone to look before you merge.
+
 ## Reviewing a pull request
 
 Ask two separate questions and answer them separately:

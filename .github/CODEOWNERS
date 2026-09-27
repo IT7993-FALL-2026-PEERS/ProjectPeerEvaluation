@@ -1,4 +1,7 @@
 # Code owners are requested for review automatically on every pull request.
+# The review is optional: authors merge their own PRs once the required checks
+# pass (see docs/team-guide.md). Keep "Require review from Code Owners" off in
+# the main ruleset, or authors can no longer merge their own PRs.
 # The last matching pattern wins, so per-folder owners go below the catch-all.
 # Every owner listed here needs write access to the repo, or GitHub ignores the line.
 
