@@ -1,0 +1,14 @@
+# Code owners are requested for review automatically on every pull request.
+# The last matching pattern wins, so per-folder owners go below the catch-all.
+# Every owner listed here needs write access to the repo, or GitHub ignores the line.
+
+# Default owner for everything.
+* @dgobin-ksu
+
+# Per-folder owners: uncomment and add GitHub usernames to route reviews to the
+# right person. A line replaces the catch-all for that folder, so keep
+# @dgobin-ksu on it if the pipeline owner should still be asked.
+# /src/frontend/          @dgobin-ksu
+# /src/backend/           @dgobin-ksu
+# /e2e/                   @dgobin-ksu
+# /docs/requirements/     @dgobin-ksu
