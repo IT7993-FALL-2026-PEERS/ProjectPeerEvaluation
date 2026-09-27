@@ -8,12 +8,12 @@ today rather than what was originally specified.
 
 **Status of this document:** approved. The workflows and requirement/code traceability below
 were identified from the current codebase, and the sponsor approved the critical workflows
-(CW-01 to CW-12) on 27 September 2026. The Requirements Traceability Matrix
+(CW-01 to CW-12) on 25 September 2026. The Requirements Traceability Matrix
 (`docs/requirements/rtm.md`) maps every requirement to these workflows.
 
 ## Legend
 - **Status**: Implemented / Partial / Broken / Planned
-- **Priority**: as approved by the sponsor, 27 Sep 2026
+- **Priority**: as approved by the sponsor, 25 Sep 2026
 
 **Note on naming — CW vs. WF:** the README's `WF01`–`WF12` IDs label stages of the CI/CD
 *pipeline* (checkout, build, deploy, etc.). The `CW-01`–`CW-12` IDs below label the

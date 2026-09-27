@@ -27,7 +27,7 @@ document. Section 11 is the consolidated defects and limitations log, owned by M
 | Database architecture | `docs/architecture/database-schema.md` | M5 Kylee | Committed |
 | Containerization status | `docs/technical-assessment/containerization-and-test-coverage-review.md` | M4 Khoa | Committed |
 | Existing testing | `docs/technical-assessment/containerization-and-test-coverage-review.md` | M4 Khoa | Committed |
-| Critical business workflows | `docs/requirements/critical-workflows.md` | M1 | Committed; approved by the sponsor 27 Sep |
+| Critical business workflows | `docs/requirements/critical-workflows.md` | M1 | Committed; approved by the sponsor 25 Sep |
 | Repository, dependency and workflow audit | `docs/technical-assessment/repo-cicd-audit.md` | M1 Donald | Committed (PR #58) |
 | Development environment | `docs/dev-environment-review.md` | M2 Aaron | Committed (PR #56) |
 | Containerization recommendations | `docs/containerization-recommendations.md` | M2 Aaron | Committed (PR #56) |
@@ -218,7 +218,7 @@ measured first and ratcheted upward, in Milestone 2.
 ## 10. Critical business workflows
 
 Twelve workflows, CW-01 to CW-12, are documented in `docs/requirements/critical-workflows.md`,
-each traced to its requirements and code. The sponsor approved them on 27 September 2026.
+each traced to its requirements and code. The sponsor approved them on 25 September 2026.
 The Requirements Traceability Matrix (`docs/requirements/rtm.md`) maps every requirement to
 its workflow and its tests.
 
@@ -276,7 +276,7 @@ a dependency is not evidence that a feature is absent — the controller has to 
 ## 12. Next steps
 
 1. **Done:** architecture, API and tech-stack documents (PR #52), critical workflows
-   (sponsor-approved 27 Sep), required functionality and acceptance criteria
+   (sponsor-approved 25 Sep), required functionality and acceptance criteria
    (`requirements.md`), and the Requirements Traceability Matrix (`rtm.md`).
 2. **28 Sep review:** walk the sponsor through these findings, as the specification
    requires, and triage the defects: which are fixed in this capstone, and which are

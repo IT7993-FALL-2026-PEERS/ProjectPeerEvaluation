@@ -3,7 +3,7 @@
 **Owner:** Laeticia Neno Aloyem (M3) — Requirements, QA, security & documentation
 **Milestone:** 1 — Assessment & Planning (14 Sep – 4 Oct 2026), review 28 Sep
 **Gantt task:** Requirements Validation & RTM — *"Document required functionality, acceptance criteria & defects"*
-**Status:** Complete for Milestone 1 — critical workflows approved by the sponsor (27 Sep); requirements presented for sponsor sign-off at the 28 Sep review
+**Status:** Complete for Milestone 1 — critical workflows approved by the sponsor (25 Sep); requirements presented for sponsor sign-off at the 28 Sep review
 **Last updated:** 27 September 2026
 
 ## Purpose and method
@@ -49,7 +49,7 @@ route search is not sufficient evidence that a feature is absent, and reading th
 controller is.
 
 **Criticality.** `docs/requirements/critical-workflows.md` defines twelve workflows (CW-01
-to CW-12), which the sponsor approved on 27 September 2026. Each requirement's workflow, its
+to CW-12), which the sponsor approved on 25 September 2026. Each requirement's workflow, its
 existing tests and its planned coverage are recorded in the Requirements Traceability Matrix
 (`docs/requirements/rtm.md`), which is used to prioritise test coverage.
 

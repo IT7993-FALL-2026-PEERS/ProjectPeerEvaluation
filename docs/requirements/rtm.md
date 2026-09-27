@@ -3,7 +3,7 @@
 **Status:** Milestone 1 baseline, complete — every functional requirement (FR-01..FR-23) and
 every critical workflow (CW-01..CW-12) is traced to its existing automated tests, or to the
 test level and Gantt week that will cover it. Statuses match `docs/requirements/requirements.md`.
-The critical workflows were approved by the sponsor (27 Sep 2026).
+The critical workflows were approved by the sponsor (25 Sep 2026).
 **Last updated:** 27 September 2026, against `main` at `e25d3b6`.
 
 **How to read the test column.** Test cases are named by file and test title until the
