@@ -357,7 +357,11 @@ exports.uploadRoster = async (req, res, next) => {
         console.log('group_assignment value:', row.group_assignment);
         console.log('group value:', row.group);
         // Validate required columns (name, student_id, email are required; team_name is optional)
-        if (!row.student_id || !row.name || !row.email) {
+        // Checked after trimming: a value that is only spaces is missing
+        const studentId = (row.student_id || '').trim();
+        const name = (row.name || '').trim();
+        const email = (row.email || '').trim();
+        if (!studentId || !name || !email) {
           errors.push(`Missing required fields in row: ${JSON.stringify(row)}`);
           return;
         }
@@ -365,9 +369,9 @@ exports.uploadRoster = async (req, res, next) => {
         const teamAssignment = (row.team_name || row.group_assignment || row.group || '').trim() || null;
         console.log('Final team assignment for student:', row.student_id, '=', teamAssignment);
         studentsToCreate.push({
-          student_id: row.student_id.trim(),
-          name: row.name.trim(),
-          email: row.email.trim(),
+          student_id: studentId,
+          name,
+          email,
           group_assignment: teamAssignment, // Primary: team_name, fallback for backward compatibility
           course_id
         });
@@ -375,21 +379,23 @@ exports.uploadRoster = async (req, res, next) => {
       .on('end', async () => {
         console.log('CSV parsing completed. Total students parsed:', studentsToCreate.length);
         try {
+          // A file with no usable rows changes nothing: reject it before any write,
+          // so a wrong or empty file can never wipe evaluations (API-3, FR-06).
+          if (studentsToCreate.length === 0) {
+            fs.rmSync(req.file.path, { force: true });
+            const detail = errors.slice(0, 3).join('; ');
+            const more = errors.length > 3 ? ` (and ${errors.length - 3} more)` : '';
+            const err = new Error(
+              errors.length === 0
+                ? 'The file has no students. Each row needs student_id, name and email.'
+                : `No student in the file could be added. ${detail}${more}. Each row needs student_id, name and email.`
+            );
+            err.code = 'VALIDATION_ERROR';
+            err.status = 400;
+            return next(err);
+          }
+
           const courseObjectId = new mongoose.Types.ObjectId(course_id);
-          
-          // Clear evaluation state for fresh start when uploading CSV
-          console.log('Clearing evaluation state for course:', course_id);
-          
-          // Clear evaluation tokens from all existing students in this course
-          await Student.updateMany(
-            { course_id: courseObjectId }, 
-            { $unset: { evaluation_token: 1, evaluation_token_expires_at: 1 } }
-          );
-          
-          // Clear all evaluation records for this course
-          const Evaluation = require('../models/Evaluation');
-          const deletedEvaluations = await Evaluation.deleteMany({ course_id: courseObjectId });
-          console.log(`Cleared ${deletedEvaluations.deletedCount} evaluation records`);
           
           // Deduplicate: filter out students that already exist in this course
           const existingStudents = await Student.find({
@@ -406,16 +412,6 @@ exports.uploadRoster = async (req, res, next) => {
           const studentsToUpdate = studentsToCreate.filter(s => existingIds.has(s.student_id));
           console.log('Existing students to potentially update with teams:', studentsToUpdate.length);
           
-          if (filteredToCreate.length === 0 && studentsToUpdate.length === 0) {
-            fs.unlinkSync(req.file.path);
-            errors.push('All students in the file already exist in this course.');
-            return res.status(200).json({
-              message: 'No new students added.',
-              students: [],
-              errors
-            });
-          }
-
           // Combine new students and existing students for team processing
           const allStudentsForTeamProcessing = [...filteredToCreate, ...studentsToUpdate];
 
@@ -480,6 +476,12 @@ exports.uploadRoster = async (req, res, next) => {
             }
           }
           
+          // Nothing was saved (the insert failed outright): take the error path below
+          // instead of going on to clear evaluations for a roster that was never applied.
+          if (filteredToCreate.length > 0 && created.length === 0 && studentsToUpdate.length === 0) {
+            throw new Error('No students could be saved.');
+          }
+
           // Step 3: Link all students to teams (use original CSV data for team assignments)
           console.log('Starting team linking process...');
           
@@ -545,6 +547,23 @@ exports.uploadRoster = async (req, res, next) => {
           });
           console.log(`Updated course student count to ${studentCount}`);
           console.log(`Updated course team count to ${teamCount}`);
+
+          // Last step, after the roster is applied: clear evaluation links and
+          // evaluations for a fresh start. Doing it last means an error above leaves
+          // submitted evaluations alone. Whether a successful re-upload should still
+          // delete them is a sponsor decision (backlog CICD-39).
+          console.log('Clearing evaluation state for course:', course_id);
+
+          // Clear evaluation tokens from all existing students in this course
+          await Student.updateMany(
+            { course_id: courseObjectId },
+            { $unset: { evaluation_token: 1, evaluation_token_expires_at: 1 } }
+          );
+
+          // Clear all evaluation records for this course
+          const Evaluation = require('../models/Evaluation');
+          const deletedEvaluations = await Evaluation.deleteMany({ course_id: courseObjectId });
+          console.log(`Cleared ${deletedEvaluations.deletedCount} evaluation records`);
 
           fs.unlinkSync(req.file.path); // Clean up temp file
           
