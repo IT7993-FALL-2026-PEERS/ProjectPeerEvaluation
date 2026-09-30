@@ -142,7 +142,7 @@ The quality gate is enforced today. Production approval is manual.
 | Integration tests | Frontend, backend, database, authentication, and email, against a real MongoDB and an isolated email transport (never real student inboxes) | M4 / M5 | Planned, weeks of 12–19 Oct |
 | Functional regression tests | One automated test per critical business workflow | M5 | Planned, week of 19 Oct |
 | End-to-end tests | Playwright: student and instructor workflows | M4 / M5 | Smoke test live. Workflows planned, week of 26 Oct |
-| Static analysis | ESLint (`npm run lint`) | M1 / M4 | Live |
+| Static analysis | ESLint: frontend (`npm run lint`) and backend (`cd src/backend && npm run lint`) | M1 / M4 | Live |
 | Dependency validation and security scan | Dependabot, OWASP Dependency Check, CodeQL code scanning, secret scanning | M3 | Partly live, report-only: Dependabot raises alerts and opens weekly update pull requests (`.github/dependabot.yml`); OWASP Dependency-Check runs on every pull request, on `main`, and weekly (`.github/workflows/security.yml`); CodeQL (GitHub default setup) scans the code on every pull request; secret scanning and push protection are on. Triage, failing on high-severity findings, and making it a required check planned, week of 19 Oct |
 | Test report | Executed, passed, and failed tests, duration, and coverage | M4 | Planned, week of 16 Nov |
 | Quality gate | `main-protection` ruleset: a pull request, passing required checks and an up-to-date branch before merge. No approval required, so authors merge their own pull requests. No bypass, and direct pushes are rejected | M1 | Live. Required checks grow as jobs are added, week of 26 Oct |
@@ -225,7 +225,7 @@ flowchart TB
 flowchart TB
     PR(["Pull request opened"]) --> WF03["★ WF03<br/>Install dependencies + static checks"]
 
-    subgraph WF03BOX["WF03 · install runs in all three CI jobs; lint runs in the frontend job"]
+    subgraph WF03BOX["WF03 · install runs in all three CI jobs; lint runs in the frontend and backend jobs"]
         direction TB
         subgraph INSTALL["Install dependencies · npm ci"]
             direction LR
@@ -233,8 +233,9 @@ flowchart TB
             BE["Backend job"]
             E2E["E2E job"]
         end
-        LINT["Lint · npm run lint<br/>its own CI step, frontend job only"]
+        LINT["Lint · npm run lint<br/>its own CI step, frontend and backend jobs"]
         FE --> LINT
+        BE --> LINT
     end
 
     WF03 --> WF03BOX
@@ -323,7 +324,7 @@ Full per-person, per-week breakdown (sponsor-approved):
 ### Continuous Integration
 
 GitHub Actions (`.github/workflows/ci.yml`) runs on every pull request to `main` and on every push
-to `main`. It has four jobs: frontend lint, tests and build; a backend syntax check and tests; the
+to `main`. It has four jobs: frontend lint, tests and build; backend lint, a syntax check and tests; the
 Playwright smoke test; and a lint of the workflow files (`actionlint`). Two more scans run on every
 pull request but do not block merging yet: the OWASP Dependency-Check scan
 (`.github/workflows/security.yml`) and GitHub's CodeQL code scanning (default setup, no workflow
@@ -337,7 +338,7 @@ npm run lint
 npm test -- --watchAll=false
 npm run build
 npm run test:e2e
-cd src/backend && npm test
+cd src/backend && npm run lint && npm test
 ```
 
 Commit `package.json` and `package-lock.json` together. `npm ci` fails if they are out of sync.

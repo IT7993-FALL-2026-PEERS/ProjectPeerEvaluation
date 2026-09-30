@@ -111,7 +111,6 @@ exports.verifyMfa = async (req, res, next) => {
 	next(err);
 };
 
-const { sendEvaluationInvitation, sendEvaluationReminder } = require('../utils/emailUtils');
 const { sendPasswordResetEmail } = require('../utils/emailUtils');
 
 // Password reset request handler

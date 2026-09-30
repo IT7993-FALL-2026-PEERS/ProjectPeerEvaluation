@@ -49,7 +49,7 @@ function linkExpiredError() {
 exports.sendTeamEvaluations = async (req, res, next) => {
   try {
     const { course_id, team_id } = req.params;
-    const { deadline, custom_message } = req.body;
+    const { deadline } = req.body;
 
     // Get course details
     const course = await Course.findById(course_id);
@@ -128,7 +128,7 @@ exports.sendTeamEvaluations = async (req, res, next) => {
 exports.sendEvaluations = async (req, res, next) => {
   try {
     const { course_id } = req.params;
-    const { deadline, custom_message } = req.body;
+    const { deadline } = req.body;
 
     // Get course details
     const course = await Course.findById(course_id);
@@ -313,10 +313,10 @@ exports.remindEvaluations = async (req, res, next) => {
     let studentsToRemind;
     if (student_ids && student_ids.length > 0) {
       // Remind specific students
+      // One _id condition: a second `_id` key would silently replace the first (API-8)
       studentsToRemind = await Student.find({ 
         course_id, 
-        _id: { $in: student_ids },
-        _id: { $nin: completedEvaluations }
+        _id: { $in: student_ids, $nin: completedEvaluations }
       });
     } else {
       // Remind all students who haven't completed

@@ -4,6 +4,7 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
+    "lint": "eslint .",
     "test": "node --test \"tests/**/*.test.js\""
   },
   "dependencies": {
@@ -16,5 +17,10 @@
     "mongoose": "^8.18.1",
     "multer": "^2.0.2",
     "nodemailer": "^10.0.10"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.11.0",
+    "globals": "^17.12.0"
   }
 }
