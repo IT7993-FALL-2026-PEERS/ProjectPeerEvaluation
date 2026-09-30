@@ -35,6 +35,10 @@ ST004,Alice Brown,alice.brown@university.edu,
 
 ## Error Handling
 
+A file with no usable rows (empty, header only, wrong column names, or every row missing a
+required field) is rejected with an error, and nothing on the course is changed. If only some
+rows have problems, those rows are reported and the rest are added.
+
 The system will provide feedback on:
 - Missing required columns
 - Invalid file format
