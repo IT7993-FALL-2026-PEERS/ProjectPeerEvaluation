@@ -16,6 +16,13 @@ updates:
       time: "06:00"
       timezone: America/New_York
     open-pull-requests-limit: 5
+    # Only update packages listed in package.json. The frontend's vulnerable
+    # transitive packages (svgo, postcss, webpack-dev-server, ...) are pinned by
+    # react-scripts 5.0.1, so security updates for them always fail. Each failure
+    # posts a failed "Dependabot" check on the main commit, and Render's
+    # checksPass trigger then skips the staging deploy. The alerts stay open.
+    allow:
+      - dependency-type: direct
     groups:
       frontend-minor-and-patch:
         update-types: [minor, patch]
