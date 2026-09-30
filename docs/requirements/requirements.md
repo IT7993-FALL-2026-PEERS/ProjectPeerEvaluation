@@ -1,10 +1,10 @@
 # Required Functionality & Acceptance Criteria
 
 **Owner:** Laeticia Neno Aloyem (M3) — Requirements, QA, security & documentation
-**Milestone:** 1 — Assessment & Planning (14 Sep – 4 Oct 2026), review 28 Sep
+**Milestone:** 1 — Assessment & Planning (14 Sep – 30 Sep 2026), review 28 Sep
 **Gantt task:** Requirements Validation & RTM — *"Document required functionality, acceptance criteria & defects"*
-**Status:** Complete for Milestone 1 — critical workflows approved by the sponsor (25 Sep); requirements presented for sponsor sign-off at the 28 Sep review
-**Last updated:** 27 September 2026
+**Status:** Signed off by the sponsor at the 28 Sep milestone review, together with the other Milestone 1 deliverables; critical workflows approved by the sponsor on 25 Sep. The open questions below are still open.
+**Last updated:** 30 September 2026
 
 ## Purpose and method
 
