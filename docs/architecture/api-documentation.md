@@ -3,7 +3,7 @@
 **Gantt task:** Technical Assessment — *"Review software architecture & technology stack"* (M1)
 **Milestone:** 1 — Assessment & Planning
 **Status:** Complete for review. Documents the API as it is on `main` (commit `11cfd3d`, 26 Sep 2026)
-**Updated:** 30 Sep 2026 for evaluation link expiry and log redaction (CICD-17): §1, §9, §11 and API-1 in §13
+**Updated:** 30 Sep 2026 for evaluation link expiry and log redaction (CICD-17): §1, §9, §11 and API-1 in §13; and for evaluation target checks (CICD-18): §11 and API-2 in §13
 **Related:** [system-architecture.md](system-architecture.md) ·
 [database-schema.md](database-schema.md) · [../csv-upload-format.md](../csv-upload-format.md)
 
@@ -481,7 +481,10 @@ once the link has expired.
 ```
 Ratings are 1–5, except `participation`, which is 1–4 (D-19). `overall_feedback` needs at
 least 10 characters (FR-14 asks for 50–500). Every evaluation is validated before any is
-saved (FR-16), so a submission is all-or-nothing.
+saved (FR-16), so a submission is all-or-nothing. The `student_id`s must be exactly the
+teammates the form lists (the rest of the team, or the rest of the course without a team),
+each once: rating yourself, someone else, the same teammate twice, or leaving a teammate out
+is a **400** `VALIDATION_ERROR` (API-2).
 
 **201** `{ "message": "Evaluation submitted successfully.", "evaluations_count": 2,
 "submitted_at": "..." }` · **400** `VALIDATION_ERROR` · **404** `EVALUATION_CANCELLED` ·
@@ -508,7 +511,7 @@ Found while writing this document. Defect IDs refer to the
 | # | Issue | Risk |
 |---|---|---|
 | API-1 | **Fixed (CICD-17).** Tokens were generated with `Math.random()`, never expired, and were written to the request log | Tokens now come from `crypto.randomBytes(32)`, expire `EVALUATION_TOKEN_TTL_DAYS` after the latest email, and are redacted from logs. Links sent before the fix have no expiry and are refused until the professor re-sends |
-| API-2 | `POST /evaluate/:token` does not check that each `student_id` is one of the evaluator's teammates, or that it appears only once | A student can rate themselves, rate someone outside their team, or rate one teammate twice, which changes grades |
+| API-2 | **Fixed (CICD-18).** `POST /evaluate/:token` did not check that each `student_id` is one of the evaluator's teammates, or that it appears only once | Submissions must now cover exactly the teammates the form lists, each once; anything else is a 400 and nothing is saved |
 | API-3 | Uploading a roster deletes every submitted evaluation in the course | Re-uploading a corrected roster mid-evaluation silently destroys student work |
 | API-4 | `PUT .../students/:student_id` and `PUT .../teams/:team_id` save the request body as sent | Within their own course a professor can overwrite system fields (for example `course_id`) |
 | API-5 | No rate limiting on `/auth/login`, `/auth/reset-password` or `/evaluate/*` | Password guessing and reset-email flooding are unthrottled |
