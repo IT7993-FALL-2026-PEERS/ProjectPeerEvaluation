@@ -1,10 +1,10 @@
 # Technical Assessment Report
 
 **Owner:** Laeticia Neno Aloyem (M3) — Requirements, QA, security & documentation
-**Milestone:** 1 — Assessment & Planning (14 Sep – 4 Oct 2026), review 28 Sep
+**Milestone:** 1 — Assessment & Planning (14 Sep – 30 Sep 2026), review 28 Sep
 **Gantt task:** Technical Assessment — *"Log known defects/limitations; compile technical assessment report"*
-**Status:** Final for Milestone 1 — every section is complete; findings are reviewed with the sponsor at the 28 Sep milestone review
-**Last updated:** 27 September 2026
+**Status:** Final for Milestone 1 — every section is complete; findings reviewed with the sponsor and signed off at the 28 Sep milestone review
+**Last updated:** 30 September 2026
 
 ## Purpose
 
@@ -122,8 +122,10 @@ local SMTP testing, Docker + cloud provider), but only the Render path has match
 committed configuration, so Render is the flow actually in use.
 
 **Since Aaron's review was written**, a CI workflow has been added (see section 9), so the
-statement that "no `.github/workflows` directory exists" is now out of date for CI. It
-remains accurate for CD: nothing deploys automatically.
+statement that "no `.github/workflows` directory exists" is now out of date for CI. It is also
+out of date for deployment: since PR #31 (25 Sep), `render.yaml` defines the staging services and
+Render deploys `main` automatically once the CI checks pass. A CI-driven deploy with smoke tests and
+a release candidate is still planned for Milestone 3.
 
 ## 5. Configuration management
 

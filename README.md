@@ -2,8 +2,9 @@
 
 Productionization, Automated Testing, and CI/CD for the PEERS Peer Evaluation System
 
-Date: 09/20/2026
-Status: In Progress — Milestone 1 (Assessment & Planning)
+Last updated: 09/30/2026
+Status: Milestone 1 (Assessment & Planning) signed off by the sponsor on 28 Sep 2026 · Milestone 2
+(Quality Automation) starts 5 Oct
 
 A web-based platform for professors to manage peer evaluations in team-based courses: create and
 manage student rosters, assign students to courses/teams, trigger email invitations, and receive
@@ -142,7 +143,7 @@ The quality gate is enforced today. Production approval is manual.
 | Functional regression tests | One automated test per critical business workflow | M5 | Planned, week of 19 Oct |
 | End-to-end tests | Playwright: student and instructor workflows | M4 / M5 | Smoke test live. Workflows planned, week of 26 Oct |
 | Static analysis | ESLint (`npm run lint`) | M1 / M4 | Live |
-| Dependency validation and security scan | Dependabot and OWASP Dependency Check | M3 | Partly live: Dependabot opens weekly update pull requests (`.github/dependabot.yml`); OWASP Dependency-Check runs on every pull request, on `main`, and weekly, report-only (`.github/workflows/security.yml`). Triage, failing on high-severity findings, and making it a required check planned, week of 19 Oct |
+| Dependency validation and security scan | Dependabot, OWASP Dependency Check, CodeQL code scanning, secret scanning | M3 | Partly live, report-only: Dependabot raises alerts and opens weekly update pull requests (`.github/dependabot.yml`); OWASP Dependency-Check runs on every pull request, on `main`, and weekly (`.github/workflows/security.yml`); CodeQL (GitHub default setup) scans the code on every pull request; secret scanning and push protection are on. Triage, failing on high-severity findings, and making it a required check planned, week of 19 Oct |
 | Test report | Executed, passed, and failed tests, duration, and coverage | M4 | Planned, week of 16 Nov |
 | Quality gate | `main-protection` ruleset: a pull request, passing required checks and an up-to-date branch before merge. No approval required, so authors merge their own pull requests. No bypass, and direct pushes are rejected | M1 | Live. Required checks grow as jobs are added, week of 26 Oct |
 | Build artifacts and Docker images | Build the deployment artifacts and the frontend and backend images for the exact commit that passed CI | M2 | Planned, week of 2 Nov |
@@ -252,7 +253,8 @@ flowchart TB
 
 ## Project Timeline and Milestones
 
-📅 **Milestone 1 — Assessment & Planning** — 14 Sep – 04 Oct 2026 (review 28 Sep)
+📅 **Milestone 1 — Assessment & Planning** — 14 Sep – 30 Sep 2026 (review 28 Sep: all nine
+deliverables signed off by the sponsor)
 - Application architecture review, technical assessment report
 - Requirements validation, critical workflow identification, Requirements Traceability Matrix
 - Development environment validation, containerization assessment
@@ -282,7 +284,11 @@ Full per-person, per-week breakdown (sponsor-approved):
    version is pinned in `.nvmrc`; with [nvm](https://github.com/nvm-sh/nvm) run `nvm use`. Other
    Node/npm versions can generate a different `package-lock.json`, which then fails `npm ci` in CI.
 2. **Install [Git](https://git-scm.com/)**
-3. A code editor, e.g. [VS Code](https://code.visualstudio.com/)
+3. **MongoDB 7** — the backend needs a running MongoDB. The easiest way is Docker:
+   `docker run -d --name peers-dev-mongo -p 27017:27017 mongo:7` (after the first time,
+   `docker start peers-dev-mongo`). A local MongoDB Community Server or a MongoDB Atlas
+   connection string also works.
+4. A code editor, e.g. [VS Code](https://code.visualstudio.com/)
 
 ### Setup Steps
 
@@ -294,9 +300,10 @@ Full per-person, per-week breakdown (sponsor-approved):
    ```bash
    npm run setup
    ```
-3. **Configure environment variables** — copy `src/backend/.env.example` to `src/backend/.env`
-   and fill in `MONGODB_URI` and SMTP settings.
-4. **Start the application**
+3. **Configure environment variables** — copy `src/backend/.env.example` to `src/backend/.env`.
+   It already points `MONGODB_URI` at `mongodb://localhost:27017/peer-eval`; change it only if
+   you use Atlas. SMTP settings are needed only to send email, not to start the app.
+4. **Start MongoDB** (see Prerequisites), then **start the application**
    ```bash
    npm run dev
    ```
@@ -317,10 +324,12 @@ Full per-person, per-week breakdown (sponsor-approved):
 
 GitHub Actions (`.github/workflows/ci.yml`) runs on every pull request to `main` and on every push
 to `main`. It has four jobs: frontend lint, tests and build; a backend syntax check and tests; the
-Playwright smoke test; and a lint of the workflow files (`actionlint`). A separate workflow
-(`.github/workflows/security.yml`) runs the OWASP Dependency-Check scan; it reports findings but
-does not block merging yet. The `main` branch ruleset requires a pull request and all four CI
-checks to pass before merging. To reproduce the checks locally, use Node 24 (see `.nvmrc`) and run:
+Playwright smoke test; and a lint of the workflow files (`actionlint`). Two more scans run on every
+pull request but do not block merging yet: the OWASP Dependency-Check scan
+(`.github/workflows/security.yml`) and GitHub's CodeQL code scanning (default setup, no workflow
+file), so a pull request normally shows eight checks. The `main` branch ruleset requires a pull request, the
+four CI checks, and a branch that is up to date with `main`. To reproduce the checks locally, use
+Node 24 (see `.nvmrc`) and run:
 
 ```bash
 npm ci
@@ -340,6 +349,8 @@ button on the pull request, or `gh pr update-branch <number>`) and the check wil
 ### Troubleshooting
 
 - Missing dependencies: re-run `npm run setup`.
+- Backend cannot connect to the database: start MongoDB (`docker start peers-dev-mongo`) and
+  check `MONGODB_URI` in `src/backend/.env`.
 - `npm ci` says the lock file is out of sync: check `node -v` (should be 24) and `npm -v`, then
   reinstall with `npm install` on the pinned Node version and commit both files.
 - Ports 3000/5000 in use: close conflicting apps or change the port in config.
@@ -383,22 +394,30 @@ Primary contact for inquiries: Team Leader (Khoa Ho).
 ## Repository Structure
 
 ```
-.github/workflows/  # CI workflow (ci.yml)
-.nvmrc              # pinned Node version (24)
+.github/
+  workflows/             # ci.yml (CI), security.yml (OWASP Dependency-Check)
+  dependabot.yml         # weekly dependency update pull requests
+  CODEOWNERS             # reviewers requested automatically
+  pull_request_template.md
+.nvmrc                   # pinned Node version (24)
+render.yaml              # Render staging services (Blueprint)
+playwright.config.js
+package.json             # frontend dependencies and root scripts (setup, dev, test, lint)
 src/
-  frontend/       # React 19 (Create React App)
-  backend/        # Express + MongoDB (Mongoose); own package.json
-e2e/              # Playwright end-to-end tests
+  frontend/              # React 19 (Create React App)
+  backend/               # Express + MongoDB (Mongoose); own package.json and tests/
+e2e/                     # Playwright end-to-end tests
 docs/
-  requirements/
-  architecture/          # system and database documentation
-  testing-strategy/      # frontend testing strategy
-  technical-assessment/  # Milestone 1 reviews (containerization and test coverage, and more)
-  meeting-notes/
-  research-report/
+  requirements/          # requirements, critical workflows, traceability matrix (RTM)
+  architecture/          # system architecture, API and database documentation
+  testing-strategy/      # team testing strategy, frontend testing strategy
+  technical-assessment/  # Milestone 1 technical assessment and reviews
+  milestones/            # milestone progress reports
+  meeting-notes/         # sponsor meeting decisions
+  research-report/       # tech stack analysis
   user-manual/
   gantt/                 # sponsor-approved schedule
-  deployment-review.md   # current deployment flow and the gap to automated staging
+  deployment-review.md, dev-environment-review.md, containerization-recommendations.md
 DEPLOYMENT_GUIDE.md      # historical deployment notes (Render.com is the one in use)
 docker-compose.yml  # currently non-functional — see docs/technical-assessment; being
                      # rebuilt as part of Milestone 2 containerization work
@@ -408,11 +427,13 @@ docker-compose.yml  # currently non-functional — see docs/technical-assessment
 
 ## Tech Stack
 
-- **Frontend**: React 19, Create React App, MUI, React Router, Formik/Yup, Chart.js/Recharts
+- **Frontend**: React 19, Create React App, MUI, React Router, Axios
 - **Backend**: Node.js, Express, MongoDB via Mongoose, JWT auth, Nodemailer
 - **Testing**: Jest + React Testing Library (frontend unit), `node:test` (backend unit),
   Playwright (end-to-end)
-- **CI/CD**: GitHub Actions (CI is live), deploying to Render.com (CD is planned, Milestone 3)
+- **CI/CD**: GitHub Actions (CI is live); Render.com staging deploys automatically after CI passes;
+  a CI-driven delivery pipeline with smoke tests is planned for Milestone 3
+- **Security scanning**: Dependabot, OWASP Dependency-Check, CodeQL, secret scanning
 - **Containerization**: Docker / Docker Compose (planned, see Milestone 2; the current
   `docker-compose.yml` does not work)
 
@@ -430,9 +451,12 @@ docker-compose.yml  # currently non-functional — see docs/technical-assessment
 ## Contributing
 
 - Never push directly to `main`. Use a feature branch and open a pull request into `main`
-- All four CI checks must pass before a pull request can be merged (see
-  [Continuous Integration](#continuous-integration))
-- Reference the relevant Milestone/task in PR descriptions
+- Fill in the pull request template: what changed, the linked issue or Gantt task, and how it
+  was tested
+- All four CI checks must pass and the branch must be up to date with `main` before a pull
+  request can be merged (see [Continuous Integration](#continuous-integration))
+- CODEOWNERS requests a review automatically; an approval is not required, so authors merge
+  their own pull requests once the checks pass
 - Keep commit messages descriptive
 - Keep secrets out of the repository. Never commit a real `.env` file
 - Merged branches are deleted automatically

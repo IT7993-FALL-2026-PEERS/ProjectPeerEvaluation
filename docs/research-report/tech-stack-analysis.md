@@ -71,7 +71,8 @@ high-severity advisories with a fix inside the current major version
 
 Removing them shrinks the install, the attack surface and the audit report. `multer`
 alone accounts for one high-severity finding in the frontend audit. The README's Tech
-Stack section also lists Formik, Yup, Chart.js and Recharts as if they were in use.
+Stack section also listed Formik, Yup, Chart.js and Recharts as if they were in use (corrected
+30 Sep 2026, after PR #53 removed them).
 `babel-eslint` in `devDependencies` is also unused: the lint configuration extends
 `react-app`.
 
