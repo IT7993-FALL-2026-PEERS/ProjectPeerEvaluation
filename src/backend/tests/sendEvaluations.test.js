@@ -32,6 +32,7 @@ test('course invitations are spaced out by EMAIL_SEND_INTERVAL_MS', async (t) =>
   }));
   t.mock.method(Course, 'findById', async () => ({ _id: 'course-1', course_name: 'Capstone' }));
   t.mock.method(Student, 'find', () => ({ populate: async () => students }));
+  t.mock.method(Student, 'findByIdAndUpdate', async () => {});
 
   let body;
   const res = { status() { return this; }, json(data) { body = data; } };

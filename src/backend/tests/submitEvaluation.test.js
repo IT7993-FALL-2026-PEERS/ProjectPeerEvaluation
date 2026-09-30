@@ -10,6 +10,7 @@ const { submitEvaluation } = require('../controllers/evaluationController');
 const evaluator = {
   _id: new mongoose.Types.ObjectId(),
   course_id: { _id: new mongoose.Types.ObjectId() },
+  evaluation_token_expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000),
 };
 
 function validEvaluation(overrides = {}) {
