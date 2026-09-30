@@ -76,6 +76,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # ESLint 10 recommended rules (src/backend/eslint.config.js). Catches bugs like
+      # a duplicate object key, which silently drops the first value (API-8).
+      - name: Lint (ESLint)
+        run: npm run lint
+
       # Catches files that don't parse, including ones no test loads yet.
       - name: Syntax check
         run: find . -name node_modules -prune -o -name '*.js' -print0 | xargs -0 -n1 node --check

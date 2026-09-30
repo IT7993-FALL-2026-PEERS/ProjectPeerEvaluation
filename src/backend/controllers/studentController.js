@@ -1,10 +1,7 @@
 const mongoose = require('mongoose');
 const Student = require('../models/Student');
 const csv = require('csv-parser');
-const multer = require('multer');
 const fs = require('fs');
-
-const upload = multer({ dest: 'uploads/' });
 
 // Manual add student to course
 exports.addStudent = async (req, res, next) => {

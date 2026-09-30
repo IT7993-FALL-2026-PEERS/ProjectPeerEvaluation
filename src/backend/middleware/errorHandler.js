@@ -1,5 +1,7 @@
 // Global error handler middleware for standardized error responses
-module.exports = (err, req, res, next) => {
+// Express only treats middleware with four parameters as an error handler, so
+// `_next` has to stay even though it isn't called.
+module.exports = (err, req, res, _next) => {
   const status = err.status || 500;
   res.status(status).json({
     error: {

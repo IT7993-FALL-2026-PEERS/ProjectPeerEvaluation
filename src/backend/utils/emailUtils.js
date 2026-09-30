@@ -104,7 +104,7 @@ async function sendEvaluationInvitation(student, course, evaluationToken, fronte
 /**
  * Send reminder email to a student
  */
-async function sendEvaluationReminder(student, course, evaluationToken, frontendUrl = 'http://localhost:3000', deadline) {
+async function sendEvaluationReminder(student, course, evaluationToken, frontendUrl = 'http://localhost:3000') {
   const evaluationUrl = `${frontendUrl}/evaluate/${evaluationToken}`;
   const subject = `Reminder: Peer Evaluation Due for ${course.course_name}`;
   

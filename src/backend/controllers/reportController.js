@@ -255,7 +255,7 @@ exports.getCourseReport = async (req, res, next) => {
     }
 
     // Apply grading results to students
-    const studentsWithGrades = studentScores.map((item, index) => {
+    const studentsWithGrades = studentScores.map((item) => {
       let finalScore = item.originalScore;
       
       if (gradingMethod === 'curved' && gradingResults && item.originalScore > 0) {
