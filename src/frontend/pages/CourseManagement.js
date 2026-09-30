@@ -55,6 +55,7 @@ import { useNavigate } from 'react-router-dom';
 import api, { getCourseById } from '../services/api';
 import { getApiBaseUrl } from '../services/apiUrl';
 import { describeEmailResult } from '../services/emailResult';
+import { isCsvFile } from '../services/csvFile';
 import { useAuth } from '../contexts/AuthContext';
 import styles from '../styles/CourseManagement.module.css';
 import '../App.css';
@@ -258,11 +259,11 @@ function CourseManagement() {
 
   const handleCsvFileChange = (event) => {
     const file = event.target.files[0];
-    if (file && file.type === 'text/csv') {
+    if (isCsvFile(file)) {
       setCsvFile(file);
       setCsvUploadError('');
     } else {
-      setCsvUploadError('Please select a valid CSV file');
+      setCsvUploadError('Please choose a file whose name ends in .csv');
       setCsvFile(null);
     }
   };
