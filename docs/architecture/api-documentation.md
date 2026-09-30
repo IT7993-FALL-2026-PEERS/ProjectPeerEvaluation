@@ -3,6 +3,7 @@
 **Gantt task:** Technical Assessment — *"Review software architecture & technology stack"* (M1)
 **Milestone:** 1 — Assessment & Planning
 **Status:** Complete for review. Documents the API as it is on `main` (commit `11cfd3d`, 26 Sep 2026)
+**Updated:** 30 Sep 2026 for evaluation link expiry and log redaction (CICD-17): §1, §9, §11 and API-1 in §13
 **Related:** [system-architecture.md](system-architecture.md) ·
 [database-schema.md](database-schema.md) · [../csv-upload-format.md](../csv-upload-format.md)
 
@@ -34,7 +35,9 @@ Authorization: Bearer <access_token>
 Tokens are signed with `JWT_SECRET` (HS256) and expire after **1 hour**. There is no
 working refresh endpoint, so the user logs in again (see D-18 for the 30-minute
 requirement). Student endpoints under `/evaluate` use no login: the evaluation token in
-the URL is the only credential.
+the URL is the only credential. It is 32 random bytes (64 hex characters) and expires
+`EVALUATION_TOKEN_TTL_DAYS` (default 14) after the latest invitation or reminder. The
+request log redacts it.
 
 **Course ownership.** Every `/courses/:course_id/...` endpoint first checks that the
 course belongs to the logged-in professor (`middleware/courseOwner.js`). Another
@@ -67,6 +70,7 @@ takes the student's **university ID** string (for example `S0012345`).
 | 404 | `NOT_FOUND` | Resource missing, or a course owned by someone else |
 | 404 | `EVALUATION_CANCELLED` / `INVALID_TOKEN` | Student evaluation token no longer valid |
 | 409 | `DUPLICATE` | Email or student ID already exists |
+| 410 | `EVALUATION_LINK_EXPIRED` | Student evaluation link has expired; the professor re-sends it |
 | 409 | `ALREADY_COMPLETED` | Student already submitted their evaluation |
 | 409 | `CONSTRAINT_ERROR` | Team still has students |
 | 500 | `SERVER_ERROR` | Unexpected failure (the message is the raw internal error) |
@@ -348,9 +352,11 @@ class therefore makes a long request. The frontend waits up to 3 minutes.
 
 ### `POST .../evaluations/send` and `POST /courses/:course_id/teams/:team_id/evaluations/send`
 
-Body (optional): `{ "deadline": "2026-10-10", "custom_message": "..." }`. Students
-without an evaluation token get one, then each receives an email with
-`FRONTEND_URL/evaluate/<token>`.
+Body (optional): `{ "deadline": "2026-10-10", "custom_message": "..." }`. Each student
+gets a working link first: a valid token is kept, a missing or expired one is replaced,
+and the expiry restarts at `EVALUATION_TOKEN_TTL_DAYS`. Then each receives an email with
+`FRONTEND_URL/evaluate/<token>`. The `deadline` only appears in the email text; it doesn't
+set the link's expiry (D-23).
 
 **200**
 ```json
@@ -373,7 +379,8 @@ Partial failures still answer 200: check `failed`, a list of `"Name (email): err
 ### `POST .../evaluations/remind`
 
 Body (optional): `{ "student_ids": [...] }` is meant to remind only some students, but it
-is currently ignored (API-8), so everyone who hasn't submitted is reminded. **200** `{ "message", "reminders_sent", "total_reminded",
+is currently ignored (API-8), so everyone who hasn't submitted is reminded. Links are
+refreshed the same way as for invitations, so a reminder never carries an expired link. **200** `{ "message", "reminders_sent", "total_reminded",
 "failed": [...] }`, or `reminders_sent: 0` when everyone is done.
 
 ### `DELETE .../evaluations/reset`
@@ -457,7 +464,8 @@ These are the only endpoints students use. The token comes from the invitation e
 Teammates are the other members of the student's team, or everyone else in the course if
 they have no team. If already submitted: **200** `{ "message": "Evaluation already
 completed.", "completed": true, "submitted_at": "..." }`. **404**
-`EVALUATION_CANCELLED` for an unknown or reset token.
+`EVALUATION_CANCELLED` for an unknown or reset token. **410** `EVALUATION_LINK_EXPIRED`
+once the link has expired.
 
 ### `POST /evaluate/:token`
 
@@ -477,12 +485,12 @@ saved (FR-16), so a submission is all-or-nothing.
 
 **201** `{ "message": "Evaluation submitted successfully.", "evaluations_count": 2,
 "submitted_at": "..." }` · **400** `VALIDATION_ERROR` · **404** `EVALUATION_CANCELLED` ·
-**409** `ALREADY_COMPLETED`.
+**409** `ALREADY_COMPLETED` · **410** `EVALUATION_LINK_EXPIRED`.
 
 ### `GET /evaluate/:token/status`
 
 **200** `{ "valid": true, "completed": false, "student_name": "Alice", "course_name":
-"..." }` · **404** `INVALID_TOKEN`.
+"..." }` · **404** `INVALID_TOKEN` · **410** `EVALUATION_LINK_EXPIRED`.
 
 ---
 
@@ -499,7 +507,7 @@ Found while writing this document. Defect IDs refer to the
 
 | # | Issue | Risk |
 |---|---|---|
-| API-1 | Student evaluation tokens are generated with `Math.random()`, which is not cryptographically random, and never expire | A token is the only credential for a student's form; it should come from `crypto.randomBytes` and expire after the deadline |
+| API-1 | **Fixed (CICD-17).** Tokens were generated with `Math.random()`, never expired, and were written to the request log | Tokens now come from `crypto.randomBytes(32)`, expire `EVALUATION_TOKEN_TTL_DAYS` after the latest email, and are redacted from logs. Links sent before the fix have no expiry and are refused until the professor re-sends |
 | API-2 | `POST /evaluate/:token` does not check that each `student_id` is one of the evaluator's teammates, or that it appears only once | A student can rate themselves, rate someone outside their team, or rate one teammate twice, which changes grades |
 | API-3 | Uploading a roster deletes every submitted evaluation in the course | Re-uploading a corrected roster mid-evaluation silently destroys student work |
 | API-4 | `PUT .../students/:student_id` and `PUT .../teams/:team_id` save the request body as sent | Within their own course a professor can overwrite system fields (for example `course_id`) |

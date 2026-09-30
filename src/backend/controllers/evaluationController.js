@@ -5,6 +5,26 @@ const Evaluation = require('../models/Evaluation');
 const EVALUATION_RUBRIC = require('../config/rubric');
 const { sendEvaluationInvitation, sendEvaluationReminder } = require('../utils/emailUtils');
 const { createEmailPacer } = require('../utils/emailPacer');
+const { refreshEvaluationToken, isTokenExpired } = require('../utils/evaluationToken');
+
+// Gives the student a working link before an invitation or reminder is sent:
+// keeps a valid token, replaces a missing or expired one, and restarts the expiry.
+async function issueEvaluationLink(student) {
+  const { token, expiresAt } = refreshEvaluationToken(student);
+  await Student.findByIdAndUpdate(student._id, {
+    evaluation_token: token,
+    evaluation_token_expires_at: expiresAt
+  });
+  student.evaluation_token = token;
+  student.evaluation_token_expires_at = expiresAt;
+}
+
+function linkExpiredError() {
+  const err = new Error('This evaluation link has expired. Ask your professor to send a new one.');
+  err.code = 'EVALUATION_LINK_EXPIRED';
+  err.status = 410;
+  return err;
+}
 
 /**
  * Send evaluation invitations to all students in a specific team
@@ -50,12 +70,7 @@ exports.sendTeamEvaluations = async (req, res, next) => {
     const waitTurn = createEmailPacer();
     for (const student of students) {
       try {
-        // Generate evaluation token if student doesn't have one
-        if (!student.evaluation_token) {
-          const evaluationToken = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-          await Student.findByIdAndUpdate(student._id, { evaluation_token: evaluationToken });
-          student.evaluation_token = evaluationToken;
-        }
+        await issueEvaluationLink(student);
 
         await waitTurn();
         const result = await sendEvaluationInvitation(
@@ -128,13 +143,7 @@ exports.sendEvaluations = async (req, res, next) => {
       try {
         console.log(`Processing student: ${student.name} (${student.email})`);
         
-        // Generate evaluation token if student doesn't have one
-        if (!student.evaluation_token) {
-          console.log(`Generating token for student: ${student.name}`);
-          const evaluationToken = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-          await Student.findByIdAndUpdate(student._id, { evaluation_token: evaluationToken });
-          student.evaluation_token = evaluationToken;
-        }
+        await issueEvaluationLink(student);
 
         console.log(`Sending email to: ${student.email}`);
         await waitTurn();
@@ -314,6 +323,7 @@ exports.remindEvaluations = async (req, res, next) => {
     const waitTurn = createEmailPacer();
     for (const student of studentsToRemind) {
       try {
+        await issueEvaluationLink(student);
         await waitTurn();
         const result = await sendEvaluationReminder(
           student,
@@ -362,6 +372,10 @@ exports.getEvaluationForm = async (req, res, next) => {
       err.code = 'EVALUATION_CANCELLED';
       err.status = 404;
       return next(err);
+    }
+
+    if (isTokenExpired(student)) {
+      return next(linkExpiredError());
     }
 
     // Check if student has already completed evaluation
@@ -437,6 +451,10 @@ exports.submitEvaluation = async (req, res, next) => {
       err.code = 'EVALUATION_CANCELLED';
       err.status = 404;
       return next(err);
+    }
+
+    if (isTokenExpired(student)) {
+      return next(linkExpiredError());
     }
 
     // Check if already completed
@@ -546,6 +564,10 @@ exports.evaluationTokenStatus = async (req, res, next) => {
       err.code = 'INVALID_TOKEN';
       err.status = 404;
       return next(err);
+    }
+
+    if (isTokenExpired(student)) {
+      return next(linkExpiredError());
     }
 
     // Check if evaluation completed

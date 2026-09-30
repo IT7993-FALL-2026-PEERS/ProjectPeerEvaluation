@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const { getHealth } = require('./config/health');
 const { applyServerTimeouts } = require('./config/serverTimeouts');
+const { requestLogger } = require('./middleware/requestLogger');
 
 const app = express();
 
@@ -21,11 +22,8 @@ app.use(cors({
 }));
 app.use(express.json());
 
-// Request logger middleware
-app.use((req, res, next) => {
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl}`);
-  next();
-});
+// Request logger middleware (redacts student evaluation tokens)
+app.use(requestLogger);
 
 // Connect to MongoDB
 mongoose.connect(process.env.MONGODB_URI || process.env.MONGO_URI || 'mongodb://localhost:27017/peer-evaluation')
