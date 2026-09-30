@@ -19,6 +19,23 @@ async function issueEvaluationLink(student) {
   student.evaluation_token_expires_at = expiresAt;
 }
 
+// The students an evaluator rates: the rest of their team, or the rest of the
+// course when they have no team. The form and the submission both use this, so
+// a student can only submit for the people the form showed them.
+function findTeammates(student) {
+  const scope = student.team_id
+    ? { team_id: student.team_id._id || student.team_id }
+    : { course_id: student.course_id._id };
+  return Student.find({ ...scope, _id: { $ne: student._id } }).select('_id name student_id');
+}
+
+function validationError(message) {
+  const err = new Error(message);
+  err.code = 'VALIDATION_ERROR';
+  err.status = 400;
+  return err;
+}
+
 function linkExpiredError() {
   const err = new Error('This evaluation link has expired. Ask your professor to send a new one.');
   err.code = 'EVALUATION_LINK_EXPIRED';
@@ -392,20 +409,7 @@ exports.getEvaluationForm = async (req, res, next) => {
       });
     }
 
-    // Get teammates to evaluate (same team)
-    let teammates = [];
-    if (student.team_id) {
-      teammates = await Student.find({ 
-        team_id: student.team_id._id,
-        _id: { $ne: student._id } // Exclude self
-      }).select('_id name student_id');
-    } else {
-      // If no team, evaluate all other students in course
-      teammates = await Student.find({ 
-        course_id: student.course_id._id,
-        _id: { $ne: student._id } // Exclude self
-      }).select('_id name student_id');
-    }
+    const teammates = await findTeammates(student);
 
     // Prepare evaluation form data
     const evaluationForm = {
@@ -476,6 +480,29 @@ exports.submitEvaluation = async (req, res, next) => {
       err.code = 'VALIDATION_ERROR';
       err.status = 400;
       return next(err);
+    }
+
+    // API-2: the evaluations must cover exactly the evaluator's teammates, each
+    // once. Checked before anything is saved; a partial submission could never be
+    // completed later, because the duplicate guard above would refuse it.
+    const teammateIds = new Set((await findTeammates(student)).map((mate) => String(mate._id)));
+    const ratedIds = new Set();
+    for (const evalData of evaluations) {
+      // Only a plain string ID counts; String(['<id>']) would otherwise pass.
+      const targetId = evalData && typeof evalData.student_id === 'string' ? evalData.student_id : null;
+      if (targetId === String(student._id)) {
+        return next(validationError('You cannot rate yourself.'));
+      }
+      if (!teammateIds.has(targetId)) {
+        return next(validationError('You can only rate your current teammates. Reload the page and try again.'));
+      }
+      if (ratedIds.has(targetId)) {
+        return next(validationError('Each teammate can only be rated once.'));
+      }
+      ratedIds.add(targetId);
+    }
+    if (ratedIds.size !== teammateIds.size) {
+      return next(validationError('Rate every teammate before submitting. Reload the page if your team has changed.'));
     }
 
     // Validate every evaluation before saving any, so a bad one later in the list

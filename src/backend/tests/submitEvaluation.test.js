@@ -32,6 +32,8 @@ function validEvaluation(overrides = {}) {
 async function submit(t, evaluations) {
   const saved = [];
   t.mock.method(Student, 'findOne', () => ({ populate: async () => evaluator }));
+  // Everyone rated is a teammate here; who may be rated is tested in evaluationTargets.test.js.
+  t.mock.method(Student, 'find', () => ({ select: async () => evaluations.map((e) => ({ _id: e.student_id })) }));
   t.mock.method(Student, 'findByIdAndUpdate', async () => {});
   t.mock.method(Evaluation, 'findOne', async () => null);
   t.mock.method(Evaluation.prototype, 'save', async function save() {
