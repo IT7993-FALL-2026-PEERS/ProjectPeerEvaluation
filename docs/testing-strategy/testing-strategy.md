@@ -1,7 +1,7 @@
 # Automated Testing Strategy
 
 **Owner:** Laeticia Neno Aloyem (M3) — Requirements, QA, security & documentation
-**Milestone:** 1 — Assessment & Planning (14 Sep – 4 Oct 2026), review 28 Sep
+**Milestone:** 1 — Assessment & Planning (14 Sep – 30 Sep 2026), review 28 Sep
 **Gantt task:** CI/CD & Testing Strategy Design — *"Draft automated testing strategy (unit / integration / regression / e2e / smoke)"*
 **Status:** Final for Milestone 1 — the four decisions in §7 were confirmed on 27 Sep 2026 by the team leader (M4), following this document's recommendations; the team can revisit any of them at the Milestone 2 kickoff on 5 Oct.
 **Last updated:** 27 September 2026

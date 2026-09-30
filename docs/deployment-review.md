@@ -22,6 +22,12 @@ staging deployment (Milestone 3) is clear before that work starts.
 
 ## 2. Current deployment flow, step by step
 
+> **Update, 30 Sep 2026:** this section describes the repository when the review was written.
+> Since then, CI runs on every pull request (`.github/workflows/ci.yml`, PR #6 onwards), and
+> `render.yaml` (PR #31) defines the staging services: Render deploys `main` automatically once
+> the CI checks pass, and polls `/api/health` before switching traffic. See the README
+> "CI/CD Pipeline" section for the current state.
+
 The repo has no CI/CD automation today. "Deployment" currently means a person
 manually configuring two services on Render.com by hand, following
 `DEPLOYMENT_GUIDE.md`. There is no `.github/workflows` directory, so nothing runs
