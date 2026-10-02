@@ -11,10 +11,14 @@
 //   evaluate   the public student evaluation links
 //   general    every other /api route; /api/health is registered before this and never counts
 //
-// The client's address comes from X-Forwarded-For, so Express has to trust exactly the
-// proxy in front of the app: Render puts one there, hence "trust proxy" = 1 (see
-// trustProxyHops). Trusting more would let a client spoof its address; trusting none would
-// give every visitor the proxy's address and so one shared count.
+// The client's address comes from X-Forwarded-For, so Express has to trust exactly the proxies
+// in front of the app. On Render that is two: Cloudflare's edge and Render's load balancer
+// (Render: "all inbound traffic passes through Cloudflare" first), each appending to the
+// header, so the app sees "<client-supplied>, <client>, <edge>" and "trust proxy" must be 2
+// (see trustProxyHops). Trusting too few picks the edge address, which comes from a pool and
+// changes between requests, so one client's requests fall into different buckets (this was
+// the first version, measured on staging 2 Oct); trusting too many lets a client choose its
+// own address; trusting none gives every visitor one shared bucket.
 const rateLimit = require('express-rate-limit');
 
 const MINUTE = 60 * 1000;
@@ -54,13 +58,16 @@ function readLimits(env = process.env) {
   return limits;
 }
 
-// How many proxies sit in front of the app: 1 on Render. TRUST_PROXY overrides it; anything
-// that is not a whole number (including "true") keeps 1, because trusting every proxy
-// would let a client choose its own address.
+// How many proxies sit in front of the app: 2 on Render (Cloudflare and its load balancer).
+// TRUST_PROXY overrides it, for example 0 when running with no proxy; anything that is not a
+// whole number (including "true") keeps 2, because trusting every proxy would let a client
+// choose its own address.
+const RENDER_PROXY_HOPS = 2;
+
 function trustProxyHops(env = process.env) {
   const raw = env.TRUST_PROXY;
   if (typeof raw === 'string' && /^\d+$/.test(raw)) return Number(raw);
-  return 1;
+  return RENDER_PROXY_HOPS;
 }
 
 // Options for one limiter. A rejected request goes to the app's error handler, so the 429
