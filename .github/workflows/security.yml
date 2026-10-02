@@ -4,10 +4,11 @@ name: Security scan
 # repo root, backend in src/backend). Weekly as well, because new CVEs are
 # published against dependencies that haven't changed.
 #
-# Report-only for now: the first scan found existing high/critical findings
-# (mostly through react-scripts), so failing on them would block every PR.
-# Once they're triaged, add `--failOnCVSS 7` plus a suppressions file for
-# accepted risks, and make this job a required check on main.
+# Blocks on any finding with CVSS 7 or higher that is not an accepted risk. The
+# 9 inherited findings (all react-scripts build tooling) were triaged and are listed
+# in .github/dependency-check-suppressions.xml, each with an expiry date; the policy
+# and the reasons are in docs/security/security-policy.md (backlog CICD-24). A new
+# finding, or a new version of a package that already has one, fails the job.
 
 on:
   pull_request:
@@ -40,7 +41,8 @@ jobs:
       # commit because the action has no maintained release tags. Keep args to
       # standard options: the image's CLI rejected the advanced
       # --disableRetireJS flag. No quotes or globs in args either, because the
-      # action word-splits them in a shell.
+      # action word-splits them in a shell. The report is written before the
+      # exit code is decided, so the summary and artifact exist on a failure too.
       - name: Run OWASP Dependency-Check
         uses: dependency-check/Dependency-Check_Action@1e54355a8b4c8abaa8cc7d0b70aa655a3bb15a6c # main, 2025-12-10
         with:
@@ -48,7 +50,7 @@ jobs:
           path: .
           format: HTML
           out: reports
-          args: --format JSON
+          args: --format JSON --failOnCVSS 7 --suppression .github/dependency-check-suppressions.xml
 
       - name: Summarize findings
         if: ${{ !cancelled() }}
@@ -72,12 +74,14 @@ jobs:
           }
           const order = ['CRITICAL', 'HIGH', 'MODERATE', 'MEDIUM', 'LOW', 'UNKNOWN'];
           const rows = order.filter((s) => counts[s]).map((s) => `| ${s} | ${counts[s]} |`);
-          console.log('## OWASP Dependency-Check (report only, not blocking)\n');
+          const accepted = (fs.readFileSync('.github/dependency-check-suppressions.xml', 'utf8').match(/<suppress\b/g) || []).length;
+          console.log('## OWASP Dependency-Check (blocks CVSS 7 or higher unless accepted)\n');
           console.log(rows.length ? ['| Severity | Findings |', '|---|---|', ...rows].join('\n') : 'No known vulnerabilities found.');
           if (packages.size) {
             console.log(`\n**Packages with critical or high findings (${packages.size}):**\n`);
             for (const [name, sev] of [...packages].sort()) console.log(`- ${name} (${sev})`);
           }
+          console.log(`\n${accepted} accepted risks are suppressed (they expire 31 Dec 2026): see docs/security/security-policy.md.`);
           console.log('\nFull details: download the `dependency-check-report` artifact and open the HTML file.');
           EOF
 
