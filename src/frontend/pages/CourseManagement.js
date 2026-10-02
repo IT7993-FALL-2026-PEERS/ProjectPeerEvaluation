@@ -1,7 +1,7 @@
 // ...existing code...
 
 // ...existing code...
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 
 // Test comment for GitHub upload - Preston
 
@@ -145,7 +145,6 @@ function CourseManagement() {
       // Refresh students list
       const response = await api.get(`/courses/${studentsCourse._id || studentsCourse.id}/students`);
   setStudents(response.data);
-  setFilteredStudents(response.data); // Immediately update filtered list
   // Reset search filters so all students are shown
   setStudentSearch({ student_id: '', name: '', email: '', team: '' });
       // Ensure Manage Students dialog stays open and refreshed
@@ -181,8 +180,6 @@ function CourseManagement() {
       // Refresh students list
       const response = await api.get(`/courses/${studentsCourse._id || studentsCourse.id}/students`);
       setStudents(response.data);
-      // Re-apply current search filters
-      handleStudentSearchChange('student_id', studentSearch.student_id, response.data);
     } catch (error) {
       setAlert({ severity: 'error', message: 'Failed to update student' });
     }
@@ -212,8 +209,6 @@ function CourseManagement() {
       // Refresh students list
       const response = await api.get(`/courses/${studentsCourse._id || studentsCourse.id}/students`);
       setStudents(response.data);
-      // Re-apply current search filters
-      handleStudentSearchChange('student_id', studentSearch.student_id, response.data);
     } catch (error) {
       setAlert({ severity: 'error', message: `Failed to delete student "${studentName}"` });
       console.error('Delete student error:', error);
@@ -244,14 +239,12 @@ function CourseManagement() {
       // Refresh students list
       const studentsResponse = await api.get(`/courses/${studentsCourse._id || studentsCourse.id}/students`);
       setStudents(studentsResponse.data);
-      // Re-apply current search filters
-      handleStudentSearchChange('student_id', studentSearch.student_id, studentsResponse.data);
       
       // Reset form
       setCsvFile(null);
       
     } catch (error) {
-      const errorMessage = error.response?.data?.error?.message || 'Failed to upload CSV file';
+      const errorMessage = getErrorMessage(error, 'Failed to upload CSV file');
       setCsvUploadError(errorMessage);
       setAlert({ severity: 'error', message: errorMessage });
     } finally {
@@ -286,13 +279,11 @@ function CourseManagement() {
       
       // Clear students and teams data immediately
       setStudents([]);
-      setFilteredStudents([]);
       setTeams([]);
-      setFilteredTeams([]);
       
       // Clear search filters
       setStudentSearch({ student_id: '', name: '', email: '', team: '' });
-      setTeamSearch({ team_name: '' });
+      setTeamSearch({ team_name: '', team_status: '' });
       setShowStudentSearch(false);
       setShowTeamSearch(false);
       
@@ -303,7 +294,7 @@ function CourseManagement() {
       await fetchCoursesWithCounts();
       
     } catch (error) {
-      const errorMessage = error.response?.data?.error?.message || 'Failed to delete all students';
+      const errorMessage = getErrorMessage(error, 'Failed to delete all students');
       setAlert({ severity: 'error', message: errorMessage });
     } finally {
       setDeleteAllStudentsLoading(false);
@@ -526,7 +517,6 @@ function CourseManagement() {
     email: '',
     team: ''
   });
-  const [filteredStudents, setFilteredStudents] = useState([]);
   const [showStudentSearch, setShowStudentSearch] = useState(false);
 
   // Team search state
@@ -534,7 +524,6 @@ function CourseManagement() {
     team_name: '',
     team_status: ''
   });
-  const [filteredTeams, setFilteredTeams] = useState([]);
   const [showTeamSearch, setShowTeamSearch] = useState(false);
 
   const handleViewStudents = async (course) => {
@@ -547,102 +536,56 @@ function CourseManagement() {
     try {
       const response = await api.get(`/courses/${course._id || course.id}/students`);
       setStudents(response.data);
-      setFilteredStudents(response.data); // Initialize filtered list with all students
     } catch (error) {
       setStudents([]);
-      setFilteredStudents([]);
     } finally {
       setStudentsLoading(false);
     }
   };
 
-  // Filter students based on search criteria
-  const filterStudents = () => {
-    let filtered = students.filter(student => {
-      const matchesId = studentSearch.student_id === '' || 
-        student.student_id.toLowerCase().includes(studentSearch.student_id.toLowerCase());
-      const matchesName = studentSearch.name === '' || 
-        student.name.toLowerCase().includes(studentSearch.name.toLowerCase());
-      const matchesEmail = studentSearch.email === '' || 
-        student.email.toLowerCase().includes(studentSearch.email.toLowerCase());
-      const matchesTeam = studentSearch.team === '' || 
-        (student.group_assignment && student.group_assignment.toLowerCase().includes(studentSearch.team.toLowerCase()));
-      
-      return matchesId && matchesName && matchesEmail && matchesTeam;
-    });
-    
-    setFilteredStudents(filtered);
-  };
+  // The lists shown in the dialogs are worked out from the full list and the search fields, so they
+  // can never be out of date: change `students`, `teams` or a search field and they follow. (They used
+  // to be separate state set by hand, which showed the old list after a refresh.)
+  const filteredStudents = useMemo(() => students.filter(student => {
+    const matchesId = studentSearch.student_id === '' || 
+      student.student_id.toLowerCase().includes(studentSearch.student_id.toLowerCase());
+    const matchesName = studentSearch.name === '' || 
+      student.name.toLowerCase().includes(studentSearch.name.toLowerCase());
+    const matchesEmail = studentSearch.email === '' || 
+      student.email.toLowerCase().includes(studentSearch.email.toLowerCase());
+    const matchesTeam = studentSearch.team === '' || 
+      (student.group_assignment && student.group_assignment.toLowerCase().includes(studentSearch.team.toLowerCase()));
+    return matchesId && matchesName && matchesEmail && matchesTeam;
+  }), [students, studentSearch]);
+
+  const filteredTeams = useMemo(() => teams.filter(team => {
+    const matchesName = teamSearch.team_name === '' || 
+      team.team_name.toLowerCase().includes(teamSearch.team_name.toLowerCase());
+    const matchesStatus = teamSearch.team_status === '' || 
+      team.team_status === teamSearch.team_status;
+    return matchesName && matchesStatus;
+  }), [teams, teamSearch]);
 
   // Clear student search
   const clearStudentSearch = () => {
     setStudentSearch({ student_id: '', name: '', email: '', team: '' });
-    setFilteredStudents(students);
     setShowStudentSearch(false); // Hide search after clearing
   };
 
-  // Handle search input changes
-  // `source` is the list to filter. After a refresh, pass the list just fetched: `students` is still
-  // the old value inside the same function call, so filtering it would show the old list.
-  const handleStudentSearchChange = (field, value, source = students) => {
-    const newSearch = { ...studentSearch, [field]: value };
-    setStudentSearch(newSearch);
-    
-    // Filter immediately as user types
-    let filtered = source.filter(student => {
-      const matchesId = newSearch.student_id === '' || 
-        student.student_id.toLowerCase().includes(newSearch.student_id.toLowerCase());
-      const matchesName = newSearch.name === '' || 
-        student.name.toLowerCase().includes(newSearch.name.toLowerCase());
-      const matchesEmail = newSearch.email === '' || 
-        student.email.toLowerCase().includes(newSearch.email.toLowerCase());
-      const matchesTeam = newSearch.team === '' || 
-        (student.group_assignment && student.group_assignment.toLowerCase().includes(newSearch.team.toLowerCase()));
-      
-      return matchesId && matchesName && matchesEmail && matchesTeam;
-    });
-    
-    setFilteredStudents(filtered);
-  };
-
-  // Filter teams based on search criteria
-  const filterTeams = () => {
-    let filtered = teams.filter(team => {
-      const matchesName = teamSearch.team_name === '' || 
-        team.team_name.toLowerCase().includes(teamSearch.team_name.toLowerCase());
-      const matchesStatus = teamSearch.team_status === '' || 
-        team.team_status === teamSearch.team_status;
-      
-      return matchesName && matchesStatus;
-    });
-    
-    setFilteredTeams(filtered);
+  // Handle search input changes (the list is filtered as the user types)
+  const handleStudentSearchChange = (field, value) => {
+    setStudentSearch(previous => ({ ...previous, [field]: value }));
   };
 
   // Clear team search
   const clearTeamSearch = () => {
     setTeamSearch({ team_name: '', team_status: '' });
-    setFilteredTeams(teams);
     setShowTeamSearch(false); // Hide search after clearing
   };
 
   // Handle team search input changes
-  // `source` is the list to filter; see handleStudentSearchChange.
-  const handleTeamSearchChange = (field, value, source = teams) => {
-    const newSearch = { ...teamSearch, [field]: value };
-    setTeamSearch(newSearch);
-    
-    // Filter immediately as user types
-    let filtered = source.filter(team => {
-      const matchesName = newSearch.team_name === '' || 
-        team.team_name.toLowerCase().includes(newSearch.team_name.toLowerCase());
-      const matchesStatus = newSearch.team_status === '' || 
-        team.team_status === newSearch.team_status;
-      
-      return matchesName && matchesStatus;
-    });
-    
-    setFilteredTeams(filtered);
+  const handleTeamSearchChange = (field, value) => {
+    setTeamSearch(previous => ({ ...previous, [field]: value }));
   };
 
   const handleViewTeams = async (course) => {
@@ -655,10 +598,8 @@ function CourseManagement() {
     try {
       const response = await api.get(`/courses/${course._id || course.id}/teams`);
       setTeams(response.data);
-      setFilteredTeams(response.data); // Initialize filtered list with all teams
     } catch (error) {
       setTeams([]);
-      setFilteredTeams([]);
     } finally {
       setTeamsLoading(false);
     }
@@ -675,7 +616,6 @@ function CourseManagement() {
       const response = await api.delete(`/courses/${teamsCourse._id}/teams`);
       setAlert({ severity: 'success', message: response.data.message });
       setTeams([]); // Clear the teams list
-      setFilteredTeams([]); // Clear the filtered teams list
       fetchCoursesWithCounts(); // Refresh the course list to update team count
     } catch (error) {
       console.error('Error clearing teams:', error);
@@ -711,8 +651,6 @@ function CourseManagement() {
       // only the refresh fails the delete still happened, so fall back to the local list.
       const freshTeams = await fetchTeamsOr(teams.filter(team => team._id !== teamId));
       setTeams(freshTeams);
-      // Re-apply current search filters
-      handleTeamSearchChange('team_name', teamSearch.team_name, freshTeams);
       
       // Refresh the course list to update team count
       fetchCoursesWithCounts();
@@ -749,8 +687,6 @@ function CourseManagement() {
         team._id === teamToEdit._id ? { ...team, ...editTeamData } : team
       )));
       setTeams(freshTeams);
-      // Re-apply current search filters
-      handleTeamSearchChange('team_name', teamSearch.team_name, freshTeams);
       
       // If team name was changed, refresh students list to show updated team assignments
       if (editTeamData.team_name !== teamToEdit.team_name && students.length > 0) {
@@ -789,8 +725,6 @@ function CourseManagement() {
       // Refresh teams list
       const teamsResponse = await api.get(`/courses/${teamsCourse._id}/teams`);
       setTeams(teamsResponse.data);
-      // Re-apply current search filters
-      handleTeamSearchChange('team_name', teamSearch.team_name, teamsResponse.data);
       
       // Close the dialog and reset form
       setCreateTeamDialogOpen(false);
@@ -1192,10 +1126,8 @@ function CourseManagement() {
         errorMessage = 'Authentication failed - please log in again';
       } else if (error.response?.data?.message) {
         errorMessage = error.response.data.message;
-      } else if (error.response?.data?.error?.message) {
-        errorMessage = error.response.data.error.message;
-      } else if (error.message) {
-        errorMessage = error.message;
+      } else {
+        errorMessage = getErrorMessage(error, error.message || errorMessage);
       }
       
       setAlert({ 
@@ -1677,14 +1609,6 @@ function CourseManagement() {
                 </Box>
                 <Box sx={{ display: 'flex', gap: 1 }}>
                   <Button
-                    variant="contained"
-                    size="small"
-                    startIcon={<SearchIcon />}
-                    onClick={filterStudents}
-                  >
-                    Search
-                  </Button>
-                  <Button
                     variant="outlined"
                     size="small"
                     startIcon={<ClearIcon />}
@@ -1817,14 +1741,6 @@ function CourseManagement() {
                   </FormControl>
                 </Box>
                 <Box sx={{ display: 'flex', gap: 1 }}>
-                  <Button
-                    variant="contained"
-                    size="small"
-                    startIcon={<SearchIcon />}
-                    onClick={filterTeams}
-                  >
-                    Search
-                  </Button>
                   <Button
                     variant="outlined"
                     size="small"

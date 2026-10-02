@@ -27,6 +27,20 @@ test('TC-SEC-02: every suppression expires, so it has to be reviewed again', () 
   }
 });
 
+// Advance notice: this fails 14 days before the earliest expiry, so the review happens while CI is still
+// green, instead of every pull request turning red on the day a suppression lapses.
+test('TC-SEC-04: no suppression expires within 14 days; re-triage and extend it before then', () => {
+  const WARNING_DAYS = 14;
+  for (const { attrs } of blocks) {
+    const until = /\buntil="(\d{4}-\d{2}-\d{2})Z"/.exec(attrs)[1];
+    const daysLeft = Math.floor((new Date(`${until}T00:00:00Z`).getTime() - Date.now()) / 86400000);
+    assert.ok(
+      daysLeft > WARNING_DAYS,
+      `a suppression expires on ${until} (${daysLeft} days): re-triage it and extend the date (docs/security/security-policy.md)`
+    );
+  }
+});
+
 test('TC-SEC-03: every suppression says why, in the notes', () => {
   for (const { body } of blocks) {
     const notes = /<notes><!\[CDATA\[([\s\S]*?)\]\]><\/notes>/.exec(body);

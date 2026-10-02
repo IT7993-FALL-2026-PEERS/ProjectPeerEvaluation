@@ -23,6 +23,11 @@ const FIXED_EVALUATIONS = [
   { evaluator: IDS.di, student: IDS.cy, ratings: ratings(4, 5, 4, 5, 4, 4), feedback: 'Good communicator and a steady contributor.' },
 ];
 
+// Two sets used by the tests that submit or store a single evaluation: ordinary ratings, and the ones
+// the student tests send through the form.
+const ORDINARY_RATINGS = ratings(4, 4, 4, 4, 4, 3);
+const STUDENT_RATINGS = ratings(4, 5, 4, 3, 4, 3);
+
 const EXPECTED_SCORES = { ann: 100, ben: 79.17, cy: 90, di: 58.33 };
 
 async function seedEvaluations() {
@@ -36,4 +41,4 @@ async function seedEvaluations() {
   })));
 }
 
-module.exports = { seedEvaluations, FIXED_EVALUATIONS, EXPECTED_SCORES };
+module.exports = { seedEvaluations, FIXED_EVALUATIONS, EXPECTED_SCORES, ORDINARY_RATINGS, STUDENT_RATINGS };

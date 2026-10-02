@@ -3,7 +3,8 @@ const assert = require('node:assert/strict');
 const Student = require('../models/Student');
 const { startDatabase, stopDatabase, clearDatabase } = require('./helpers/db');
 const { startApp, sentEmails, clearEmails } = require('./helpers/app');
-const { seed, IDS } = require('./helpers/seed');
+const { seed, IDS } = require('./helpers/seed');
+const { ORDINARY_RATINGS: RATINGS } = require('./helpers/evaluations');
 
 // CW-08 tracking and reminders (FR-11, FR-12): who has submitted, and who is reminded. A reminder
 // goes only to students who have not submitted, and reuses a link that still works.
@@ -17,9 +18,6 @@ const status = (token) => app.request('GET', `/api/courses/${IDS.courseAda}/eval
 const remind = (token, body = {}) => app.request('POST', `/api/courses/${IDS.courseAda}/evaluations/remind`, { token, body });
 const send = () => app.request('POST', `/api/courses/${IDS.courseAda}/evaluations/send`, { token: ada, body: {} });
 
-const RATINGS = {
-  professionalism: 4, communication: 4, work_ethic: 4, content_knowledge_skills: 4, overall_contribution: 4, participation: 3,
-};
 // Ann submits her one rating, as a student would, with the link from her invitation.
 async function annSubmits() {
   const { evaluation_token: token } = await Student.findById(IDS.ann);

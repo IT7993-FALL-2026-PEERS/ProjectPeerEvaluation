@@ -4,7 +4,8 @@ const Student = require('../models/Student');
 const Evaluation = require('../models/Evaluation');
 const { startDatabase, stopDatabase, clearDatabase } = require('./helpers/db');
 const { startApp, sentEmails, clearEmails } = require('./helpers/app');
-const { seed, IDS } = require('./helpers/seed');
+const { seed, IDS } = require('./helpers/seed');
+const { STUDENT_RATINGS: RATINGS } = require('./helpers/evaluations');
 
 // FR-09 / FR-16: the student path, from the invitation to a saved evaluation. The student has no
 // login; the link token is the only credential, and it is taken from the captured email, as a
@@ -13,9 +14,6 @@ let replSet;
 let app;
 let ada;
 
-const RATINGS = {
-  professionalism: 4, communication: 5, work_ethic: 4, content_knowledge_skills: 3, overall_contribution: 4, participation: 3,
-};
 const rating = (studentId, overrides = {}) => ({
   student_id: String(studentId),
   ratings: { ...RATINGS, ...overrides.ratings },
