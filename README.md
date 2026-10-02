@@ -138,7 +138,7 @@ The quality gate is enforced today. Production approval is manual.
 |---|---|---|---|
 | Install dependencies and build | `npm ci` and the production build | M1 / M4 | Live (`.github/workflows/ci.yml`) |
 | Workflow lint | `actionlint` checks the workflow files themselves | M1 / M4 | Live |
-| Unit tests | Jest and React Testing Library for the frontend; Node's built-in test runner (`node:test`) for the backend | M4 / M5 | Live for both in CI on every pull request. Coverage is measured on every pull request and gated by floors just below today's baseline (`coverage-floors.json`; backend about 64% of lines, frontend about 8%), and the floors only go up. Coverage still growing, weeks of 5–12 Oct |
+| Unit tests | Jest and React Testing Library for the frontend; Node's built-in test runner (`node:test`) for the backend | M4 / M5 | Live for both in CI on every pull request. Coverage is measured on every pull request and gated by floors just below today's baseline ( + "coverage-floors.json" + ; backend about 64% of lines, frontend about 8%), and the floors only go up. Coverage still growing, weeks of 5–12 Oct |
 | Integration tests | Frontend, backend, database, authentication, and email, against a real MongoDB and an isolated email transport (never real student inboxes) | M4 / M5 | Planned, weeks of 12–19 Oct |
 | Functional regression tests | One automated test per critical business workflow | M5 | Planned, week of 19 Oct |
 | End-to-end tests | Playwright: student and instructor workflows | M4 / M5 | Smoke test live. Workflows planned, week of 26 Oct |
@@ -279,6 +279,31 @@ Full per-person, per-week breakdown (sponsor-approved):
 
 ## Getting Started (For New Users)
 
+### Quick start
+
+Prerequisites: Git, Node 24 (see `.nvmrc`), and either Docker or a reachable MongoDB.
+
+```bash
+git clone https://github.com/IT7993-FALL-2026-PEERS/ProjectPeerEvaluation.git
+cd ProjectPeerEvaluation
+npm run setup          # checks Node, creates .env files (random JWT_SECRET), installs dependencies
+npm run dev            # frontend :3000 + backend :5000 (needs MongoDB, see Prerequisites)
+```
+
+Confirm it worked (second terminal): `bash scripts/verify-env.sh` prints `✔ backend is up` and
+`✔ frontend is up`, and exits non-zero with a message if either is down.
+
+**All in containers instead** (includes MongoDB): `npm run docker:up`, then `npm run docker:down`.
+See [docs/docker-setup.md](docs/docker-setup.md).
+
+Top 3 problems:
+1. **Backend cannot connect to the database**: MongoDB is not running. Start one with
+   `docker run -d --name peers-dev-mongo -p 27017:27017 mongo:7` (or `docker start peers-dev-mongo`).
+2. **`Node 24+ is required`**: run `nvm use` (or install Node 24). A different Node makes `npm ci` fail in CI.
+3. **Port 3000/5000 already in use**: stop the other app (often a leftover `npm run dev`).
+
+The step-by-step version follows.
+
 ### Prerequisites
 
 1. **Install [Node.js and npm](https://nodejs.org/)** — Node 24 (npm 11 is included). The required
@@ -301,11 +326,11 @@ Full per-person, per-week breakdown (sponsor-approved):
    ```bash
    npm run setup
    ```
-3. **Configure environment variables** — copy `src/backend/.env.example` to `src/backend/.env`.
-   It already points `MONGODB_URI` at `mongodb://localhost:27017/peer-eval`; change it only if
-   you use Atlas. SMTP settings are needed only to send email, not to start the app.
-   The real `.env` is never committed (it is git-ignored), so if a `git pull` removed yours,
-   copy `.env.example` again.
+3. **Configure environment variables**: `npm run setup` already copied
+   `src/backend/.env.example` to `src/backend/.env` (only if it was missing) and generated a
+   random `JWT_SECRET`. `MONGODB_URI` points at `mongodb://localhost:27017/peer-eval`; change it
+   only if you use Atlas. SMTP settings are needed only to send email, not to start the app.
+   The real `.env` is never committed (it is git-ignored).
 4. **Start MongoDB** (see Prerequisites), then **start the application**
    ```bash
    npm run dev
@@ -317,7 +342,9 @@ Full per-person, per-week breakdown (sponsor-approved):
 ### Available Scripts
 
 - `npm run dev` — start both frontend and backend servers simultaneously
-- `npm run setup` — install dependencies for both frontend and backend
+- `npm run setup` — check Node, create missing `.env` files, install frontend and backend dependencies (safe to re-run)
+- `npm run verify` — wait for the frontend and backend and fail clearly if either is down
+- `npm run docker:up` / `npm run docker:down` — start/stop the Docker Compose stack (see `docs/docker-setup.md`)
 - `npm run start:backend` / `npm run start:frontend` — start one side only
 - `npm test` — frontend unit tests (Jest + React Testing Library)
 - `npm run test:e2e` — end-to-end tests (Playwright)
@@ -356,7 +383,7 @@ button on the pull request, or `gh pr update-branch <number>`) and the check wil
   check `MONGODB_URI` in `src/backend/.env`.
 - `npm ci` says the lock file is out of sync: check `node -v` (should be 24) and `npm -v`, then
   reinstall with `npm install` on the pinned Node version and commit both files.
-- Ports 3000/5000 in use: close conflicting apps or change the port in config.
+- Ports 3000/5000 in use: close conflicting apps. With Docker, change `FRONTEND_PORT` / `BACKEND_PORT` in `.env`.
 - Email sending issues: check `src/backend/.env` SMTP settings.
 
 ---
@@ -422,8 +449,12 @@ docs/
   gantt/                 # sponsor-approved schedule
   deployment-review.md, dev-environment-review.md, containerization-recommendations.md
 DEPLOYMENT_GUIDE.md      # historical deployment notes (Render.com is the one in use)
-docker-compose.yml  # currently non-functional — see docs/technical-assessment; being
-                     # rebuilt as part of Milestone 2 containerization work
+docker-compose.yml       # mongo + backend + frontend with health checks (docs/docker-setup.md)
+Dockerfile.frontend      # CRA build -> nginx
+docker/nginx.conf        # SPA fallback for the frontend image
+src/backend/Dockerfile   # backend image (non-root)
+.env.example             # Docker Compose settings (src/backend/.env.example is for npm run dev)
+scripts/                 # setup.js (npm run setup), setup.sh, verify-env.sh
 ```
 
 ---
@@ -437,8 +468,8 @@ docker-compose.yml  # currently non-functional — see docs/technical-assessment
 - **CI/CD**: GitHub Actions (CI is live); Render.com staging deploys automatically after CI passes;
   a CI-driven delivery pipeline with smoke tests is planned for Milestone 3
 - **Security scanning**: Dependabot, OWASP Dependency-Check, CodeQL, secret scanning
-- **Containerization**: Docker / Docker Compose (planned, see Milestone 2; the current
-  `docker-compose.yml` does not work)
+- **Containerization**: Docker / Docker Compose (local dev and CI; deployment stays on Render,
+  see `docs/docker-setup.md`)
 
 ---
 

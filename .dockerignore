@@ -1,0 +1,23 @@
+# Build context of the frontend image (docker build -f Dockerfile.frontend .), which is also what
+# Compose uses for it. Dockerfile.frontend copies only the package files, public/, src/index.js,
+# src/frontend/ and docker/nginx.conf, so everything else stays out of the context: it is faster,
+# and local secrets (.env files) can never reach the build.
+.git
+.github
+.claude
+node_modules
+**/node_modules
+**/.env
+**/.env.*
+!**/.env.example
+build
+coverage
+**/coverage
+playwright-report
+playwright-results
+test-results
+e2e
+docs
+scripts
+src/backend
+*.md
