@@ -1,0 +1,16 @@
+# Build context of the backend image (docker build src/backend). The Dockerfile runs `npm ci` and
+# then `COPY . .`, so whatever is not listed here ends up in the image. Keep out: the host's
+# node_modules (it would overwrite the clean production install), local .env files with real
+# secrets, uploads, coverage output and the test files.
+node_modules
+**/node_modules
+.env
+.env.*
+!.env.example
+coverage
+uploads
+tests
+eslint.config.js
+*.md
+.dockerignore
+Dockerfile
