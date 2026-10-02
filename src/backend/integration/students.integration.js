@@ -132,3 +132,43 @@ test('TC-06-40: the student list does not leak another course\'s students', asyn
   assert.equal(list.status, 200);
   assert.ok(list.body.every((s) => String(s.course_id) === String(IDS.courseAda)));
 });
+
+// CICD-46: editing only a name or email used to remove the student from Team.students while
+// Student.team_id stayed set, so the two sides disagreed and the student vanished from the team.
+test('TC-06-41: editing only the name or email keeps the student in their team, on both sides', async () => {
+  for (const body of [{ name: 'Ann A. Archer' }, { email: 'ann.archer@example.edu' }, { student_id: '1001A' }]) {
+    const res = await app.request('PUT', `${students()}/${IDS.ann}`, { token: ada, body });
+    assert.equal(res.status, 200);
+    const ann = await Student.findById(IDS.ann);
+    assert.equal(String(ann.team_id), String(IDS.teamAlpha));
+    const alpha = await Team.findById(IDS.teamAlpha);
+    assert.deepEqual(alpha.students.map(String).sort(), [String(IDS.ann), String(IDS.ben)].sort());
+    await assertCourseConsistent(IDS.courseAda);
+  }
+});
+
+test('TC-06-42: a body with only a team_id (which edits ignore) changes nothing', async () => {
+  const res = await app.request('PUT', `${students()}/${IDS.ann}`, { token: ada, body: { team_id: String(IDS.teamBeta) } });
+  assert.equal(res.status, 200);
+  assert.equal(String((await Student.findById(IDS.ann)).team_id), String(IDS.teamAlpha));
+  await assertCourseConsistent(IDS.courseAda);
+});
+
+test('TC-06-43: clearing the team on purpose (group_assignment null or empty) removes the student from it on both sides', async () => {
+  for (const value of [null, '']) {
+    await app.request('POST', `/api/courses/${IDS.courseAda}/teams/${IDS.teamAlpha}/students/${IDS.ann}`, { token: ada });
+    const res = await app.request('PUT', `${students()}/${IDS.ann}`, { token: ada, body: { group_assignment: value } });
+    assert.equal(res.status, 200);
+    assert.equal((await Student.findById(IDS.ann)).team_id, null);
+    assert.deepEqual((await Team.findById(IDS.teamAlpha)).students.map(String), [String(IDS.ben)]);
+    await assertCourseConsistent(IDS.courseAda);
+  }
+});
+
+test('TC-06-44: a student with no team stays without one when only their name is edited', async () => {
+  const res = await app.request('PUT', `${students()}/${IDS.ann}`, { token: ada, body: { group_assignment: null } });
+  assert.equal(res.status, 200);
+  await app.request('PUT', `${students()}/${IDS.ann}`, { token: ada, body: { name: 'Ann Again' } });
+  assert.equal((await Student.findById(IDS.ann)).team_id, null);
+  await assertCourseConsistent(IDS.courseAda);
+});

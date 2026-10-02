@@ -167,6 +167,9 @@ exports.updateStudent = async (req, res, next) => {
     
     const oldTeamId = currentStudent.team_id;
     let newTeamId = null;
+    // Team membership changes only when the request names a team (or clears it). An edit of just the
+    // name or email must leave Team.students alone, or the two sides of the membership disagree.
+    const teamChangeRequested = updates.group_assignment !== undefined;
     
     // Handle team assignment changes
     if (updates.group_assignment !== undefined) {
@@ -213,7 +216,7 @@ exports.updateStudent = async (req, res, next) => {
     const Team = require('../models/Team');
     
     // Remove from old team if changed
-    if (oldTeamId && (!newTeamId || oldTeamId.toString() !== newTeamId.toString())) {
+    if (teamChangeRequested && oldTeamId && (!newTeamId || oldTeamId.toString() !== newTeamId.toString())) {
       await Team.findByIdAndUpdate(oldTeamId, {
         $pull: { students: student_id }
       });
