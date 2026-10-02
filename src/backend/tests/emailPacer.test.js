@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { createEmailPacer, getEmailIntervalMs } = require('../utils/emailPacer');
+const { createEmailPacer, getEmailIntervalMs, getRecipientLimit, getRequestBudgetMs } = require('../utils/emailPacer');
 
 function recordingSleep() {
   const waits = [];
@@ -33,4 +33,27 @@ test('reads EMAIL_SEND_INTERVAL_MS and ignores missing or invalid values', () =>
   assert.equal(getEmailIntervalMs({}), 0);
   assert.equal(getEmailIntervalMs({ EMAIL_SEND_INTERVAL_MS: 'soon' }), 0);
   assert.equal(getEmailIntervalMs({ EMAIL_SEND_INTERVAL_MS: '-5' }), 0);
+});
+
+// CICD-36: one request must finish before the browser's 3-minute timeout, so it can email only as many
+// students as fit in the time budget at the current interval.
+test('TC-10-34: with no interval there is no recipient limit', () => {
+  assert.equal(getRecipientLimit({}), Infinity);
+  assert.equal(getRecipientLimit({ EMAIL_SEND_INTERVAL_MS: '0' }), Infinity);
+});
+
+test('TC-10-35: staging (11 s interval, default 150 s budget) allows 14 recipients, not the 18 that would time out', () => {
+  assert.equal(getRecipientLimit({ EMAIL_SEND_INTERVAL_MS: '11000' }), 14);
+  // n recipients wait (n - 1) gaps: 14 wait 143 s, inside the budget; 18 would wait 187 s, past the
+  // 180 s browser timeout.
+  const waitMs = (recipients, intervalMs) => (recipients - 1) * intervalMs;
+  assert.ok(waitMs(14, 11000) <= 150000);
+  assert.ok(waitMs(18, 11000) > 180000);
+});
+
+test('TC-10-36: the budget and interval come from the environment, and bad values fall back', () => {
+  assert.equal(getRecipientLimit({ EMAIL_SEND_INTERVAL_MS: '1000', EMAIL_REQUEST_BUDGET_MS: '10000' }), 11);
+  assert.equal(getRequestBudgetMs({ EMAIL_REQUEST_BUDGET_MS: 'soon' }), 150000);
+  assert.equal(getRequestBudgetMs({ EMAIL_REQUEST_BUDGET_MS: '-5' }), 150000);
+  assert.equal(getRecipientLimit({ EMAIL_SEND_INTERVAL_MS: 'x' }), Infinity);
 });

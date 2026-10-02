@@ -264,7 +264,7 @@ New findings from this review. Items already in the defects log keep their D-num
 
 | # | Finding | Impact | Suggested direction |
 |---|---|---|---|
-| A-1 | Email is sent synchronously inside the HTTP request, one email every `EMAIL_SEND_INTERVAL_MS` | Large classes hit the 3-minute frontend timeout (about 16 students on staging) | Queue the sends in the background and report progress; use a real email provider in production |
+| A-1 | Email is sent synchronously inside the HTTP request, one email every `EMAIL_SEND_INTERVAL_MS` | Large classes would hit the 3-minute frontend timeout. Since CICD-36 a request that cannot finish in `EMAIL_REQUEST_BUDGET_MS` (default 150 s, so 14 recipients at 11 s) is refused up front with advice to send team by team | A background queue with progress reporting would remove the limit; a real email provider (no pacing) also does |
 | A-2 | Student evaluation tokens are weak and permanent, and submissions aren't checked against the teammate list (API-1, API-2) | Grade integrity depends on these links | `crypto.randomBytes` tokens with an expiry; accept only the evaluator's own teammates, each once |
 | A-3 | Uploading a roster deletes all evaluations for the course (API-3) | Silent data loss mid-cycle | Keep evaluations on upload, or ask for confirmation |
 | A-4 | Team membership is stored twice (D-10) and reports rely on `Student.team_id` | The two can drift | Treat `Student.team_id` as the source of truth |

@@ -61,8 +61,10 @@ services:
         sync: false
       # Wait between emails in a batch. Mailtrap's free sandbox allows 1 email per
       # 10 seconds and rejects faster sends with "550 Too many emails per second"
-      # (1.5s and 3s both failed on staging). 11s leaves a margin, but it caps one
-      # send at ~16 students before the frontend's 3-minute request timeout.
+      # (1.5s and 3s both failed on staging). 11s leaves a margin, but one request
+      # must finish inside the frontend's 3-minute timeout, so the backend refuses
+      # a send of more than 14 recipients (EMAIL_REQUEST_BUDGET_MS, default 150 s)
+      # and tells the professor to send team by team.
       - key: EMAIL_SEND_INTERVAL_MS
         value: "11000"
 

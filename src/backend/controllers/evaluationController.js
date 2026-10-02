@@ -4,7 +4,7 @@ const Team = require('../models/Team');
 const Evaluation = require('../models/Evaluation');
 const EVALUATION_RUBRIC = require('../config/rubric');
 const { sendEvaluationInvitation, sendEvaluationReminder } = require('../utils/emailUtils');
-const { createEmailPacer } = require('../utils/emailPacer');
+const { createEmailPacer, getEmailIntervalMs, getRecipientLimit } = require('../utils/emailPacer');
 const { refreshEvaluationToken, isTokenExpired } = require('../utils/evaluationToken');
 const evaluationStore = require('../utils/saveEvaluations');
 
@@ -33,6 +33,22 @@ function findTeammates(student) {
 function validationError(message) {
   const err = new Error(message);
   err.code = 'VALIDATION_ERROR';
+  err.status = 400;
+  return err;
+}
+
+// Refuses a send that cannot finish inside one request (see utils/emailPacer.js). Checked before any
+// link is issued or email sent, so a refused request changes nothing. `what` is "students" for a whole
+// course or "team members" for one team.
+function checkRecipientLimit(count, what) {
+  const limit = getRecipientLimit();
+  if (count <= limit) return null;
+  const seconds = Math.round(getEmailIntervalMs() / 1000);
+  const err = new Error(
+    `This would email ${count} ${what}, but at the current sending speed (one email every ${seconds} seconds) ` +
+    `at most ${limit} can be emailed in one go. Send to each team instead, or choose fewer students.`
+  );
+  err.code = 'TOO_MANY_RECIPIENTS';
   err.status = 400;
   return err;
 }
@@ -78,6 +94,9 @@ exports.sendTeamEvaluations = async (req, res, next) => {
       err.status = 404;
       return next(err);
     }
+
+    const tooMany = checkRecipientLimit(students.length, 'team members');
+    if (tooMany) return next(tooMany);
 
     let emailsSent = 0;
     let failedEmails = [];
@@ -149,6 +168,9 @@ exports.sendEvaluations = async (req, res, next) => {
       err.status = 404;
       return next(err);
     }
+
+    const tooMany = checkRecipientLimit(students.length, 'students');
+    if (tooMany) return next(tooMany);
 
     let emailsSent = 0;
     let failedEmails = [];
@@ -333,6 +355,9 @@ exports.remindEvaluations = async (req, res, next) => {
         reminders_sent: 0
       });
     }
+
+    const tooMany = checkRecipientLimit(studentsToRemind.length, 'students');
+    if (tooMany) return next(tooMany);
 
     let remindersSent = 0;
     let failedReminders = [];
