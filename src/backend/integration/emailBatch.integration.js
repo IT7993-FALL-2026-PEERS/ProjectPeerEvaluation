@@ -55,9 +55,19 @@ test('TC-10-30: a course too big to email within the time budget is refused with
   assert.equal(res.body.error.code, 'TOO_MANY_RECIPIENTS');
   assert.match(res.body.error.message, /20 students/);
   assert.match(res.body.error.message, /at most 4/);
+  assert.match(res.body.error.message, /every 100 milliseconds/, 'the real interval, not a rounded one');
   assert.match(res.body.error.message, /team/i, 'it says to send team by team');
   assert.equal(sentEmails.length, 0);
   assert.equal(await Student.countDocuments({ evaluation_token: { $ne: null } }), 0, 'no link was issued');
+});
+
+test('TC-10-37: the interval is shown as it is, not rounded to whole seconds', async () => {
+  process.env.EMAIL_SEND_INTERVAL_MS = '1500';
+  process.env.EMAIL_REQUEST_BUDGET_MS = '3000';
+  await addStudents(16);
+  const res = await send();
+  assert.equal(res.status, 400);
+  assert.match(res.body.error.message, /every 1\.5 seconds/);
 });
 
 test('TC-10-31: a course exactly at the limit is sent in full', async () => {

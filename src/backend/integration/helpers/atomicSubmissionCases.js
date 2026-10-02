@@ -4,14 +4,12 @@ const Student = require('../../models/Student');
 const Evaluation = require('../../models/Evaluation');
 const { startDatabase, stopDatabase, clearDatabase } = require('./db');
 const { startApp, clearEmails } = require('./app');
-const { seed, IDS } = require('./seed');
+const { seed, IDS } = require('./seed');
+const { STUDENT_RATINGS: RATINGS } = require('./evaluations');
 
 // FR-16 / CICD-33: a submission is all or nothing, and a double submit saves once. The same cases
 // run on a replica set (transactions) and on a standalone mongod (no transactions), because both
 // are in use: Atlas and these tests use a replica set; a local MongoDB and Docker Compose do not.
-const RATINGS = {
-  professionalism: 4, communication: 5, work_ethic: 4, content_knowledge_skills: 3, overall_contribution: 4, participation: 3,
-};
 const rating = (studentId) => ({
   student_id: String(studentId),
   ratings: RATINGS,

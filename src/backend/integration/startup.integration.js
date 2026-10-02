@@ -3,16 +3,14 @@ const assert = require('node:assert/strict');
 const Evaluation = require('../models/Evaluation');
 const { startDatabase, stopDatabase, clearDatabase } = require('./helpers/db');
 const { seed, IDS } = require('./helpers/seed');
-const { ensureEvaluationIndexes } = require('../utils/ensureIndexes');
+const { ensureEvaluationIndexes } = require('../utils/ensureIndexes');
+const { ORDINARY_RATINGS: RATINGS } = require('./helpers/evaluations');
 
 // CICD-33: the unique index is what makes a double submit save once. If old duplicate ratings stop it
 // from being built, the service must say so at startup instead of silently running without it.
 let server;
 const INDEX = 'evaluator_id_1_student_id_1_course_id_1';
 
-const RATINGS = {
-  professionalism: 4, communication: 4, work_ethic: 4, content_knowledge_skills: 4, overall_contribution: 4, participation: 3,
-};
 const doc = () => ({
   course_id: IDS.courseAda, evaluator_id: IDS.ann, student_id: IDS.ben,
   evaluation_token: 'a'.repeat(64), ratings: RATINGS, overall_feedback: 'Reliable and prepared every week.',

@@ -43,9 +43,10 @@ function validationError(message) {
 function checkRecipientLimit(count, what, advice) {
   const limit = getRecipientLimit();
   if (count <= limit) return null;
-  const seconds = Math.round(getEmailIntervalMs() / 1000);
+  const intervalMs = getEmailIntervalMs();
+  const every = intervalMs % 1000 === 0 ? `${intervalMs / 1000} seconds` : (intervalMs < 1000 ? `${intervalMs} milliseconds` : `${intervalMs / 1000} seconds`);
   const err = new Error(
-    `This would email ${count} ${what}, but at the current sending speed (one email every ${seconds} seconds) ` +
+    `This would email ${count} ${what}, but at the current sending speed (one email every ${every}) ` +
     `at most ${limit} can be emailed in one go. ${advice}`
   );
   err.code = 'TOO_MANY_RECIPIENTS';

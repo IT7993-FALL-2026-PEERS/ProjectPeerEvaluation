@@ -22,7 +22,15 @@ if (!fs.existsSync(path.join(buildDir, 'index.html'))) {
 }
 
 http.createServer((req, res) => {
-  const requested = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
+  let requested;
+  try {
+    requested = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
+  } catch (err) {
+    // A malformed percent-encoding (for example /%E0%A4%A) must not take the server down.
+    res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' });
+    res.end('Bad request');
+    return;
+  }
   const file = path.normalize(path.join(buildDir, requested));
   // Never serve anything outside build/.
   const inside = file.startsWith(buildDir + path.sep);

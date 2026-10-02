@@ -3,14 +3,12 @@ const assert = require('node:assert/strict');
 const Evaluation = require('../models/Evaluation');
 const { startDatabase, stopDatabase, clearDatabase } = require('./helpers/db');
 const { seed, IDS } = require('./helpers/seed');
-const { findDuplicateEvaluations } = require('../scripts/findDuplicateEvaluations');
+const { findDuplicateEvaluations } = require('../scripts/findDuplicateEvaluations');
+const { ORDINARY_RATINGS: RATINGS } = require('./helpers/evaluations');
 
 // CICD-33: the check that runs before the unique index is deployed to a database that already has data.
 let server;
 
-const RATINGS = {
-  professionalism: 4, communication: 4, work_ethic: 4, content_knowledge_skills: 4, overall_contribution: 4, participation: 3,
-};
 const doc = (evaluator, student) => ({
   course_id: IDS.courseAda, evaluator_id: evaluator, student_id: student,
   evaluation_token: 'a'.repeat(64), ratings: RATINGS, overall_feedback: 'Reliable and prepared every week.',

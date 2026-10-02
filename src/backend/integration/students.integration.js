@@ -6,7 +6,8 @@ const Evaluation = require('../models/Evaluation');
 const { startDatabase, stopDatabase, clearDatabase } = require('./helpers/db');
 const { startApp } = require('./helpers/app');
 const { seed, IDS } = require('./helpers/seed');
-const { assertCourseConsistent } = require('./helpers/consistency');
+const { assertCourseConsistent } = require('./helpers/consistency');
+const { ORDINARY_RATINGS: RATINGS } = require('./helpers/evaluations');
 
 // CW-04 roster management by hand: add, edit and remove students one at a time or in bulk. Each
 // change touches the student, its team and the course counts, so each test ends by checking that
@@ -19,9 +20,6 @@ let bo;
 const students = (courseId = IDS.courseAda) => `/api/courses/${courseId}/students`;
 const NEW_STUDENT = { student_id: '1005', name: 'Fay Foster', email: 'fay@example.edu' };
 
-const RATINGS = {
-  professionalism: 4, communication: 4, work_ethic: 4, content_knowledge_skills: 4, overall_contribution: 4, participation: 3,
-};
 
 test.before(async () => {
   server = await startDatabase();
