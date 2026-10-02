@@ -29,7 +29,7 @@
     "start:backend": "cd src/backend && npm start",
     "start:frontend": "cross-env HOST=0.0.0.0 react-scripts start",
     "dev": "concurrently \"npm run start:backend\" \"npm run start:frontend\"",
-    "setup": "node scripts/setup.js",
+        "setup": "node scripts/setup.js",
     "verify": "bash scripts/verify-env.sh",
     "docker:up": "node scripts/setup.js --env-only && docker compose up --build -d --wait",
     "docker:down": "docker compose down",
@@ -42,6 +42,16 @@
     ]
   },
   "jest": {
+    "collectCoverageFrom": [
+      "src/frontend/**/*.{js,jsx}",
+      "!src/frontend/**/__tests__/**",
+      "!src/frontend/index.js"
+    ],
+    "coverageReporters": [
+      "json-summary",
+      "lcov",
+      "text-summary"
+    ],
     "testMatch": [
       "<rootDir>/src/frontend/**/__tests__/**/*.{js,jsx}",
       "<rootDir>/src/frontend/**/*.{spec,test}.{js,jsx}"
