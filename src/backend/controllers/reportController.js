@@ -478,8 +478,9 @@ exports.getTeamReport = async (req, res, next) => {
     const courseObjectId = new mongoose.Types.ObjectId(course_id);
     const teamObjectId = new mongoose.Types.ObjectId(team_id);
     
-    // Find the team
-    const team = await Team.findById(teamObjectId);
+    // Find the team within this course: by ID alone it would also return a team of
+    // another course, and the ownership middleware only checks :course_id (CICD-51)
+    const team = await Team.findOne({ _id: teamObjectId, course_id: courseObjectId });
     if (!team) {
       const err = new Error('Team not found.');
       err.code = 'NOT_FOUND';

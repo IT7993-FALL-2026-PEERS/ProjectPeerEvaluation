@@ -3,7 +3,7 @@
 **Gantt task:** Technical Assessment — *"Review software architecture & technology stack"* (M1)
 **Milestone:** 1 — Assessment & Planning
 **Status:** Complete for review. Documents the API as it is on `main` (commit `11cfd3d`, 26 Sep 2026)
-**Updated:** 30 Sep 2026 for evaluation link expiry and log redaction (CICD-17): §1, §9, §11 and API-1 in §13; and for evaluation target checks (CICD-18): §11 and API-2 in §13; and for roster upload checks (CICD-19): §7 and API-3 in §13; and for team and student request bodies (CICD-45): §7, §8 and API-4 in §13
+**Updated:** 30 Sep 2026 for evaluation link expiry and log redaction (CICD-17): §1, §9, §11 and API-1 in §13; and for evaluation target checks (CICD-18): §11 and API-2 in §13; and for roster upload checks (CICD-19): §7 and API-3 in §13; and for team and student request bodies (CICD-45): §7, §8 and API-4 in §13; and for the team report lookup (CICD-51): §10
 **Related:** [system-architecture.md](system-architecture.md) ·
 [database-schema.md](database-schema.md) · [../csv-upload-format.md](../csv-upload-format.md)
 
@@ -448,7 +448,7 @@ don't run it as a formula.
 ### `GET .../reports/team/:team_id`
 
 **200** `{ "team", "members": [{ ..., "meanScore", "letterGrade", "evaluationsReceived" }],
-"teamAverage", "teamLetterGrade" }` · **404** unknown team.
+"teamAverage", "teamLetterGrade" }` · **404** the team does not exist **in this course**.
 
 ---
 
@@ -520,7 +520,7 @@ Found while writing this document. Defect IDs refer to the
 | API-1 | **Fixed (CICD-17).** Tokens were generated with `Math.random()`, never expired, and were written to the request log | Tokens now come from `crypto.randomBytes(32)`, expire `EVALUATION_TOKEN_TTL_DAYS` after the latest email, and are redacted from logs. Links sent before the fix have no expiry and are refused until the professor re-sends |
 | API-2 | **Fixed (CICD-18).** `POST /evaluate/:token` did not check that each `student_id` is one of the evaluator's teammates, or that it appears only once | Submissions must now cover exactly the teammates the form lists, each once; anything else is a 400 and nothing is saved |
 | API-3 | Uploading a roster deletes every submitted evaluation in the course. **Partly fixed (CICD-19):** an empty or unusable file, or a database error while applying the roster, no longer deletes anything. A successful upload still does | Re-uploading a corrected roster mid-evaluation silently destroys student work; what a valid re-upload should do is a sponsor decision (CICD-39) |
-| API-4 | **Fixed (CICD-45).** `PUT .../students/:student_id`, `PUT .../teams/:team_id` and `POST .../teams` saved the request body as sent, and the team list returned each member's evaluation token | They now read only the editable fields, teams are created empty (members go through the add-student endpoint, which checks the course), and the team list omits tokens. `GET .../reports/team/:team_id` still looks the team up by ID alone (new backlog item) |
+| API-4 | **Fixed (CICD-45).** `PUT .../students/:student_id`, `PUT .../teams/:team_id` and `POST .../teams` saved the request body as sent, and the team list returned each member's evaluation token | They now read only the editable fields, teams are created empty (members go through the add-student endpoint, which checks the course), and the team list omits tokens. The team report is now looked up within the course (CICD-51) |
 | API-5 | No rate limiting on `/auth/login`, `/auth/reset-password` or `/evaluate/*` | Password guessing and reset-email flooding are unthrottled |
 | API-6 | 500 responses include the raw internal error message | Can leak database or library details |
 | API-7 | Sending invitations and reminders happens inside the HTTP request | About 16 students fit in the frontend's 3-minute timeout on staging's email pace |

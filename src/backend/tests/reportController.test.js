@@ -215,13 +215,28 @@ test('getStudentReport: returns received and given evaluations', async (t) => {
 });
 
 test('getTeamReport: unknown team returns 404', async (t) => {
-  t.mock.method(Team, 'findById', async () => null);
+  t.mock.method(Team, 'findOne', async () => null);
   error(await call('getTeamReport'), 404, 'NOT_FOUND');
+});
+
+// CICD-51: the team used to be found by its ID alone, so a professor could read another
+// course's team (name, course ID, member IDs) through a course URL they own. The ownership
+// middleware only checks :course_id. Team.findById is stubbed to return the team anyway,
+// so code that still looks the team up by ID alone fails this test.
+test('TC-17-01: getTeamReport: a team from another course returns 404, not its details', async (t) => {
+  const data = fixture();
+  const otherCourseId = new mongoose.Types.ObjectId();
+  t.mock.method(Team, 'findById', async () => data.team);
+  t.mock.method(Team, 'findOne', async (filter) =>
+    String(filter.course_id) === String(data.team.course_id) && String(filter._id) === String(data.team._id) ? data.team : null);
+  t.mock.method(Student, 'find', async () => []);
+  t.mock.method(Evaluation, 'find', async () => []);
+  error(await call('getTeamReport', { params: { course_id: otherCourseId.toString() } }), 404, 'NOT_FOUND');
 });
 
 test('getTeamReport: returns member scores and teamAverage', async (t) => {
   const data = fixture([60, 80]);
-  t.mock.method(Team, 'findById', async () => data.team);
+  const lookup = t.mock.method(Team, 'findOne', async () => data.team);
   const find = t.mock.method(Student, 'find', async () => data.students);
   t.mock.method(Evaluation, 'find', async () => data.evaluations);
   const body = ok(await call('getTeamReport'));
@@ -231,6 +246,7 @@ test('getTeamReport: returns member scores and teamAverage', async (t) => {
   assert.deepEqual(body.members.map(m => [m.meanScore, m.letterGrade, m.evaluationsReceived]),
     [[60, 'D', 1], [80, 'B', 1]]);
   assert.deepEqual(find.mock.calls[0].arguments, [{ course_id: courseId, team_id: teamId }]);
+  assert.deepEqual(lookup.mock.calls[0].arguments, [{ _id: teamId, course_id: courseId }], 'the team is looked up within the course');
 });
 
 test('generateReport: returns the same report as getCourseReport', async (t) => {
