@@ -4,6 +4,7 @@ const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 
 const { getConfig } = require('../config/env');
+const { asText, firstNonText, validationError } = require('../utils/inputGuards');
 
 const JWT_SECRET = getConfig().jwtSecret;
 const JWT_EXPIRES_IN = '1h';
@@ -11,13 +12,15 @@ const JWT_EXPIRES_IN = '1h';
 exports.login = async (req, res, next) => {
 	try {
 		const { email, password } = req.body;
+		const nonText = firstNonText(req.body, ['email', 'password']);
+		if (nonText) return next(validationError(`${nonText} must be text.`));
 		if (!email || !password) {
 			const err = new Error('Email and password are required.');
 			err.code = 'VALIDATION_ERROR';
 			err.status = 400;
 			return next(err);
 		}
-		const professor = await Professor.findOne({ email });
+		const professor = await Professor.findOne({ email: asText(email) });
 		if (!professor) {
 			const err = new Error('Invalid email or password.');
 			err.code = 'AUTH_ERROR';
@@ -66,13 +69,15 @@ exports.login = async (req, res, next) => {
 exports.register = async (req, res, next) => {
 	try {
 		const { email, password, name, department } = req.body;
+		const nonText = firstNonText(req.body, ['email', 'password', 'name', 'department']);
+		if (nonText) return next(validationError(`${nonText} must be text.`));
 		if (!email || !password || !name || !department) {
 			const err = new Error('All fields are required.');
 			err.code = 'VALIDATION_ERROR';
 			err.status = 400;
 			return next(err);
 		}
-		const existing = await Professor.findOne({ email });
+		const existing = await Professor.findOne({ email: asText(email) });
 		if (existing) {
 			const err = new Error('Email already registered.');
 			err.code = 'DUPLICATE';
@@ -117,13 +122,15 @@ const { sendPasswordResetEmail } = require('../utils/emailUtils');
 exports.resetPassword = async (req, res, next) => {
 	try {
 		const { email } = req.body;
+		const nonText = firstNonText(req.body, ['email']);
+		if (nonText) return next(validationError(`${nonText} must be text.`));
 		if (!email) {
 			const err = new Error('Email is required.');
 			err.code = 'VALIDATION_ERROR';
 			err.status = 400;
 			return next(err);
 		}
-		const professor = await Professor.findOne({ email });
+		const professor = await Professor.findOne({ email: asText(email) });
 		if (!professor) {
 			// For security, do not reveal if email is not registered
 			return res.status(200).json({ message: 'If the email is registered, a reset link will be sent.' });
@@ -147,13 +154,15 @@ exports.resetPassword = async (req, res, next) => {
 exports.updatePassword = async (req, res, next) => {
 	try {
 		const { token, password } = req.body;
+		const nonText = firstNonText(req.body, ['token', 'password']);
+		if (nonText) return next(validationError(`${nonText} must be text.`));
 		if (!token || !password) {
 			const err = new Error('Token and new password are required.');
 			err.code = 'VALIDATION_ERROR';
 			err.status = 400;
 			return next(err);
 		}
-		const professor = await Professor.findOne({ securityToken: token });
+		const professor = await Professor.findOne({ securityToken: asText(token) });
 		if (!professor || !professor.securityTokenExpires || professor.securityTokenExpires < Date.now()) {
 			const err = new Error('Invalid or expired token.');
 			err.code = 'TOKEN_ERROR';

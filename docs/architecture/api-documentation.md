@@ -3,7 +3,7 @@
 **Gantt task:** Technical Assessment — *"Review software architecture & technology stack"* (M1)
 **Milestone:** 1 — Assessment & Planning
 **Status:** Complete for review. Documents the API as it is on `main` (commit `11cfd3d`, 26 Sep 2026)
-**Updated:** 30 Sep 2026 for evaluation link expiry and log redaction (CICD-17): §1, §9, §11 and API-1 in §13; and for evaluation target checks (CICD-18): §11 and API-2 in §13; and for roster upload checks (CICD-19): §7 and API-3 in §13; and for team and student request bodies (CICD-45): §7, §8 and API-4 in §13; and for the team report lookup (CICD-51): §10; and for rate limiting (CICD-34): §1 and API-5 in §13
+**Updated:** 30 Sep 2026 for evaluation link expiry and log redaction (CICD-17): §1, §9, §11 and API-1 in §13; and for evaluation target checks (CICD-18): §11 and API-2 in §13; and for roster upload checks (CICD-19): §7 and API-3 in §13; and for team and student request bodies (CICD-45): §7, §8 and API-4 in §13; and for the team report lookup (CICD-51): §10; and for rate limiting (CICD-34): §1 and API-5 in §13; and for text-only request values (CICD-24): §4, §6, §7 and API-9 in §13
 **Related:** [system-architecture.md](system-architecture.md) ·
 [database-schema.md](database-schema.md) · [../csv-upload-format.md](../csv-upload-format.md)
 
@@ -87,8 +87,9 @@ takes the student's **university ID** string (for example `S0012345`).
 
 The counts can be changed with `RATE_LIMIT_LOGIN_MAX`, `RATE_LIMIT_SIGNUP_MAX`, `RATE_LIMIT_RESET_MAX`,
 `RATE_LIMIT_UPDATE_MAX`, `RATE_LIMIT_EVALUATE_MAX` and `RATE_LIMIT_GENERAL_MAX` (whole numbers above 0; anything else keeps the
-default). The client address is read with `trust proxy` set to 1 (Render puts one proxy in front;
-`TRUST_PROXY` overrides it). The limits are per address, not per account, so one account can still be
+default). The client address is read from `X-Forwarded-For` with `trust proxy` set to 2: Render sends
+every request through Cloudflare and then its own load balancer, each appending to the header
+(`TRUST_PROXY` overrides it, for example `0` with no proxy). The limits are per address, not per account, so one account can still be
 guessed at slowly from many addresses, many students behind one address share one count, and a victim's
 inbox can still be flooded with reset emails from many addresses.
 | 409 | `CONSTRAINT_ERROR` | Team still has students |
@@ -172,6 +173,10 @@ readiness check. Returns **200** when the database is connected, **503** otherwi
 ---
 
 ## 4. Authentication — `/api/auth`
+
+Every value in a login, registration, password reset or password update body has to be **text**. A number,
+array or object (for example `{"token": {"$ne": null}}`) is a **400** `VALIDATION_ERROR` naming the field,
+before the database is queried (API-9).
 
 ### `POST /auth/register`
 
@@ -258,8 +263,9 @@ feedback (FR-22).
 
 Lists the logged-in professor's courses. Optional query filters (case-insensitive
 partial match): `course_name`, `course_number` (also matches the legacy `course_code`),
-`course_section`, `semester`. `course_status` defaults to `Active`; pass `Inactive` for
-deactivated courses or an empty value for all.
+`course_section`, `semester`. The text is matched **literally** (characters such as `[` or `*` are not
+pattern syntax) and is limited to 100 characters. `course_status` defaults to `Active`; pass `Inactive` for
+deactivated courses or an empty value for all. A filter value that is not text is a **400**.
 
 **200** an array of courses, each with a live `team_count`.
 
@@ -280,7 +286,8 @@ collection.
 
 Body: any of `course_name`, `course_number`, `course_section`, `semester`,
 `course_status` (`Active` or `Inactive`). Other fields, including `professor_id`, are
-ignored. **200** `{ "message": "Course updated." }`.
+ignored. A supplied field must be non-blank text (it is trimmed), and `course_status` must be one of
+the two values; anything else, including `null`, is a **400**. **200** `{ "message": "Course updated." }`.
 
 ### `DELETE /courses/:course_id`
 
@@ -543,4 +550,5 @@ Found while writing this document. Defect IDs refer to the
 | API-5 | **Fixed (CICD-34).** There was no rate limiting on `/auth/login`, `/auth/reset-password` or `/evaluate/*` | Limits are now in place (see the table in §1) and the API has a general limit. Per-address only, in memory |
 | API-6 | 500 responses include the raw internal error message | Can leak database or library details |
 | API-7 | Sending invitations and reminders happens inside the HTTP request | About 16 students fit in the frontend's 3-minute timeout on staging's email pace |
+| API-9 | **Fixed (CICD-24).** Request body and query values went straight into MongoDB filters, so an object such as `{"$ne": null}` acted as an operator (CodeQL `js/sql-injection`). The worst case was `POST /auth/update-password`: `{"token": {"$ne": null}}` matched any professor with a pending password reset, so an attacker who requested a reset for a victim's email could set that account's password | Login, registration, password reset and update, course list, create and update, and manual student add now require text and return 400 otherwise, before any query; course search text is matched literally; `updateStudent` looks students up by ObjectId |
 | API-8 | `remindEvaluations` builds its query with `_id` twice, so the second key replaces the first and `student_ids` is ignored | Latent: the frontend never sends `student_ids` today, but a client that does would email every student who hasn't submitted |

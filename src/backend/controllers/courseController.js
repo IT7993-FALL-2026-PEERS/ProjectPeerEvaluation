@@ -1,5 +1,10 @@
 const Course = require('../models/Course');
 const mongoose = require('mongoose');
+const { asText, firstNonText, validationError, escapeRegex } = require('../utils/inputGuards');
+
+// A course search is a plain substring search; this keeps the pattern short.
+const MAX_SEARCH_LENGTH = 100;
+const COURSE_STATUSES = Course.schema.path('course_status').enumValues;
 
 exports.listCourses = async (req, res, next) => {
 	try {
@@ -11,28 +16,33 @@ exports.listCourses = async (req, res, next) => {
 			semester, 
 			course_status = 'Active' 
 		} = req.query;
+		const nonText = firstNonText(req.query, ['course_name', 'course_number', 'course_section', 'semester', 'course_status']);
+		if (nonText) return next(validationError(`${nonText} must be text.`));
+
+		const tooLong = ['course_name', 'course_number', 'course_section', 'semester'].find((f) => asText(req.query[f]).length > MAX_SEARCH_LENGTH);
+		if (tooLong) return next(validationError(`${tooLong} must be at most ${MAX_SEARCH_LENGTH} characters.`));
 
 		// Build search filter
 		const filter = { professor_id: req.user.id };
 		
 		if (course_name) {
-			filter.course_name = { $regex: course_name, $options: 'i' };
+			filter.course_name = { $regex: escapeRegex(asText(course_name)), $options: 'i' };
 		}
 		if (course_number) {
 			// Search both new course_number field and old course_code field
 			filter.$or = [
-				{ course_number: { $regex: course_number, $options: 'i' } },
-				{ course_code: { $regex: course_number, $options: 'i' } }
+				{ course_number: { $regex: escapeRegex(asText(course_number)), $options: 'i' } },
+				{ course_code: { $regex: escapeRegex(asText(course_number)), $options: 'i' } }
 			];
 		}
 		if (course_section) {
-			filter.course_section = { $regex: course_section, $options: 'i' };
+			filter.course_section = { $regex: escapeRegex(asText(course_section)), $options: 'i' };
 		}
 		if (semester) {
-			filter.semester = { $regex: semester, $options: 'i' };
+			filter.semester = { $regex: escapeRegex(asText(semester)), $options: 'i' };
 		}
 		if (course_status) {
-			filter.course_status = course_status;
+			filter.course_status = asText(course_status);
 		}
 
 		let courses = await Course.find(filter);
@@ -78,6 +88,8 @@ exports.createCourse = async (req, res, next) => {
 			console.log('Received course creation request:', req.body);
 			console.log('User from token:', req.user);
 			const { course_name, course_number, course_section, semester } = req.body;
+			const nonText = firstNonText(req.body, ['course_name', 'course_number', 'course_section', 'semester']);
+			if (nonText) return next(validationError(`${nonText} must be text.`));
 			console.log('Extracted fields:', { course_name, course_number, course_section, semester });
 			if (!course_name || !course_number || !course_section || !semester) {
 				console.log('Validation failed - missing fields');
@@ -88,10 +100,10 @@ exports.createCourse = async (req, res, next) => {
 			}
 			// Check for inactive course with same details
 			let course = await Course.findOne({
-				course_name,
-				course_number,
-				course_section,
-				semester,
+				course_name: asText(course_name),
+				course_number: asText(course_number),
+				course_section: asText(course_section),
+				semester: asText(semester),
 				professor_id: req.user.id,
 				course_status: 'Inactive'
 			});
@@ -155,9 +167,19 @@ exports.updateCourse = async (req, res, next) => {
 	try {
 		const { course_id } = req.params;
 		// Only what the edit form sends; never professor_id or the system counts.
+		const nonText = firstNonText(req.body, ['course_name', 'course_number', 'course_section', 'semester', 'course_status']);
+		if (nonText) return next(validationError(`${nonText} must be text.`));
 		const updates = {};
 		for (const field of ['course_name', 'course_number', 'course_section', 'semester', 'course_status']) {
-			if (req.body[field] !== undefined) updates[field] = req.body[field];
+			if (req.body[field] === undefined) continue;
+			// A null or blank value would be written as is (the update runs no validators) and could
+			// hide the course from every list, so a supplied field has to have text in it.
+			const value = typeof req.body[field] === 'string' ? req.body[field].trim() : '';
+			if (value === '') return next(validationError(`${field} cannot be empty.`));
+			if (field === 'course_status' && !COURSE_STATUSES.includes(value)) {
+				return next(validationError(`course_status must be one of: ${COURSE_STATUSES.join(', ')}.`));
+			}
+			updates[field] = value;
 		}
 		if (!mongoose.Types.ObjectId.isValid(course_id)) {
 			const err = new Error('Invalid course ID.');
