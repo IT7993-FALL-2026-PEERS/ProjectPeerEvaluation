@@ -198,6 +198,50 @@ jobs:
         if: ${{ always() }}
         run: docker compose down -v
 
+  # Backend integration tests against a real MongoDB started by mongodb-memory-server in
+  # replica-set mode, pinned to the staging Atlas version (ADR 0001, backlog CICD-21). Report-only
+  # until it has been stable for a while; then it becomes a required check.
+  integration:
+    name: Integration (real MongoDB)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: src/backend
+    env:
+      MONGOMS_DOWNLOAD_DIR: ${{ github.workspace }}/.mongodb-binaries
+      # The default binary name leaves out the Ubuntu release; this puts the archive name in it.
+      MONGOMS_USE_ARCHIVE_NAME_FOR_BINARY_NAME: "1"
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: src/backend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      # The key names everything that decides which binary is downloaded.
+      - name: Work out the MongoDB binary cache key
+        id: mongo
+        run: |
+          version=$(node -p "require('./integration/helpers/db').ATLAS_MONGODB_VERSION")
+          release=$(. /etc/os-release && echo "$VERSION_ID")
+          echo "key=mongod-${RUNNER_OS}-${RUNNER_ARCH}-ubuntu${release}-${version}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache@v6
+        with:
+          path: .mongodb-binaries
+          key: ${{ steps.mongo.outputs.key }}
+
+      - name: Integration tests
+        run: npm run test:integration
+
   # Lints the workflow files themselves, so a YAML or expression mistake fails here
   # instead of at the next run.
   workflow-lint:

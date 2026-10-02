@@ -80,6 +80,12 @@ live at boundaries, not inside single functions, so this level earns its keep.
 stubbed at the transport, not at the application layer, so the message-building code is
 actually exercised.
 
+**How it runs (CICD-21, ADR 0001).** `cd src/backend && npm run test:integration` starts a one-member
+MongoDB replica set with `mongodb-memory-server`, pinned to the staging Atlas version (8.0.x), so transactions work as on Atlas.
+The tests live in `src/backend/integration/` and end in `.integration.js`, so `npm test` stays fast and database-free.
+The shared seed is `integration/helpers/seed.js` (two professors, two courses, five students, two teams). Each test file
+starts its own database and clears and re-seeds it before every test. CI runs them in the job `Integration (real MongoDB)`.
+
 **Note on the two meanings of "integration."** M4's document uses the term for frontend
 page flows with the network mocked by MSW; this document's sense is real service-to-service
 interaction. Both are worth having. To keep them distinct in reporting, M4's are named

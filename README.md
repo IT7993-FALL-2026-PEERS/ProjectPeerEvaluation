@@ -349,6 +349,7 @@ The step-by-step version follows.
 - `npm test` — frontend unit tests (Jest + React Testing Library)
 - `npm run test:e2e` — end-to-end tests (Playwright)
 - `cd src/backend && npm test` — backend unit tests (`node:test`)
+- `cd src/backend && npm run test:integration` — backend integration tests against a real MongoDB that the tests start themselves (no Docker needed; the first run downloads the MongoDB binary)
 
 ### Continuous Integration
 
