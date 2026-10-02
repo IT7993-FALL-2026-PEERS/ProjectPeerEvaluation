@@ -44,8 +44,11 @@ test('TC-10-34: with no interval there is no recipient limit', () => {
 
 test('TC-10-35: staging (11 s interval, default 150 s budget) allows 14 recipients, not the 18 that would time out', () => {
   assert.equal(getRecipientLimit({ EMAIL_SEND_INTERVAL_MS: '11000' }), 14);
-  // 14 recipients wait 13 * 11 s = 143 s; 18 would wait 187 s, past the 180 s browser timeout.
-  assert.ok(13 * 11 <= 150 && 17 * 11 > 180);
+  // n recipients wait (n - 1) gaps: 14 wait 143 s, inside the budget; 18 would wait 187 s, past the
+  // 180 s browser timeout.
+  const waitMs = (recipients, intervalMs) => (recipients - 1) * intervalMs;
+  assert.ok(waitMs(14, 11000) <= 150000);
+  assert.ok(waitMs(18, 11000) > 180000);
 });
 
 test('TC-10-36: the budget and interval come from the environment, and bad values fall back', () => {
