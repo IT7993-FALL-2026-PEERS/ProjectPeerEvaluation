@@ -193,3 +193,25 @@ so the two are never confused.
   built, anyone who can reach the login page can create a professor account. If signup should
   be restricted (invite-only, admin-created, or limited to university email), CW-11 is a
   security defect and needs a D-number.
+
+## Automated regression coverage (CICD-22)
+
+Each workflow has integration tests that run in CI against a real MongoDB (`src/backend/integration/`,
+`npm run test:integration`), on a fixed seed. Test names start with `TC-<requirement>-<n>`. Where a
+feature is a stub or missing, the test records how it behaves today and is marked so; replace it when
+the feature is built.
+
+| Workflow | Test files | What is covered | Gaps and notes |
+|---|---|---|---|
+| CW-01 Professor authentication | `login.integration.js` (TC-01-20..28) | Login, saved last login, bad credentials, operator payload, register, duplicate email, unique index; logout, refresh and MFA as they behave today | Logout is a no-op, refresh is a 501 stub, MFA cannot complete (D-17) |
+| CW-02 Password reset | `passwordReset.integration.js` (TC-01-30..35) | Emailed link and stored token, no account enumeration, one-time use, expiry, forged and operator tokens | |
+| CW-03 Course setup | `courses.integration.js` (TC-05-30..36), `courseOwnership.integration.js` (TC-05-20..25) | Create, list, edit, validation, soft delete and reactivation, search, ownership across professors | |
+| CW-04 Roster management | `roster.integration.js` (TC-06-20..27), `students.integration.js` (TC-06-30..40) | Roster upload, invalid files keep data, rows with missing fields, manual add, edit, delete, bulk delete, counts | Email format is not validated yet (FR-07); a valid re-upload deletes evaluations (sponsor decision, API-3) |
+| CW-05 Team assignment | `teams.integration.js` (TC-08-20..33), consistency helper `helpers/consistency.js` | Create, move, remove, rename, delete, clear, membership and counts agree on both sides | Auto-assign is a 501 stub |
+| CW-06 Evaluation distribution | `invitation.integration.js` (TC-10-20..25) | Emails captured at the transport, link matches stored token, 14-day expiry, resend, team send, authorization | |
+| CW-07 Student submission | `submission.integration.js` (TC-16-20..27), `atomicSubmission.*.integration.js` (TC-16-30..34), `duplicateEvaluations.integration.js` | Full path from the emailed link, validation, duplicates, concurrent double submit, all-or-nothing save | Participation 1-4 and a 10-character feedback minimum are as built (D-19, FR-14) |
+| CW-08 Tracking and reminders | `status.integration.js` (TC-11-20..21, TC-12-20..25) | Status counts, reminders only to students who have not submitted, reuse of the existing link, reset, authorization | Reminders are manual only (FR-12 asks for scheduled) |
+| CW-09 Reports | `reports.integration.js` (TC-17-20..27, TC-18-20, TC-19-20..21, TC-20-30, TC-22-20..21) | Scores, grades, summary and team averages from a fixed set of evaluations, curved grading, no-data cases, CSV export and formula safety, outlier and concerning-word flags, authorization | PDF export is not built (FR-19) |
+| CW-10 AI-assisted feedback | `settings.integration.js` (TC-21-20..21, TC-22-30..32) | Flag-word list: defaults, add, edit, delete, per professor | Summaries, red flags and sentiment are 501 stubs (FR-21, FR-23) |
+| CW-11 Self-registration | `login.integration.js` (TC-01-23, 24) | Register, hash, duplicate | Open to anyone (sponsor question) |
+| CW-12 Rubric management | `settings.integration.js` (TC-13-20) | The one fixed rubric reaches the student form with the right scales | No rubric management exists (D-09) |
