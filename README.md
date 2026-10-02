@@ -304,6 +304,8 @@ Full per-person, per-week breakdown (sponsor-approved):
 3. **Configure environment variables** — copy `src/backend/.env.example` to `src/backend/.env`.
    It already points `MONGODB_URI` at `mongodb://localhost:27017/peer-eval`; change it only if
    you use Atlas. SMTP settings are needed only to send email, not to start the app.
+   The real `.env` is never committed (it is git-ignored), so if a `git pull` removed yours,
+   copy `.env.example` again.
 4. **Start MongoDB** (see Prerequisites), then **start the application**
    ```bash
    npm run dev

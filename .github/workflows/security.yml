@@ -35,12 +35,6 @@ jobs:
         with:
           persist-credentials: false
 
-      # build/ is a stale compiled bundle that's still tracked in git; scanning it
-      # would report libraries from an old build, not what we ship. Removed from
-      # this job's checkout only, not from the repo.
-      - name: Skip the stale build/ bundle
-        run: rm -rf build
-
       # The action's image is rebuilt nightly with the vulnerability database
       # included, so no NVD API key or database download is needed. Pinned to a
       # commit because the action has no maintained release tags. Keep args to

@@ -3,3 +3,12 @@ coverage
 playwright-report
 playwright-results
 test-results
+
+# Real environment files hold local settings and secrets; only .env.example is tracked
+.env
+.env.*
+!.env.example
+
+# Generated: the compiled frontend (npm run build) and files uploaded at runtime
+/build/
+/src/backend/uploads/
