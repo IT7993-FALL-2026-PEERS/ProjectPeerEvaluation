@@ -88,3 +88,27 @@ test('TC-01-25: the unique index on email rejects a duplicate that skips the con
     (err) => err.code === 11000
   );
 });
+
+// Behaviour today, not decisions: logout does nothing on the server, refresh is a stub, and a
+// professor with MFA switched on cannot finish logging in (D-17). Replace these if they are built.
+test('TC-01-26: logout needs a valid token and answers 200, but the token keeps working (no server-side logout)', async () => {
+  const login = await app.request('POST', '/api/auth/login', { body: { email: 'ada@example.edu', password: PASSWORDS.ada } });
+  const token = login.body.access_token;
+  assert.equal((await app.request('POST', '/api/auth/logout', {})).status, 401);
+  assert.equal((await app.request('POST', '/api/auth/logout', { token })).status, 200);
+  assert.equal((await app.request('GET', '/api/courses', { token })).status, 200, 'the token still works after logout');
+});
+
+test('TC-01-27: token refresh is not implemented (501)', async () => {
+  const res = await app.request('POST', '/api/auth/refresh', { body: {} });
+  assert.equal(res.status, 501);
+});
+
+test('TC-01-28: a professor with MFA on is told MFA is required and gets no token, and cannot complete it (D-17)', async () => {
+  await Professor.updateOne({ email: 'ada@example.edu' }, { mfa_enabled: true });
+  const res = await app.request('POST', '/api/auth/login', { body: { email: 'ada@example.edu', password: PASSWORDS.ada } });
+  assert.equal(res.status, 200);
+  assert.equal(res.body.mfa_required, true);
+  assert.equal(res.body.access_token, undefined);
+  assert.equal((await app.request('POST', '/api/auth/verify-mfa', { body: {} })).status, 501);
+});

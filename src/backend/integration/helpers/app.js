@@ -31,6 +31,7 @@ async function startApp() {
   app.use('/api/auth', require('../../routes/auth'));
   app.use('/api/courses', require('../../routes/courses'));
   app.use('/api/evaluate', require('../../routes/evaluate'));
+  app.use('/api/ai', require('../../routes/ai'));
   app.use('/api/professor', require('../../routes/professor'));
   app.use(errorHandler);
 
@@ -66,7 +67,7 @@ async function startApp() {
   const tokenFor = (professorId, email) =>
     jwt.sign({ id: String(professorId), email }, process.env.JWT_SECRET, { expiresIn: '1h' });
 
-  return { request, uploadCsv, tokenFor, close: () => new Promise((resolve) => server.close(resolve)) };
+  return { baseUrl, request, uploadCsv, tokenFor, close: () => new Promise((resolve) => server.close(resolve)) };
 }
 
 module.exports = { startApp, sentEmails, clearEmails: () => { sentEmails.length = 0; } };
