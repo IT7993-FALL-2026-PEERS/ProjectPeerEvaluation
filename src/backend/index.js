@@ -5,8 +5,13 @@ const cors = require('cors');
 const { getHealth } = require('./config/health');
 const { applyServerTimeouts } = require('./config/serverTimeouts');
 const { requestLogger } = require('./middleware/requestLogger');
+const { applyRateLimits, trustProxyHops } = require('./config/rateLimit');
 
 const app = express();
+
+// Render puts one proxy in front of the app. Trusting exactly that hop makes req.ip the real
+// client address (for the rate limits) and keeps a client from spoofing X-Forwarded-For.
+app.set('trust proxy', trustProxyHops());
 
 // Middleware
 app.use(cors({
@@ -52,6 +57,9 @@ app.get('/api/health', (req, res) => {
   const health = getHealth(mongoose.connection);
   res.status(health.status === 'OK' ? 200 : 503).json(health);
 });
+
+// Rate limits (API-5): after the health check, which must never be limited, and before the routers
+applyRateLimits(app);
 
 // Routes
 app.use('/api/auth', require('./routes/auth'));
