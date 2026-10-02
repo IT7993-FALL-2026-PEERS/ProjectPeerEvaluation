@@ -156,6 +156,48 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
+  # Builds both images and starts the Compose stack the way a fresh clone would, then checks
+  # the backend (which needs MongoDB) and the frontend answer. Not a required check yet: it
+  # becomes one after it has been green on a few pull requests (backlog CICD-25).
+  containers:
+    name: Containers (build + compose smoke)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+
+      # Same step a new teammate runs: creates the root .env with a random JWT_SECRET.
+      - name: Create .env (scripts/setup.js)
+        run: node scripts/setup.js --env-only
+
+      - name: Build and start the stack
+        run: docker compose up --build -d --wait --wait-timeout 300
+
+      - name: Smoke check (backend and frontend)
+        run: bash scripts/verify-env.sh
+
+      # The health route answers 503 when MongoDB is not connected, and curl -f turns that
+      # into a failure above; this also checks the body, so a changed route cannot pass quietly.
+      - name: Health body reports the database connected
+        run: |
+          body=$(curl -sf http://localhost:5000/api/health)
+          echo "$body"
+          echo "$body" | grep -q '"status":"OK"'
+
+      - name: Show container logs on failure
+        if: ${{ failure() }}
+        run: docker compose ps -a && docker compose logs --no-color --tail 100
+
+      - name: Stop the stack
+        if: ${{ always() }}
+        run: docker compose down -v
+
   # Lints the workflow files themselves, so a YAML or expression mistake fails here
   # instead of at the next run.
   workflow-lint:
