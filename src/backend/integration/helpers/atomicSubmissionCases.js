@@ -93,6 +93,42 @@ function registerAtomicSubmissionTests({ standalone }) {
     assert.equal(await Evaluation.countDocuments({ evaluator_id: IDS.ann }), 2);
   });
 
+  // The fallback path only runs without transactions, so these two are for the standalone server.
+  if (standalone) {
+    test(`TC-16-40 (${kind}): a rating written but not acknowledged is rolled back too, and the student can retry`, async (t) => {
+      const fay = await addFay();
+      const token = await tokenOf(IDS.ann);
+      const body = { evaluations: [rating(IDS.ben), rating(fay._id)] };
+
+      // The second rating reaches the database, then the connection "drops" before save() returns.
+      const save = Evaluation.prototype.save;
+      let calls = 0;
+      const mock = t.mock.method(Evaluation.prototype, 'save', async function lostAcknowledgement(...args) {
+        calls += 1;
+        const saved = await save.apply(this, args);
+        if (calls === 2) throw new Error('connection lost after the write');
+        return saved;
+      });
+
+      const failed = await app.request('POST', `/api/evaluate/${token}`, { body });
+      assert.equal(failed.status, 500);
+      assert.equal(await Evaluation.countDocuments({ evaluator_id: IDS.ann }), 0, 'the unacknowledged rating is rolled back too');
+
+      mock.mock.restore();
+      assert.equal((await app.request('POST', `/api/evaluate/${token}`, { body })).status, 201);
+    });
+
+    test(`TC-16-41 (${kind}): if the rollback itself fails, the error returned is the one that started it`, async (t) => {
+      const token = await tokenOf(IDS.ann);
+      t.mock.method(Student, 'updateOne', async () => { throw new Error('simulated database failure'); });
+      t.mock.method(Evaluation, 'deleteMany', async () => { throw new Error('cleanup failed'); });
+
+      const res = await app.request('POST', `/api/evaluate/${token}`, { body: { evaluations: [rating(IDS.ben)] } });
+      assert.equal(res.status, 500);
+      assert.equal(res.body.error.message, 'simulated database failure');
+    });
+  }
+
   test(`TC-16-33 (${kind}): the database refuses a second rating of the same person by the same evaluator`, async () => {
     const make = (feedback) => new Evaluation({
       course_id: IDS.courseAda, student_id: IDS.ben, evaluator_id: IDS.ann, evaluation_token: 'a'.repeat(64),

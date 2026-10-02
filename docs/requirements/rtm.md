@@ -75,7 +75,9 @@ Milestone 2 closes.
 
 **FR-16.** Fixed in CICD-33. A submission is saved in one transaction (or, on a database
 without transactions, saved one by one and rolled back on failure), and a unique index on
-`Evaluation` (evaluator, student, course) makes two simultaneous submissions save once.
+`Evaluation` (evaluator, student, course) makes two simultaneous submissions save once. The standalone
+fallback is best effort (a crash mid-way can leave ratings behind; Atlas uses the transaction), and at
+startup the service logs a warning if the unique index could not be built because of old duplicates.
 `integration/atomicSubmission.*.integration.js` (TC-16-30 to TC-16-34, run on a replica set and
 on a standalone `mongod`) covers concurrent submits, a failure after the ratings are written, the
 index, and resubmitting after a reset; `duplicateEvaluations.integration.js` covers the
