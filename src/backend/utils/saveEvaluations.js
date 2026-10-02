@@ -12,9 +12,11 @@ const Student = require('../models/Student');
 //
 // Throws the database error unchanged; a duplicate has err.code 11000.
 
-// The error a standalone server gives when a transaction is started on it.
+// The error a standalone server gives when a transaction is started on it. Matched by its message:
+// its code (20, IllegalOperation) is shared by unrelated errors, and mistaking one of those for this
+// would quietly save a submission without the transaction.
 function isTransactionUnsupported(err) {
-  return Boolean(err) && (err.code === 20 || /Transaction numbers are only allowed/i.test(err.message || ''));
+  return Boolean(err) && /Transaction numbers are only allowed/i.test(err.message || '');
 }
 
 async function markCompleted(evaluatorId, options) {
@@ -25,8 +27,13 @@ async function markCompleted(evaluatorId, options) {
 // transaction path. If the process dies mid-way the ratings already written stay, which a real
 // transaction would not allow.
 async function saveWithoutTransaction(evaluations, evaluatorId) {
+  // Every request writes in the same order (by person rated), whatever order the payload listed them
+  // in. Two requests at the same moment then collide on the same first rating, one wins whole and the
+  // other writes nothing; in different orders each could trip the other's first rating and both roll
+  // back, saving nothing.
+  const inOrder = [...evaluations].sort((a, b) => String(a.student_id).localeCompare(String(b.student_id)));
   try {
-    for (const evaluation of evaluations) {
+    for (const evaluation of inOrder) {
       // Fresh documents: a failed insertMany has already marked the originals as saved.
       await new Evaluation(evaluation.toObject()).save();
     }
