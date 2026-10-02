@@ -381,7 +381,10 @@ message quotes up to three problem rows.
 
 Sending runs inside the request: emails go out one at a time, `EMAIL_SEND_INTERVAL_MS`
 apart (11 s on staging, because Mailtrap's free plan allows one email every 10 s). A large
-class therefore makes a long request. The frontend waits up to 3 minutes.
+class therefore makes a long request, and the frontend waits only 3 minutes. A send or reminder that
+cannot finish in `EMAIL_REQUEST_BUDGET_MS` (default 150 s; so at most 14 recipients at 11 s) is
+refused up front with **400** `TOO_MANY_RECIPIENTS` and advice to send team by team, before any link
+is issued or email sent. With no interval (`EMAIL_SEND_INTERVAL_MS` unset or 0) there is no limit.
 
 ### `POST .../evaluations/send` and `POST /courses/:course_id/teams/:team_id/evaluations/send`
 

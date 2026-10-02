@@ -79,7 +79,7 @@ function CourseManagement() {
       ));
       fetchCoursesWithCounts();
     } catch (error) {
-      setAlert({ severity: 'error', message: error.userMessage || `Failed to send evaluations to team "${team.team_name}".` });
+      setAlert({ severity: 'error', message: error.userMessage || getErrorMessage(error, `Failed to send evaluations to team "${team.team_name}".`) });
     } finally {
       setSendingTeamEvaluations((prev) => ({ ...prev, [teamId]: false }));
     }
@@ -1249,7 +1249,7 @@ function CourseManagement() {
         setEvaluationStatus(statusResponse.data);
       }
     } catch (error) {
-      setAlert({ severity: 'error', message: 'Failed to send reminders' });
+      setAlert({ severity: 'error', message: getErrorMessage(error, 'Failed to send reminders') });
     }
   };
 
