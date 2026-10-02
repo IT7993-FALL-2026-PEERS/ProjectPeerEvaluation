@@ -6,7 +6,24 @@ process.env.JWT_SECRET = process.env.JWT_SECRET || 'integration-test-secret-at-l
 
 const express = require('express');
 const jwt = require('jsonwebtoken');
+const nodemailer = require('nodemailer');
 const errorHandler = require('../../middleware/errorHandler');
+
+// Email is captured at the Nodemailer transport, never sent: emailUtils builds the real message,
+// Nodemailer's JSON transport accepts it, and the options (to, subject, html) are kept here.
+// This must run before emailUtils is loaded, which happens when the routers are required below.
+const sentEmails = [];
+const createTransport = nodemailer.createTransport;
+nodemailer.createTransport = () => {
+  const transport = createTransport({ jsonTransport: true });
+  const sendMail = transport.sendMail.bind(transport);
+  transport.sendMail = async (options) => {
+    const info = await sendMail(options);
+    sentEmails.push(options);
+    return info;
+  };
+  return transport;
+};
 
 async function startApp() {
   const app = express();
@@ -33,10 +50,23 @@ async function startApp() {
     return { status: res.status, body: text ? JSON.parse(text) : null };
   }
 
+  // Uploads CSV text as the multipart field "file", the way the roster dialog does.
+  async function uploadCsv(path, csvText, { token } = {}) {
+    const form = new FormData();
+    form.append('file', new Blob([csvText], { type: 'text/csv' }), 'roster.csv');
+    const res = await fetch(baseUrl + path, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: form,
+    });
+    const text = await res.text();
+    return { status: res.status, body: text ? JSON.parse(text) : null };
+  }
+
   const tokenFor = (professorId, email) =>
     jwt.sign({ id: String(professorId), email }, process.env.JWT_SECRET, { expiresIn: '1h' });
 
-  return { request, tokenFor, close: () => new Promise((resolve) => server.close(resolve)) };
+  return { request, uploadCsv, tokenFor, close: () => new Promise((resolve) => server.close(resolve)) };
 }
 
-module.exports = { startApp };
+module.exports = { startApp, sentEmails, clearEmails: () => { sentEmails.length = 0; } };
