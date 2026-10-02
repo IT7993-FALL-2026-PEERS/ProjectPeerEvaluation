@@ -1,41 +1,90 @@
-version: '3.8'
+# Local dev / CI stack: mongo -> backend -> frontend, each gated on the previous
+# one being healthy. Docker here is a local-dev and CI convenience; deployment stays
+# on Render (see README "Deployment").
+#
+#   npm run docker:up        # creates .env if missing, builds, starts, waits for healthy
+#   docker compose ps        # STATUS column shows (healthy) / (unhealthy)
+#   npm run docker:down
+#
+# Needs Docker Compose v2.24+ (for env_file `required: false`; the top-level `version:` key is obsolete and omitted).
+name: peers
 
 services:
-  postgres:
-    image: postgres:14
-    environment:
-      POSTGRES_DB: peer_eval_db
-      POSTGRES_USER: peer_eval_user
-      POSTGRES_PASSWORD: secure_password
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
     ports:
-      - "5432:5432"
+      # Bound to loopback only so the database is not exposed to your network.
+      - "127.0.0.1:${MONGO_PORT:-27017}:27017"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - mongo_data:/data/db
+    networks: [peers]
+    healthcheck:
+      # Asks mongod to answer a ping; mongosh ships in the mongo:7 image. Exits 1 if
+      # the reply is not ok, so Compose marks the service unhealthy.
+      test: ["CMD", "mongosh", "--quiet", "--eval", "quit(db.adminCommand('ping').ok ? 0 : 1)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
   backend:
-    build: ./src/backend
-    ports:
-      - "5000:5000"
+    build:
+      context: ./src/backend
+      dockerfile: Dockerfile
+    image: peers-backend:local
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false # CI can supply variables through the environment instead
     environment:
-      DATABASE_URL: postgresql://peer_eval_user:secure_password@postgres:5432/peer_eval_db
-      JWT_SECRET_KEY: your-secret-key
-      SMTP_SERVER: smtp.gmail.com
-      SMTP_PORT: 587
+      # `environment` wins over env_file. The DB host is the service name, never localhost.
+      MONGODB_URI: ${DOCKER_MONGODB_URI:-mongodb://mongo:27017/peer-eval}
+      NODE_ENV: production
+      PORT: "5000"
+      # Fail fast with a clear message if the secret is missing.
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is not set. Copy .env.example to .env (npm run setup does this)}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+    ports:
+      - "${BACKEND_PORT:-5000}:5000"
+    networks: [peers]
     depends_on:
-      - postgres
-    volumes:
-      - ./src/backend:/app
+      mongo:
+        condition: service_healthy
+    healthcheck:
+      # /api/health returns 200 only while Mongoose is connected (503 otherwise), so this
+      # checks the database too. busybox wget exists in alpine; curl does not.
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:5000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
   frontend:
-    build: ./src/frontend
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+      args:
+        # Baked into the bundle at build time (see Dockerfile.frontend).
+        REACT_APP_API_URL: ${FRONTEND_API_URL:-http://localhost:5000/api}
+    image: peers-frontend:local
+    restart: unless-stopped
     ports:
-      - "3000:3000"
-    environment:
-      REACT_APP_API_URL: http://localhost:5000/api
+      - "${FRONTEND_PORT:-3000}:80"
+    networks: [peers]
     depends_on:
-      - backend
-    volumes:
-      - ./src/frontend:/app
+      backend:
+        condition: service_healthy
+    healthcheck:
+      # nginx answers / with index.html when it is serving the build.
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
 
 volumes:
-  postgres_data:
+  mongo_data:
+
+networks:
+  peers:
