@@ -33,7 +33,10 @@ app.use(requestLogger);
 
 // Connect to MongoDB
 mongoose.connect(process.env.MONGODB_URI || process.env.MONGO_URI || 'mongodb://localhost:27017/peer-evaluation')
-  .then(() => console.log('✅ MongoDB connected'))
+  .then(() => {
+    console.log('✅ MongoDB connected');
+    return require('./utils/ensureIndexes').ensureEvaluationIndexes();
+  })
   .catch(err => console.error('❌ MongoDB connection error:', err));
 
 // Root route

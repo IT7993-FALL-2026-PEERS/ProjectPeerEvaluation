@@ -694,11 +694,12 @@ function CourseManagement() {
       await api.delete(`/courses/${teamsCourse._id}/teams/${teamId}`);
       setAlert({ severity: 'success', message: `Team "${teamName}" deleted successfully` });
       
-      // Remove the deleted team from the local state
-      const remainingTeams = teams.filter(team => team._id !== teamId);
-      setTeams(remainingTeams);
+      // Refresh from the server rather than editing the local list: two changes in flight at once
+      // would otherwise each start from the same old list and bring back what the other removed.
+      const teamsResponse = await api.get(`/courses/${teamsCourse._id}/teams`);
+      setTeams(teamsResponse.data);
       // Re-apply current search filters
-      handleTeamSearchChange('team_name', teamSearch.team_name, remainingTeams);
+      handleTeamSearchChange('team_name', teamSearch.team_name, teamsResponse.data);
       
       // Refresh the course list to update team count
       fetchCoursesWithCounts();
@@ -730,15 +731,11 @@ function CourseManagement() {
       await api.put(`/courses/${teamsCourse._id}/teams/${teamToEdit._id}`, editTeamData);
       setAlert({ severity: 'success', message: `Team "${editTeamData.team_name}" updated successfully` });
       
-      // Update the team in the local state
-      const editedTeams = teams.map(team => 
-        team._id === teamToEdit._id 
-          ? { ...team, ...editTeamData }
-          : team
-      );
-      setTeams(editedTeams);
+      // Refresh from the server, as for a delete.
+      const teamsResponse = await api.get(`/courses/${teamsCourse._id}/teams`);
+      setTeams(teamsResponse.data);
       // Re-apply current search filters
-      handleTeamSearchChange('team_name', teamSearch.team_name, editedTeams);
+      handleTeamSearchChange('team_name', teamSearch.team_name, teamsResponse.data);
       
       // If team name was changed, refresh students list to show updated team assignments
       if (editTeamData.team_name !== teamToEdit.team_name && students.length > 0) {
