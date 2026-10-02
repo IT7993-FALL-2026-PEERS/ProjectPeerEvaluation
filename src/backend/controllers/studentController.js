@@ -2,12 +2,15 @@ const mongoose = require('mongoose');
 const Student = require('../models/Student');
 const csv = require('csv-parser');
 const fs = require('fs');
+const { firstNonText, validationError } = require('../utils/inputGuards');
 
 // Manual add student to course
 exports.addStudent = async (req, res, next) => {
   try {
     const { course_id } = req.params;
     const { student_id, name, email, group_assignment } = req.body;
+    const nonText = firstNonText(req.body, ['student_id', 'name', 'email', 'group_assignment']);
+    if (nonText) return next(validationError(`${nonText} must be text.`));
     if (!mongoose.Types.ObjectId.isValid(course_id)) {
       const err = new Error('Invalid course ID.');
       err.code = 'VALIDATION_ERROR';
@@ -149,8 +152,12 @@ exports.updateStudent = async (req, res, next) => {
       updates[field] = value;
     }
     
+    // Look the student up by ObjectIds, never by the raw request values
+    const studentObjectId = new mongoose.Types.ObjectId(student_id);
+    const courseIdCast = new mongoose.Types.ObjectId(course_id);
+
     // Get current student data before update
-    const currentStudent = await Student.findOne({ _id: student_id, course_id });
+    const currentStudent = await Student.findOne({ _id: studentObjectId, course_id: courseIdCast });
     if (!currentStudent) {
       const err = new Error('Student not found.');
       err.code = 'NOT_FOUND';
@@ -200,7 +207,7 @@ exports.updateStudent = async (req, res, next) => {
     }
     
     // Update the student
-    const student = await Student.findOneAndUpdate({ _id: student_id, course_id }, updates, { new: true });
+    const student = await Student.findOneAndUpdate({ _id: studentObjectId, course_id: courseIdCast }, updates, { new: true });
     
     // Handle team membership changes
     const Team = require('../models/Team');

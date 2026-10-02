@@ -4,6 +4,7 @@ const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 
 const { getConfig } = require('../config/env');
+const { firstNonText, validationError } = require('../utils/inputGuards');
 
 const JWT_SECRET = getConfig().jwtSecret;
 const JWT_EXPIRES_IN = '1h';
@@ -11,6 +12,8 @@ const JWT_EXPIRES_IN = '1h';
 exports.login = async (req, res, next) => {
 	try {
 		const { email, password } = req.body;
+		const nonText = firstNonText(req.body, ['email', 'password']);
+		if (nonText) return next(validationError(`${nonText} must be text.`));
 		if (!email || !password) {
 			const err = new Error('Email and password are required.');
 			err.code = 'VALIDATION_ERROR';
@@ -66,6 +69,8 @@ exports.login = async (req, res, next) => {
 exports.register = async (req, res, next) => {
 	try {
 		const { email, password, name, department } = req.body;
+		const nonText = firstNonText(req.body, ['email', 'password', 'name', 'department']);
+		if (nonText) return next(validationError(`${nonText} must be text.`));
 		if (!email || !password || !name || !department) {
 			const err = new Error('All fields are required.');
 			err.code = 'VALIDATION_ERROR';
@@ -117,6 +122,8 @@ const { sendPasswordResetEmail } = require('../utils/emailUtils');
 exports.resetPassword = async (req, res, next) => {
 	try {
 		const { email } = req.body;
+		const nonText = firstNonText(req.body, ['email']);
+		if (nonText) return next(validationError(`${nonText} must be text.`));
 		if (!email) {
 			const err = new Error('Email is required.');
 			err.code = 'VALIDATION_ERROR';
@@ -147,6 +154,8 @@ exports.resetPassword = async (req, res, next) => {
 exports.updatePassword = async (req, res, next) => {
 	try {
 		const { token, password } = req.body;
+		const nonText = firstNonText(req.body, ['token', 'password']);
+		if (nonText) return next(validationError(`${nonText} must be text.`));
 		if (!token || !password) {
 			const err = new Error('Token and new password are required.');
 			err.code = 'VALIDATION_ERROR';
