@@ -343,7 +343,7 @@ re-reading the controller.*
 *Revised 27 Sep — previously "Needs verification".*
 
 ### FR-16 — Prevent duplicate submissions
-*Inherited: FR4.4* · **Status: Validated, with a concurrency gap**
+*Inherited: FR4.4* · **Status: Validated** (concurrency gap closed in CICD-33)
 
 **Required functionality.** A student cannot submit more than one evaluation for the same
 teammate in the same round.
@@ -355,9 +355,9 @@ teammate in the same round.
 *Evidence.* Duplicate-submission guard in
 `src/backend/controllers/evaluationController.js:436-446`.
 
-*Open gap.* The guard checks and then inserts, and the database index does not enforce
-uniqueness, so two requests arriving at the same moment could both pass the check. Worth an
-explicit concurrency test in Milestone 2 rather than assuming the guard is sufficient.
+*Closed 2 Oct (CICD-33).* The guard checked and then inserted, so two requests at the same moment
+could both pass. A unique index on evaluator, student and course now makes the second one fail with
+409, and the whole submission is saved in one transaction. Integration tests cover both.
 
 *Revised 27 Sep — previously "Needs verification".*
 

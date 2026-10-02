@@ -514,7 +514,10 @@ once the link has expired.
 ```
 Ratings are 1–5, except `participation`, which is 1–4 (D-19). `overall_feedback` needs at
 least 10 characters (FR-14 asks for 50–500). Every evaluation is validated before any is
-saved (FR-16), so a submission is all-or-nothing. The `student_id`s must be exactly the
+saved (FR-16), and they are saved together in one transaction (or, on a database without
+transactions, one by one with a rollback if anything fails), so a submission is all-or-nothing. A
+unique index on evaluator, student and course makes two requests at the same moment save once:
+the second gets the 409 below. The `student_id`s must be exactly the
 teammates the form lists (the rest of the team, or the rest of the course without a team),
 each once: rating yourself, someone else, the same teammate twice, or leaving a teammate out
 is a **400** `VALIDATION_ERROR` (API-2).

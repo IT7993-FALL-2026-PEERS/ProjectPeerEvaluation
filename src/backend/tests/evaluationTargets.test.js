@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const mongoose = require('mongoose');
 const Student = require('../models/Student');
 const Evaluation = require('../models/Evaluation');
+const evaluationStore = require('../utils/saveEvaluations');
 const { submitEvaluation } = require('../controllers/evaluationController');
 
 // API-2: a submission used to be saved for whatever student_ids it named, so a
@@ -43,11 +44,10 @@ async function submit(t, evaluations) {
     teammateQuery = filter;
     return { select: async () => [{ _id: bob }, { _id: carol }] };
   });
-  t.mock.method(Student, 'findByIdAndUpdate', async () => {});
   t.mock.method(Evaluation, 'findOne', async () => null);
-  t.mock.method(Evaluation.prototype, 'save', async function save() {
-    saved.push(this);
-    return this;
+  // The save itself (transaction, unique index) is tested against a real database in integration/.
+  t.mock.method(evaluationStore, 'saveEvaluations', async (evaluations) => {
+    saved.push(...evaluations);
   });
   t.mock.method(console, 'error', () => {});
 
@@ -116,9 +116,8 @@ test('without a team, the rest of the course counts as teammates, as on the form
   t.mock.method(Student, 'findOne', () => ({ populate: async () => noTeam }));
   let filter;
   t.mock.method(Student, 'find', (f) => { filter = f; return { select: async () => [{ _id: bob }] }; });
-  t.mock.method(Student, 'findByIdAndUpdate', async () => {});
   t.mock.method(Evaluation, 'findOne', async () => null);
-  t.mock.method(Evaluation.prototype, 'save', async function save() { return this; });
+  t.mock.method(evaluationStore, 'saveEvaluations', async () => {});
 
   let error;
   await submitEvaluation(

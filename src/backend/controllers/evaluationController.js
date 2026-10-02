@@ -6,6 +6,7 @@ const EVALUATION_RUBRIC = require('../config/rubric');
 const { sendEvaluationInvitation, sendEvaluationReminder } = require('../utils/emailUtils');
 const { createEmailPacer } = require('../utils/emailPacer');
 const { refreshEvaluationToken, isTokenExpired } = require('../utils/evaluationToken');
+const evaluationStore = require('../utils/saveEvaluations');
 
 // Gives the student a working link before an invitation or reminder is sent:
 // keeps a valid token, replaces a missing or expired one, and restarts the expiry.
@@ -555,12 +556,17 @@ exports.submitEvaluation = async (req, res, next) => {
       newEvaluations.push(evaluation);
     }
 
-    for (const evaluation of newEvaluations) {
-      await evaluation.save();
+    // All or nothing, and once only: a second request at the same moment hits the unique
+    // index and is told the evaluation is already complete.
+    try {
+      await evaluationStore.saveEvaluations(newEvaluations, student._id);
+    } catch (saveError) {
+      if (saveError.code !== 11000) throw saveError;
+      const err = new Error('Evaluation already completed.');
+      err.code = 'ALREADY_COMPLETED';
+      err.status = 409;
+      return next(err);
     }
-
-    // Mark student as having completed evaluation
-    await Student.findByIdAndUpdate(student._id, { evaluation_completed: true });
 
     res.status(201).json({
       message: 'Evaluation submitted successfully.',

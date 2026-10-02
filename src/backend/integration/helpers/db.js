@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-const { MongoMemoryReplSet } = require('mongodb-memory-server');
+const { MongoMemoryReplSet, MongoMemoryServer } = require('mongodb-memory-server');
 
 // A real MongoDB for the integration tests (ADR 0001). One member, replica-set mode, so
 // transactions work as they do on Atlas. The version is pinned to the staging Atlas cluster
@@ -17,19 +17,22 @@ require('../../models/Team');
 require('../../models/Evaluation');
 require('../../models/Report');
 
-async function startDatabase() {
-  const replSet = await MongoMemoryReplSet.create({
-    replSet: { count: 1 },
-    binary: { version: process.env.MONGOMS_VERSION || ATLAS_MONGODB_VERSION },
-  });
-  await mongoose.connect(replSet.getUri('peers-integration'));
+// `standalone: true` starts a plain mongod instead, the way a developer's local MongoDB or the
+// Docker Compose database runs. It has no transactions, so code that uses them needs a fallback
+// and a test on both kinds.
+async function startDatabase({ standalone = false } = {}) {
+  const binary = { version: process.env.MONGOMS_VERSION || ATLAS_MONGODB_VERSION };
+  const server = standalone
+    ? await MongoMemoryServer.create({ binary })
+    : await MongoMemoryReplSet.create({ replSet: { count: 1 }, binary });
+  await mongoose.connect(server.getUri('peers-integration'));
   await Promise.all(Object.values(mongoose.models).map((model) => model.init()));
-  return replSet;
+  return server;
 }
 
-async function stopDatabase(replSet) {
+async function stopDatabase(server) {
   await mongoose.disconnect();
-  await replSet.stop();
+  await server.stop();
 }
 
 // Empties every collection but keeps the indexes. Call it before each test that writes.

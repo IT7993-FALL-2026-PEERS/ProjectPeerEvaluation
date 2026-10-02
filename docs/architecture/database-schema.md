@@ -61,7 +61,7 @@ Six collections:
 | Course | A class section | Belongs to a Professor; has many Teams and Students |
 | Team | A student grouping within a course | Belongs to a Course; references Students |
 | Student | A roster entry | Belongs to a Course; optionally belongs to a Team |
-| Evaluation | One peer review submission | References a Course, the Student being evaluated, and the Student submitting (evaluator) |
+| Evaluation | One peer review submission | References a Course, the Student being evaluated, and the Student submitting (evaluator); unique per evaluator, student and course |
 | Report | Aggregated results for a course | Belongs to a Course; stores summary stats and loosely-typed report data |
 
 ### Notable findings

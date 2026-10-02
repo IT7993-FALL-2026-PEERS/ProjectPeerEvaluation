@@ -33,7 +33,7 @@ marked `todo`, until the defect is fixed, so the matrix never reports a defect a
 | FR4.1 | FR-13 Ratings on a 1–5 scale | CW-07 | BE `submitEvaluation.test.js`: "fails schema validation" (participation 5 rejected) · BE `reportController.test.js`: participation scaled by 5/4 | Unit | Update when D-19 is decided | Defective (D-19) — participation is 1–4 |
 | FR4.2 | FR-14 Feedback length limits | CW-07 | BE `submitEvaluation.test.js`: "fails the feedback check" (10-character minimum) | Unit | Update when D-22 is decided | Defective (D-22) — 10-character minimum, no maximum; requirement says 50–500 |
 | FR4.3 | FR-15 Timestamp all submissions | CW-07 | — | — | Unit: `submitted_at` set on save (12 Oct) | Validated |
-| FR4.4 | FR-16 Prevent duplicate submissions | CW-07 | BE `submitEvaluation.test.js` ×3 (all-or-nothing save, PR #27) | Unit | Integration: repeat submission returns 409, and concurrent submissions (19 Oct) | Validated, with a concurrency gap |
+| FR4.4 | FR-16 Prevent duplicate submissions | CW-07 | BE `submitEvaluation.test.js` ×3 (all-or-nothing save, PR #27) | Unit | BE `integration/submission.integration.js` (TC-16-20..27), `atomicSubmission.*.integration.js` (TC-16-30..34), `duplicateEvaluations.integration.js` (TC-16-36, 37) | Validated |
 | FR5.1 | FR-17 Aggregated team reports | CW-09 | BE `reportController.test.js`: course report, team report, team averages | Unit | Integration: report from seeded data (19 Oct); E2E review results (26 Oct) | Validated |
 | FR5.2 | FR-18 Average score per criterion | CW-09 | BE `reportController.test.js`: scoring, letter grades, curved grading | Unit | Regression: report totals for a fixed fixture (19 Oct) | Validated |
 | FR5.3 | FR-19 Downloadable reports | CW-09 | BE `reportController.test.js`: CSV download ×3 · BE `csv.test.js` ×10 (quoting, formula protection) | Unit | PDF export has no test until it is built | Partial — CSV works, PDF missing |
@@ -73,10 +73,13 @@ FR-11, FR-15) has a planned test in Milestone 2, which meets the sponsor's §9 r
 that each validated business requirement is verified by one or more automated tests once
 Milestone 2 closes.
 
-**FR-16 gaps.** The guard blocks the normal repeat submission, but two simultaneous
-submissions (double-click, two tabs) can both get through: the code checks and then inserts,
-and the index on `Evaluation.js:21` is not `unique`. The planned integration test covers it.
-The partial-save lockout was fixed in PR #27 and is covered by `submitEvaluation.test.js`.
+**FR-16.** Fixed in CICD-33. A submission is saved in one transaction (or, on a database
+without transactions, saved one by one and rolled back on failure), and a unique index on
+`Evaluation` (evaluator, student, course) makes two simultaneous submissions save once.
+`integration/atomicSubmission.*.integration.js` (TC-16-30 to TC-16-34, run on a replica set and
+on a standalone `mongod`) covers concurrent submits, a failure after the ratings are written, the
+index, and resubmitting after a reset; `duplicateEvaluations.integration.js` covers the
+pre-deploy check. The earlier partial-save lockout (PR #27) is covered by `submitEvaluation.test.js`.
 
 ## Maintaining this matrix
 
