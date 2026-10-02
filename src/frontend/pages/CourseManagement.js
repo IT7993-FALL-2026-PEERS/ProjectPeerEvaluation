@@ -683,6 +683,18 @@ function CourseManagement() {
     }
   };
 
+  // The team list from the server, or `fallback` when it cannot be fetched. The change that came
+  // before has already succeeded, so a failed refresh must not be reported as a failed change.
+  const fetchTeamsOr = async (fallback) => {
+    try {
+      const response = await api.get(`/courses/${teamsCourse._id}/teams`);
+      return response.data;
+    } catch (error) {
+      console.error('Error refreshing teams:', error);
+      return fallback;
+    }
+  };
+
   const handleDeleteTeam = async (teamId, teamName) => {
     if (!teamsCourse || !teamId) return;
     
@@ -695,11 +707,12 @@ function CourseManagement() {
       setAlert({ severity: 'success', message: `Team "${teamName}" deleted successfully` });
       
       // Refresh from the server rather than editing the local list: two changes in flight at once
-      // would otherwise each start from the same old list and bring back what the other removed.
-      const teamsResponse = await api.get(`/courses/${teamsCourse._id}/teams`);
-      setTeams(teamsResponse.data);
+      // would otherwise each start from the same old list and bring back what the other removed. If
+      // only the refresh fails the delete still happened, so fall back to the local list.
+      const freshTeams = await fetchTeamsOr(teams.filter(team => team._id !== teamId));
+      setTeams(freshTeams);
       // Re-apply current search filters
-      handleTeamSearchChange('team_name', teamSearch.team_name, teamsResponse.data);
+      handleTeamSearchChange('team_name', teamSearch.team_name, freshTeams);
       
       // Refresh the course list to update team count
       fetchCoursesWithCounts();
@@ -731,11 +744,13 @@ function CourseManagement() {
       await api.put(`/courses/${teamsCourse._id}/teams/${teamToEdit._id}`, editTeamData);
       setAlert({ severity: 'success', message: `Team "${editTeamData.team_name}" updated successfully` });
       
-      // Refresh from the server, as for a delete.
-      const teamsResponse = await api.get(`/courses/${teamsCourse._id}/teams`);
-      setTeams(teamsResponse.data);
+      // Refresh from the server, as for a delete, falling back to the local list if that fails.
+      const freshTeams = await fetchTeamsOr(teams.map(team => (
+        team._id === teamToEdit._id ? { ...team, ...editTeamData } : team
+      )));
+      setTeams(freshTeams);
       // Re-apply current search filters
-      handleTeamSearchChange('team_name', teamSearch.team_name, teamsResponse.data);
+      handleTeamSearchChange('team_name', teamSearch.team_name, freshTeams);
       
       // If team name was changed, refresh students list to show updated team assignments
       if (editTeamData.team_name !== teamToEdit.team_name && students.length > 0) {

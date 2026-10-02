@@ -93,8 +93,20 @@ function registerAtomicSubmissionTests({ standalone }) {
     assert.equal(await Evaluation.countDocuments({ evaluator_id: IDS.ann }), 2);
   });
 
-  // The fallback path only runs without transactions, so these two are for the standalone server.
+  // The fallback path only runs without transactions, so these are for the standalone server.
   if (standalone) {
+    test(`TC-16-44 (${kind}): double submits that list the teammates in different orders still save exactly one`, async () => {
+      const fay = await addFay();
+      const token = await tokenOf(IDS.ann);
+      const forward = { evaluations: [rating(IDS.ben), rating(fay._id)] };
+      const backward = { evaluations: [rating(fay._id), rating(IDS.ben)] };
+      const results = await Promise.all(
+        Array.from({ length: 8 }, (_, i) => app.request('POST', `/api/evaluate/${token}`, { body: i % 2 ? backward : forward }))
+      );
+      assert.equal(results.filter((r) => r.status === 201).length, 1, JSON.stringify(results.map((r) => r.status)));
+      assert.equal(await Evaluation.countDocuments({ evaluator_id: IDS.ann }), 2, 'the winner is saved in full');
+    });
+
     test(`TC-16-40 (${kind}): a rating written but not acknowledged is rolled back too, and the student can retry`, async (t) => {
       const fay = await addFay();
       const token = await tokenOf(IDS.ann);

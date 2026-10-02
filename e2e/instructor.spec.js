@@ -127,3 +127,21 @@ test('E2E-09: deleting an empty team removes it from the team list straight away
   await expect(alertWith(page, 'deleted successfully')).toBeVisible();
   await expect(page.getByRole('cell', { name: 'Gamma', exact: true })).toHaveCount(0);
 });
+
+test('E2E-15: if the team list cannot be refreshed after a delete, the delete still shows as done and the team is gone', async ({ page }) => {
+  await loginAsAda(page, passwords);
+  await courseAction(page, 'Manage Teams').click();
+  await page.getByRole('button', { name: 'Create Team' }).click();
+  await page.getByRole('dialog').last().getByLabel(/team name/i).fill('Gamma');
+  await page.getByRole('dialog').last().getByRole('button', { name: /^create/i }).click();
+  await expect(page.getByRole('cell', { name: 'Gamma', exact: true })).toBeVisible();
+
+  // From now on the team list request fails; the delete itself still goes through.
+  await page.route('**/api/courses/*/teams', (route) => (route.request().method() === 'GET' ? route.abort() : route.continue()));
+  page.once('dialog', (confirm) => confirm.accept());
+  await page.getByRole('row', { name: /Gamma/ }).getByTitle('Delete Team').click();
+
+  await expect(alertWith(page, 'deleted successfully')).toBeVisible();
+  await expect(alertWith(page, 'Failed to delete team')).toHaveCount(0);
+  await expect(page.getByRole('cell', { name: 'Gamma', exact: true })).toHaveCount(0);
+});

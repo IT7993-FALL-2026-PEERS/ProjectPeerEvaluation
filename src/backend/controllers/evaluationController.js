@@ -38,15 +38,15 @@ function validationError(message) {
 }
 
 // Refuses a send that cannot finish inside one request (see utils/emailPacer.js). Checked before any
-// link is issued or email sent, so a refused request changes nothing. `what` is "students" for a whole
-// course or "team members" for one team.
-function checkRecipientLimit(count, what) {
+// link is issued or email sent, so a refused request changes nothing. `what` names the recipients and
+// `advice` says what to do instead, which differs for a course, a single team and a reminder.
+function checkRecipientLimit(count, what, advice) {
   const limit = getRecipientLimit();
   if (count <= limit) return null;
   const seconds = Math.round(getEmailIntervalMs() / 1000);
   const err = new Error(
     `This would email ${count} ${what}, but at the current sending speed (one email every ${seconds} seconds) ` +
-    `at most ${limit} can be emailed in one go. Send to each team instead, or choose fewer students.`
+    `at most ${limit} can be emailed in one go. ${advice}`
   );
   err.code = 'TOO_MANY_RECIPIENTS';
   err.status = 400;
@@ -95,7 +95,8 @@ exports.sendTeamEvaluations = async (req, res, next) => {
       return next(err);
     }
 
-    const tooMany = checkRecipientLimit(students.length, 'team members');
+    const tooMany = checkRecipientLimit(students.length, 'team members',
+      'Ask an administrator to raise the sending speed, or split this team into smaller ones.');
     if (tooMany) return next(tooMany);
 
     let emailsSent = 0;
@@ -169,7 +170,7 @@ exports.sendEvaluations = async (req, res, next) => {
       return next(err);
     }
 
-    const tooMany = checkRecipientLimit(students.length, 'students');
+    const tooMany = checkRecipientLimit(students.length, 'students', 'Send to each team instead.');
     if (tooMany) return next(tooMany);
 
     let emailsSent = 0;
@@ -356,7 +357,8 @@ exports.remindEvaluations = async (req, res, next) => {
       });
     }
 
-    const tooMany = checkRecipientLimit(studentsToRemind.length, 'students');
+    const tooMany = checkRecipientLimit(studentsToRemind.length, 'students',
+      'Remind fewer students at a time by choosing them, or remind team by team.');
     if (tooMany) return next(tooMany);
 
     let remindersSent = 0;

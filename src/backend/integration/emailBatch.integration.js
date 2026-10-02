@@ -80,6 +80,8 @@ test('TC-10-33: sending to one team is limited the same way', async () => {
   const big = await app.request('POST', `/api/courses/${IDS.courseAda}/teams/${IDS.teamAlpha}/evaluations/send`, { token: ada, body: {} });
   assert.equal(big.status, 400);
   assert.equal(big.body.error.code, 'TOO_MANY_RECIPIENTS');
+  assert.match(big.body.error.message, /team members/);
+  assert.doesNotMatch(big.body.error.message, /each team/i, 'a team send must not be told to send team by team');
   const small = await app.request('POST', `/api/courses/${IDS.courseAda}/teams/${IDS.teamBeta}/evaluations/send`, { token: ada, body: {} });
   assert.equal(small.status, 200);
   assert.equal(sentEmails.length, 2);
@@ -90,6 +92,7 @@ test('TC-12-30: reminders are limited by how many students would be reminded, an
   const all = await remind();
   assert.equal(all.status, 400);
   assert.equal(all.body.error.code, 'TOO_MANY_RECIPIENTS');
+  assert.match(all.body.error.message, /remind fewer/i, 'reminders are told to name fewer students');
   assert.equal(sentEmails.length, 0);
 
   const some = await remind({ student_ids: [String(IDS.ann), String(IDS.ben), String(IDS.cy)] });
