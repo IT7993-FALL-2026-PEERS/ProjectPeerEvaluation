@@ -2,13 +2,22 @@ const { defineConfig, devices } = require('@playwright/test');
 
 const isCI = !!process.env.CI;
 
-// Milestone 2 (M4): end-to-end student workflow tests live in e2e/.
-// For now only e2e/setup.spec.js runs (an install check). Real workflow tests
-// (receive invitation -> open link -> complete evaluation -> submit -> verify)
-// come in Milestone 2.
+// End-to-end tests (CICD-26) live in e2e/.
+//
+// Set E2E_START_SERVER=1 to run them against the real app on a throwaway database:
+//   npm run build                        (the frontend build is served as static files)
+//   E2E_START_SERVER=1 npm run test:e2e
+// Playwright then starts two servers (see e2e/server/): the real backend on a seeded in-memory
+// MongoDB, with email captured instead of sent, and the frontend build on port 3000. The first run
+// downloads MongoDB (see docs/testing-strategy/testing-strategy.md); set MONGOMS_VERSION to reuse a
+// version you already have. Without E2E_START_SERVER only the install check in e2e/setup.spec.js runs.
+const startServers = !!process.env.E2E_START_SERVER;
+
 module.exports = defineConfig({
   testDir: './e2e',
-  fullyParallel: true,
+  // The workflow tests share one backend and reset its data before each test, so they run one at a time.
+  fullyParallel: false,
+  workers: 1,
   forbidOnly: isCI, // fail CI if someone leaves test.only in
   retries: isCI ? 2 : 0,
   reporter: [
@@ -20,21 +29,28 @@ module.exports = defineConfig({
     ['json', { outputFile: 'playwright-results/results.json' }],
   ],
   use: {
-    // Point BASE_URL at staging to reuse these tests as post-deploy smoke tests.
     baseURL: process.env.BASE_URL || 'http://localhost:3000',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
   },
-  // Set E2E_START_SERVER=1 to start the app before the tests. Off by default: the
-  // install check needs no server, and the real workflow tests also need a database.
-  webServer: process.env.E2E_START_SERVER
-    ? {
-        command: 'npm run dev',
-        url: 'http://localhost:3000',
-        reuseExistingServer: !isCI,
-        timeout: 120000,
-      }
+  webServer: startServers
+    ? [
+        {
+          command: 'node e2e/server/backend.js',
+          url: 'http://localhost:5000/api/health',
+          reuseExistingServer: !isCI,
+          timeout: 300000, // the first run downloads MongoDB
+          stdout: 'pipe',
+          stderr: 'pipe',
+        },
+        {
+          command: 'node e2e/server/frontend.js',
+          url: 'http://localhost:3000',
+          reuseExistingServer: !isCI,
+          timeout: 60000,
+        },
+      ]
     : undefined,
   projects: [
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },

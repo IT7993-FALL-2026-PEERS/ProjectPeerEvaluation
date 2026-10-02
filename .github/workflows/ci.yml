@@ -118,10 +118,15 @@ jobs:
           retention-days: 30
           if-no-files-found: ignore
 
+  # End-to-end workflows in a real browser against the real app (backlog CICD-26): the backend on a
+  # throwaway MongoDB with email captured, and the production frontend build. See playwright.config.js.
   e2e-smoke:
     name: E2E smoke (Playwright)
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
+    env:
+      MONGOMS_DOWNLOAD_DIR: ${{ github.workspace }}/.mongodb-binaries
+      MONGOMS_USE_ARCHIVE_NAME_FOR_BINARY_NAME: "1"
     steps:
       - uses: actions/checkout@v7
         with:
@@ -141,8 +146,29 @@ jobs:
       - name: Install Playwright browser
         run: npx playwright install --with-deps chromium
 
+      # The end-to-end servers serve this build.
+      - name: Build the frontend
+        run: npm run build
+        env:
+          CI: true
+
+      # Same key as the integration job: the MongoDB binary the in-memory database needs.
+      - name: Work out the MongoDB binary cache key
+        id: mongo
+        run: |
+          version=$(node -p "require('./src/backend/integration/helpers/db').ATLAS_MONGODB_VERSION")
+          release=$(. /etc/os-release && echo "$VERSION_ID")
+          echo "key=mongod-${RUNNER_OS}-${RUNNER_ARCH}-ubuntu${release}-${version}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache@v6
+        with:
+          path: .mongodb-binaries
+          key: ${{ steps.mongo.outputs.key }}
+
       - name: Run Playwright tests
         run: npm run test:e2e
+        env:
+          E2E_START_SERVER: "1"
 
       - name: Upload Playwright report
         if: ${{ !cancelled() }}

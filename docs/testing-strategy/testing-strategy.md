@@ -135,9 +135,16 @@ objects before 5 Oct.
 re-open the link and confirm it shows as already completed. Instructor: log in, create a
 course, upload a roster, create teams, launch evaluations, watch completion, view the report.
 
-**Constraint.** Both depend on a running application with a seeded database, so they are
-gated on M2's containerization work. `e2e/setup.spec.js` currently only verifies the
-Playwright installation — it is scaffolding, not a test of the app.
+**How it runs (CICD-26).** `npm run build`, then `E2E_START_SERVER=1 npm run test:e2e`. Playwright
+starts two servers from `e2e/server/`: the real backend on a seeded in-memory MongoDB (the same
+fixture as the integration tests, with email captured, never sent) and the frontend build as
+static files. A small control server resets the data before each test and returns the captured
+email, so the student tests take the link from the invitation email. Specs: `e2e/instructor.spec.js`
+(E2E-01 to 09: login, session, roster upload and its error message, teams, invitations, reports,
+CSV download) and `e2e/student.spec.js` (E2E-10 to 14: opening the link without a login, rating and
+submitting, the professor's count, no second submission, a bad link, missing feedback). Without
+`E2E_START_SERVER` only `e2e/setup.spec.js` (the Playwright install check) runs. In CI this is the
+required job `E2E smoke (Playwright)`.
 
 ### 2.5 Smoke tests
 

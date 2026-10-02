@@ -347,7 +347,7 @@ The step-by-step version follows.
 - `npm run docker:up` / `npm run docker:down` — start/stop the Docker Compose stack (see `docs/docker-setup.md`)
 - `npm run start:backend` / `npm run start:frontend` — start one side only
 - `npm test` — frontend unit tests (Jest + React Testing Library)
-- `npm run test:e2e` — end-to-end tests (Playwright)
+- `npm run build` then `E2E_START_SERVER=1 npm run test:e2e` — end-to-end tests (Playwright) against the real app on a throwaway database; without `E2E_START_SERVER` only the install check runs
 - `cd src/backend && npm test` — backend unit tests (`node:test`)
 - `cd src/backend && npm run test:integration` — backend integration tests against a real MongoDB that the tests start themselves (no Docker needed; the first run downloads the MongoDB binary)
 

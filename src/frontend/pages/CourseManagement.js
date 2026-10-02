@@ -182,7 +182,7 @@ function CourseManagement() {
       const response = await api.get(`/courses/${studentsCourse._id || studentsCourse.id}/students`);
       setStudents(response.data);
       // Re-apply current search filters
-      handleStudentSearchChange('student_id', studentSearch.student_id);
+      handleStudentSearchChange('student_id', studentSearch.student_id, response.data);
     } catch (error) {
       setAlert({ severity: 'error', message: 'Failed to update student' });
     }
@@ -213,7 +213,7 @@ function CourseManagement() {
       const response = await api.get(`/courses/${studentsCourse._id || studentsCourse.id}/students`);
       setStudents(response.data);
       // Re-apply current search filters
-      handleStudentSearchChange('student_id', studentSearch.student_id);
+      handleStudentSearchChange('student_id', studentSearch.student_id, response.data);
     } catch (error) {
       setAlert({ severity: 'error', message: `Failed to delete student "${studentName}"` });
       console.error('Delete student error:', error);
@@ -245,7 +245,7 @@ function CourseManagement() {
       const studentsResponse = await api.get(`/courses/${studentsCourse._id || studentsCourse.id}/students`);
       setStudents(studentsResponse.data);
       // Re-apply current search filters
-      handleStudentSearchChange('student_id', studentSearch.student_id);
+      handleStudentSearchChange('student_id', studentSearch.student_id, studentsResponse.data);
       
       // Reset form
       setCsvFile(null);
@@ -582,12 +582,14 @@ function CourseManagement() {
   };
 
   // Handle search input changes
-  const handleStudentSearchChange = (field, value) => {
+  // `source` is the list to filter. After a refresh, pass the list just fetched: `students` is still
+  // the old value inside the same function call, so filtering it would show the old list.
+  const handleStudentSearchChange = (field, value, source = students) => {
     const newSearch = { ...studentSearch, [field]: value };
     setStudentSearch(newSearch);
     
     // Filter immediately as user types
-    let filtered = students.filter(student => {
+    let filtered = source.filter(student => {
       const matchesId = newSearch.student_id === '' || 
         student.student_id.toLowerCase().includes(newSearch.student_id.toLowerCase());
       const matchesName = newSearch.name === '' || 
@@ -625,12 +627,13 @@ function CourseManagement() {
   };
 
   // Handle team search input changes
-  const handleTeamSearchChange = (field, value) => {
+  // `source` is the list to filter; see handleStudentSearchChange.
+  const handleTeamSearchChange = (field, value, source = teams) => {
     const newSearch = { ...teamSearch, [field]: value };
     setTeamSearch(newSearch);
     
     // Filter immediately as user types
-    let filtered = teams.filter(team => {
+    let filtered = source.filter(team => {
       const matchesName = newSearch.team_name === '' || 
         team.team_name.toLowerCase().includes(newSearch.team_name.toLowerCase());
       const matchesStatus = newSearch.team_status === '' || 
@@ -692,9 +695,10 @@ function CourseManagement() {
       setAlert({ severity: 'success', message: `Team "${teamName}" deleted successfully` });
       
       // Remove the deleted team from the local state
-      setTeams(prevTeams => prevTeams.filter(team => team._id !== teamId));
+      const remainingTeams = teams.filter(team => team._id !== teamId);
+      setTeams(remainingTeams);
       // Re-apply current search filters
-      handleTeamSearchChange('team_name', teamSearch.team_name);
+      handleTeamSearchChange('team_name', teamSearch.team_name, remainingTeams);
       
       // Refresh the course list to update team count
       fetchCoursesWithCounts();
@@ -727,15 +731,14 @@ function CourseManagement() {
       setAlert({ severity: 'success', message: `Team "${editTeamData.team_name}" updated successfully` });
       
       // Update the team in the local state
-      setTeams(prevTeams => 
-        prevTeams.map(team => 
-          team._id === teamToEdit._id 
-            ? { ...team, ...editTeamData }
-            : team
-        )
+      const editedTeams = teams.map(team => 
+        team._id === teamToEdit._id 
+          ? { ...team, ...editTeamData }
+          : team
       );
+      setTeams(editedTeams);
       // Re-apply current search filters
-      handleTeamSearchChange('team_name', teamSearch.team_name);
+      handleTeamSearchChange('team_name', teamSearch.team_name, editedTeams);
       
       // If team name was changed, refresh students list to show updated team assignments
       if (editTeamData.team_name !== teamToEdit.team_name && students.length > 0) {
@@ -775,7 +778,7 @@ function CourseManagement() {
       const teamsResponse = await api.get(`/courses/${teamsCourse._id}/teams`);
       setTeams(teamsResponse.data);
       // Re-apply current search filters
-      handleTeamSearchChange('team_name', teamSearch.team_name);
+      handleTeamSearchChange('team_name', teamSearch.team_name, teamsResponse.data);
       
       // Close the dialog and reset form
       setCreateTeamDialogOpen(false);
