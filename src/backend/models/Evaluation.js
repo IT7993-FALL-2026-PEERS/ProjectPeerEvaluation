@@ -20,5 +20,10 @@ const EvaluationSchema = new mongoose.Schema({
 // Add index for efficient querying
 EvaluationSchema.index({ course_id: 1, student_id: 1, evaluator_id: 1 });
 EvaluationSchema.index({ evaluation_token: 1 });
+// One rating per evaluator and person in a course (FR-16). The key order differs from the index
+// above on purpose: MongoDB refuses to turn an existing index into a unique one, so this is a
+// separate index. Run scripts/findDuplicateEvaluations.js before deploying to a database that
+// already holds data: the index cannot be built while duplicates exist.
+EvaluationSchema.index({ evaluator_id: 1, student_id: 1, course_id: 1 }, { unique: true });
 
 module.exports = mongoose.model('Evaluation', EvaluationSchema);

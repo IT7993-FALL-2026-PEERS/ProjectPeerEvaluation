@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const mongoose = require('mongoose');
 const Student = require('../models/Student');
 const Evaluation = require('../models/Evaluation');
+const evaluationStore = require('../utils/saveEvaluations');
 const { submitEvaluation } = require('../controllers/evaluationController');
 
 // No database here: the model calls that would hit MongoDB are stubbed, while the
@@ -34,11 +35,10 @@ async function submit(t, evaluations) {
   t.mock.method(Student, 'findOne', () => ({ populate: async () => evaluator }));
   // Everyone rated is a teammate here; who may be rated is tested in evaluationTargets.test.js.
   t.mock.method(Student, 'find', () => ({ select: async () => evaluations.map((e) => ({ _id: e.student_id })) }));
-  t.mock.method(Student, 'findByIdAndUpdate', async () => {});
   t.mock.method(Evaluation, 'findOne', async () => null);
-  t.mock.method(Evaluation.prototype, 'save', async function save() {
-    saved.push(this);
-    return this;
+  // The save itself (transaction, unique index) is tested against a real database in integration/.
+  t.mock.method(evaluationStore, 'saveEvaluations', async (evaluations) => {
+    saved.push(...evaluations);
   });
   t.mock.method(console, 'error', () => {});
 
