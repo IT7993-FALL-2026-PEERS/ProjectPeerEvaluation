@@ -56,6 +56,8 @@ import api, { getCourseById } from '../services/api';
 import { getApiBaseUrl } from '../services/apiUrl';
 import { describeEmailResult } from '../services/emailResult';
 import { isCsvFile } from '../services/csvFile';
+import { getErrorMessage } from '../services/apiError';
+import { buildCreateTeamBody } from '../services/teamRequest';
 import { useAuth } from '../contexts/AuthContext';
 import styles from '../styles/CourseManagement.module.css';
 import '../App.css';
@@ -766,7 +768,7 @@ function CourseManagement() {
     }
     
     try {
-      await api.post(`/courses/${teamsCourse._id}/teams`, [newTeamData]);
+      await api.post(`/courses/${teamsCourse._id}/teams`, buildCreateTeamBody(newTeamData));
       setAlert({ severity: 'success', message: `Team "${newTeamData.team_name}" created successfully` });
       
       // Refresh teams list
@@ -784,7 +786,7 @@ function CourseManagement() {
       
     } catch (error) {
       console.error('Error creating team:', error);
-      setAlert({ severity: 'error', message: 'Failed to create team' });
+      setAlert({ severity: 'error', message: getErrorMessage(error, 'Failed to create team') });
     }
   };
 
@@ -1115,7 +1117,7 @@ function CourseManagement() {
       setUploadProgress(0);
   fetchCoursesWithCounts();
     } catch (error) {
-      setAlert({ severity: 'error', message: 'Failed to upload roster' });
+      setAlert({ severity: 'error', message: getErrorMessage(error, 'Failed to upload roster') });
       setUploadProgress(0);
     }
   };
