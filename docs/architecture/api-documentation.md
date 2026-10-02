@@ -87,8 +87,9 @@ takes the student's **university ID** string (for example `S0012345`).
 
 The counts can be changed with `RATE_LIMIT_LOGIN_MAX`, `RATE_LIMIT_SIGNUP_MAX`, `RATE_LIMIT_RESET_MAX`,
 `RATE_LIMIT_UPDATE_MAX`, `RATE_LIMIT_EVALUATE_MAX` and `RATE_LIMIT_GENERAL_MAX` (whole numbers above 0; anything else keeps the
-default). The client address is read with `trust proxy` set to 1 (Render puts one proxy in front;
-`TRUST_PROXY` overrides it). The limits are per address, not per account, so one account can still be
+default). The client address is read from `X-Forwarded-For` with `trust proxy` set to 2: Render sends
+every request through Cloudflare and then its own load balancer, each appending to the header
+(`TRUST_PROXY` overrides it, for example `0` with no proxy). The limits are per address, not per account, so one account can still be
 guessed at slowly from many addresses, many students behind one address share one count, and a victim's
 inbox can still be flooded with reset emails from many addresses.
 | 409 | `CONSTRAINT_ERROR` | Team still has students |

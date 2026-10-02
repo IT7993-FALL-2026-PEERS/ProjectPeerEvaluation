@@ -9,8 +9,9 @@ const { applyRateLimits, trustProxyHops } = require('./config/rateLimit');
 
 const app = express();
 
-// Render puts one proxy in front of the app. Trusting exactly that hop makes req.ip the real
-// client address (for the rate limits) and keeps a client from spoofing X-Forwarded-For.
+// Render puts two proxies in front of the app (Cloudflare and its load balancer). Trusting
+// exactly those hops makes req.ip the real client address (for the rate limits) and keeps a
+// client from spoofing X-Forwarded-For. See config/rateLimit.js.
 app.set('trust proxy', trustProxyHops());
 
 // Middleware

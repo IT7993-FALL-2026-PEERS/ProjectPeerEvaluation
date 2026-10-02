@@ -7,8 +7,8 @@ const { applyRateLimits, readLimits, trustProxyHops, DEFAULT_LIMITS } = require(
 // API-5 (CICD-34): nothing limited how often login, password reset, sign-up or the
 // student evaluation links could be hit, so passwords could be guessed and reset
 // emails flooded. These tests run a real Express app on a random port and check the
-// limits over HTTP, the way index.js wires them: trust proxy 1 (Render puts exactly
-// one proxy in front), the health route first, then the limiters, then the routers.
+// limits over HTTP, the way index.js wires them: the real trust proxy default, the
+// health route first, then the limiters, then the routers.
 const WINDOW = 60 * 1000;
 const TINY = {
   general: { windowMs: WINDOW, limit: 100 },
@@ -21,7 +21,7 @@ const TINY = {
 
 async function startApp(t, limits = TINY) {
   const app = express();
-  app.set('trust proxy', 1);
+  app.set('trust proxy', trustProxyHops());
   app.get('/api/health', (req, res) => res.json({ status: 'OK' }));
   applyRateLimits(app, limits);
   // A login succeeds only when the test says so; every other attempt is a 401.
@@ -39,9 +39,19 @@ async function startApp(t, limits = TINY) {
   t.after(() => server.close());
   const base = `http://127.0.0.1:${server.address().port}`;
 
-  // The client's address arrives in X-Forwarded-For, as it does behind Render's proxy.
-  return (method, path, { ip = '203.0.113.1', headers = {} } = {}) =>
-    fetch(base + path, { method, headers: { 'X-Forwarded-For': ip, ...headers } });
+  // Render's path is client -> Cloudflare edge -> Render load balancer -> the app, and each
+  // proxy appends to X-Forwarded-For, so the app sees "<anything the client sent>, <client>,
+  // <edge>". The edge address comes from a pool and differs between requests. This was
+  // measured on staging (2 Oct): with only one hop trusted, requests from a single machine
+  // fell into different rate-limit buckets, because the key was the edge address. The first
+  // version of these tests modelled one proxy and could not see that.
+  let requests = 0;
+  return (method, path, { ip = '203.0.113.1', spoof, headers = {} } = {}) => {
+    requests += 1;
+    const edge = `172.70.${requests % 250}.${(requests * 7) % 250}`;
+    const chain = [spoof, ip, edge].filter(Boolean).join(', ');
+    return fetch(base + path, { method, headers: { 'X-Forwarded-For': chain, ...headers } });
+  };
 }
 
 async function statuses(call, count, method, path, options) {
@@ -78,15 +88,22 @@ test('TC-01-03: each client address has its own budget', async (t) => {
   assert.equal((await call('POST', '/api/auth/login', { ip: '198.51.100.8' })).status, 401, 'another client is not limited');
 });
 
-// Behind Render the proxy appends the real client address on the right of the chain.
-// Whatever a client puts on the left must not give it a fresh budget.
+// Behind Render the proxies append the real client address and the edge address on the right
+// of the chain. Whatever a client puts on the left must not give it a fresh budget.
 test('TC-01-04: spoofing the left of X-Forwarded-For does not get around the limit', async (t) => {
   const call = await startApp(t);
   const results = [];
   for (let i = 0; i < 5; i += 1) {
-    results.push((await call('POST', '/api/auth/login', { ip: `10.0.0.${i}, 198.51.100.9` })).status);
+    results.push((await call('POST', '/api/auth/login', { ip: '198.51.100.9', spoof: `10.0.0.${i}` })).status);
   }
   assert.deepEqual(results, [401, 401, 401, 429, 429]);
+});
+
+// The case that went wrong on staging: the same client, but a different Cloudflare edge
+// address on every request. The budget has to follow the client, not the edge.
+test('TC-01-13: one client keeps one budget even though the edge address changes every request', async (t) => {
+  const call = await startApp(t);
+  assert.deepEqual(await statuses(call, 5, 'POST', '/api/auth/login', { ip: '198.51.100.77' }), [401, 401, 401, 429, 429]);
 });
 
 test('TC-01-05: reset requests are limited, with a clear message', async (t) => {
@@ -161,9 +178,10 @@ test('TC-01-09: limits can be tuned with environment variables; bad values fall 
   }
 });
 
-test('TC-01-10: trust proxy is one hop by default (Render), and can be set', () => {
-  assert.equal(trustProxyHops({}), 1);
-  assert.equal(trustProxyHops({ TRUST_PROXY: '2' }), 2);
+test('TC-01-10: trust proxy is two hops by default (Cloudflare and Render\'s load balancer), and can be set', () => {
+  assert.equal(trustProxyHops({}), 2);
+  assert.equal(trustProxyHops({ TRUST_PROXY: '1' }), 1);
+  assert.equal(trustProxyHops({ TRUST_PROXY: '3' }), 3);
   assert.equal(trustProxyHops({ TRUST_PROXY: '0' }), 0);
-  for (const bad of ['true', 'abc', '-1', '1.5', '']) assert.equal(trustProxyHops({ TRUST_PROXY: bad }), 1, bad);
+  for (const bad of ['true', 'abc', '-1', '1.5', '']) assert.equal(trustProxyHops({ TRUST_PROXY: bad }), 2, bad);
 });
