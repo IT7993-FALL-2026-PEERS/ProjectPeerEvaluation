@@ -124,12 +124,29 @@ exports.listStudents = async (req, res, next) => {
 exports.updateStudent = async (req, res, next) => {
   try {
     const { course_id, student_id } = req.params;
-    const updates = req.body;
     if (!mongoose.Types.ObjectId.isValid(student_id)) {
       const err = new Error('Invalid student ID.');
       err.code = 'VALIDATION_ERROR';
       err.status = 400;
       return next(err);
+    }
+
+    // Only these fields can be edited. Anything else in the body (course_id,
+    // evaluation_token, evaluation_completed, team_id, ...) is ignored: the team is
+    // set below from group_assignment, within this course (API-4, CICD-45).
+    const body = req.body && typeof req.body === 'object' ? req.body : {};
+    const updates = {};
+    for (const field of ['student_id', 'name', 'email', 'group_assignment']) {
+      const value = body[field];
+      if (value === undefined) continue;
+      const clearsTeam = field === 'group_assignment' && value === null;
+      if (typeof value !== 'string' && !clearsTeam) {
+        const err = new Error(`${field} must be text.`);
+        err.code = 'VALIDATION_ERROR';
+        err.status = 400;
+        return next(err);
+      }
+      updates[field] = value;
     }
     
     // Get current student data before update

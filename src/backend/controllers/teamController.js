@@ -1,5 +1,39 @@
 const Team = require('../models/Team');
+const Student = require('../models/Student');
 const mongoose = require('mongoose');
+
+// A team request body is untrusted input: the URL's :course_id is checked by the
+// course ownership middleware, but nothing in the body is. Only the team name and
+// status are read (never course_id, members, counts or timestamps). Teams are created
+// empty: members are added with the add-student endpoint, which checks the course and
+// keeps Team.students and Student.team_id in step (CICD-45).
+const TEAM_STATUSES = Team.schema.path('team_status').enumValues;
+
+function validationError(message) {
+  const err = new Error(message);
+  err.code = 'VALIDATION_ERROR';
+  err.status = 400;
+  return err;
+}
+
+// Returns { fields } with the allowed, validated fields that were present, or { error }.
+function readTeamFields(input, { nameRequired }) {
+  const body = input && typeof input === 'object' && !Array.isArray(input) ? input : {};
+  const fields = {};
+  if (body.team_name !== undefined || nameRequired) {
+    if (typeof body.team_name !== 'string' || body.team_name.trim() === '') {
+      return { error: 'Team name is required.' };
+    }
+    fields.team_name = body.team_name.trim();
+  }
+  if (body.team_status !== undefined) {
+    if (!TEAM_STATUSES.includes(body.team_status)) {
+      return { error: `Team status must be one of: ${TEAM_STATUSES.join(', ')}.` };
+    }
+    fields.team_status = body.team_status;
+  }
+  return { fields };
+}
 
 exports.listTeams = async (req, res, next) => {
   try {
@@ -10,7 +44,11 @@ exports.listTeams = async (req, res, next) => {
       err.status = 400;
       return next(err);
     }
-    const teams = await Team.find({ course_id }).populate('students');
+    // Members are shown without their evaluation link tokens (and expiry).
+    const teams = await Team.find({ course_id }).populate({
+      path: 'students',
+      select: '-evaluation_token -evaluation_token_expires_at'
+    });
     res.status(200).json(teams);
   } catch (err) {
     err.code = err.code || 'SERVER_ERROR';
@@ -29,7 +67,21 @@ exports.createTeams = async (req, res, next) => {
       err.status = 400;
       return next(err);
     }
-    const created = await Team.insertMany(teams.map(t => ({ ...t, course_id })));
+
+    const docs = [];
+    for (const t of teams) {
+      const { fields, error } = readTeamFields(t, { nameRequired: true });
+      if (error) return next(validationError(error));
+      // A list of students here used to be saved as sent: it accepted students of
+      // other courses and wrote only Team.students, never Student.team_id.
+      const students = t.students;
+      if (students !== undefined && !(Array.isArray(students) && students.length === 0)) {
+        return next(validationError('Teams are created empty. Add students with POST /courses/:course_id/teams/:team_id/students/:student_id.'));
+      }
+      docs.push({ ...fields, course_id });
+    }
+
+    const created = await Team.insertMany(docs);
     
     // Update course team_count
     const Course = require('../models/Course');
@@ -48,7 +100,6 @@ exports.createTeams = async (req, res, next) => {
 exports.updateTeam = async (req, res, next) => {
   try {
     const { course_id, team_id } = req.params;
-    const updates = req.body;
     if (!mongoose.Types.ObjectId.isValid(team_id)) {
       const err = new Error('Invalid team ID.');
       err.code = 'VALIDATION_ERROR';
@@ -56,6 +107,9 @@ exports.updateTeam = async (req, res, next) => {
       return next(err);
     }
     
+    const { fields: updates, error: fieldError } = readTeamFields(req.body, { nameRequired: false });
+    if (fieldError) return next(validationError(fieldError));
+
     // Get the current team before updating
     const currentTeam = await Team.findOne({ _id: team_id, course_id });
     if (!currentTeam) {
@@ -69,7 +123,6 @@ exports.updateTeam = async (req, res, next) => {
     
     // If team name was updated, update all students' group_assignment field
     if (updates.team_name && updates.team_name !== currentTeam.team_name) {
-      const Student = require('../models/Student');
       await Student.updateMany(
         { team_id: team_id },
         { group_assignment: updates.team_name }
