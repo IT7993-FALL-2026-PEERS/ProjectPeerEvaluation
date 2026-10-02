@@ -3,7 +3,7 @@
 **Gantt task:** Technical Assessment — *"Review software architecture & technology stack"* (M1)
 **Milestone:** 1 — Assessment & Planning
 **Status:** Complete for review. Documents the API as it is on `main` (commit `11cfd3d`, 26 Sep 2026)
-**Updated:** 30 Sep 2026 for evaluation link expiry and log redaction (CICD-17): §1, §9, §11 and API-1 in §13; and for evaluation target checks (CICD-18): §11 and API-2 in §13; and for roster upload checks (CICD-19): §7 and API-3 in §13; and for team and student request bodies (CICD-45): §7, §8 and API-4 in §13; and for the team report lookup (CICD-51): §10
+**Updated:** 30 Sep 2026 for evaluation link expiry and log redaction (CICD-17): §1, §9, §11 and API-1 in §13; and for evaluation target checks (CICD-18): §11 and API-2 in §13; and for roster upload checks (CICD-19): §7 and API-3 in §13; and for team and student request bodies (CICD-45): §7, §8 and API-4 in §13; and for the team report lookup (CICD-51): §10; and for rate limiting (CICD-34): §1 and API-5 in §13
 **Related:** [system-architecture.md](system-architecture.md) ·
 [database-schema.md](database-schema.md) · [../csv-upload-format.md](../csv-upload-format.md)
 
@@ -72,6 +72,25 @@ takes the student's **university ID** string (for example `S0012345`).
 | 409 | `DUPLICATE` | Email or student ID already exists |
 | 410 | `EVALUATION_LINK_EXPIRED` | Student evaluation link has expired; the professor re-sends it |
 | 409 | `ALREADY_COMPLETED` | Student already submitted their evaluation |
+| 429 | `RATE_LIMITED` | Too many requests from this address; `details.retry_after_seconds` and the `Retry-After` header say how long to wait |
+
+**Rate limits** (per client IP address, kept in memory, so right for one server instance):
+
+| Route | Default limit | Counts |
+|---|---|---|
+| `POST /auth/login` | 10 per 15 minutes | failed attempts only; a successful login is free |
+| `POST /auth/register` | 10 per hour | every request |
+| `POST /auth/reset-password` | 5 per hour | every request (each one sends an email) |
+| `POST /auth/update-password` | 20 per hour, separate | every request; kept apart from the row above so a burst of reset requests from a shared address cannot stop someone using the link they were just sent |
+| `/evaluate/*` (student links) | 600 per 15 minutes | every request; generous because a class can share one campus address |
+| everything else under `/api` | 1000 per 15 minutes | every request; `/api/health` is never limited |
+
+The counts can be changed with `RATE_LIMIT_LOGIN_MAX`, `RATE_LIMIT_SIGNUP_MAX`, `RATE_LIMIT_RESET_MAX`,
+`RATE_LIMIT_UPDATE_MAX`, `RATE_LIMIT_EVALUATE_MAX` and `RATE_LIMIT_GENERAL_MAX` (whole numbers above 0; anything else keeps the
+default). The client address is read with `trust proxy` set to 1 (Render puts one proxy in front;
+`TRUST_PROXY` overrides it). The limits are per address, not per account, so one account can still be
+guessed at slowly from many addresses, many students behind one address share one count, and a victim's
+inbox can still be flooded with reset emails from many addresses.
 | 409 | `CONSTRAINT_ERROR` | Team still has students |
 | 500 | `SERVER_ERROR` | Unexpected failure (the message is the raw internal error) |
 | 501 | `NOT_IMPLEMENTED` | Endpoint exists but does nothing yet |
@@ -521,7 +540,7 @@ Found while writing this document. Defect IDs refer to the
 | API-2 | **Fixed (CICD-18).** `POST /evaluate/:token` did not check that each `student_id` is one of the evaluator's teammates, or that it appears only once | Submissions must now cover exactly the teammates the form lists, each once; anything else is a 400 and nothing is saved |
 | API-3 | Uploading a roster deletes every submitted evaluation in the course. **Partly fixed (CICD-19):** an empty or unusable file, or a database error while applying the roster, no longer deletes anything. A successful upload still does | Re-uploading a corrected roster mid-evaluation silently destroys student work; what a valid re-upload should do is a sponsor decision (CICD-39) |
 | API-4 | **Fixed (CICD-45).** `PUT .../students/:student_id`, `PUT .../teams/:team_id` and `POST .../teams` saved the request body as sent, and the team list returned each member's evaluation token | They now read only the editable fields, teams are created empty (members go through the add-student endpoint, which checks the course), and the team list omits tokens. The team report is now looked up within the course (CICD-51) |
-| API-5 | No rate limiting on `/auth/login`, `/auth/reset-password` or `/evaluate/*` | Password guessing and reset-email flooding are unthrottled |
+| API-5 | **Fixed (CICD-34).** There was no rate limiting on `/auth/login`, `/auth/reset-password` or `/evaluate/*` | Limits are now in place (see the table in §1) and the API has a general limit. Per-address only, in memory |
 | API-6 | 500 responses include the raw internal error message | Can leak database or library details |
 | API-7 | Sending invitations and reminders happens inside the HTTP request | About 16 students fit in the frontend's 3-minute timeout on staging's email pace |
 | API-8 | `remindEvaluations` builds its query with `_id` twice, so the second key replaces the first and `student_ids` is ignored | Latent: the frontend never sends `student_ids` today, but a client that does would email every student who hasn't submitted |
