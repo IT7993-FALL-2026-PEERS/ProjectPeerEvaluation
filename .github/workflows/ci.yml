@@ -46,14 +46,28 @@ jobs:
         run: npm run lint
 
       - name: Unit tests (Jest + React Testing Library)
-        run: npm test -- --watchAll=false
+        run: npm test -- --watchAll=false --coverage
         env:
           CI: true
+
+      # Fails when frontend coverage drops below the floors in coverage-floors.json and
+      # writes the numbers to the job summary. Floors only go up.
+      - name: Coverage gate (frontend)
+        run: node scripts/coverage-gate.js frontend
 
       - name: Build
         run: npm run build
         env:
           CI: true
+
+      - name: Upload frontend coverage report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-frontend
+          path: coverage/
+          retention-days: 30
+          if-no-files-found: ignore
 
   backend:
     name: Backend (install + syntax check)
@@ -86,9 +100,23 @@ jobs:
         run: find . -name node_modules -prune -o -name '*.js' -print0 | xargs -0 -n1 node --check
 
       # Runs every tests/**/*.test.js, so a new test file is picked up without
-      # touching this workflow.
-      - name: Backend tests (node:test)
-        run: npm test
+      # touching this workflow. Measures coverage over the source folders in the same run.
+      - name: Backend tests (node:test, with coverage)
+        run: npm run test:coverage
+
+      # Fails when backend coverage drops below the floors in coverage-floors.json and
+      # writes the numbers to the job summary. Floors only go up.
+      - name: Coverage gate (backend)
+        run: node ../../scripts/coverage-gate.js backend
+
+      - name: Upload backend coverage report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-backend
+          path: src/backend/coverage/
+          retention-days: 30
+          if-no-files-found: ignore
 
   e2e-smoke:
     name: E2E smoke (Playwright)
