@@ -12,6 +12,15 @@ function firstNonText(source, fields) {
   return fields.find((field) => values[field] !== undefined && values[field] !== null && typeof values[field] !== 'string');
 }
 
+// The value, if it is text, otherwise an empty string. Use it where a request value enters a
+// database filter or update: the handlers already answer 400 to a non-text value, so this is
+// the second layer, and an operator object can never become part of a query. It is a plain
+// typeof conditional on purpose: CodeQL recognises that as a type check, but not one that is
+// hidden inside another function such as firstNonText (which is why alerts stayed open).
+function asText(value) {
+  return typeof value === 'string' ? value : '';
+}
+
 function validationError(message) {
   const err = new Error(message);
   err.code = 'VALIDATION_ERROR';
@@ -25,4 +34,4 @@ function escapeRegex(text) {
   return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-module.exports = { firstNonText, validationError, escapeRegex };
+module.exports = { asText, firstNonText, validationError, escapeRegex };

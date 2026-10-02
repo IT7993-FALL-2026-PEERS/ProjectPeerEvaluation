@@ -4,7 +4,7 @@ const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 
 const { getConfig } = require('../config/env');
-const { firstNonText, validationError } = require('../utils/inputGuards');
+const { asText, firstNonText, validationError } = require('../utils/inputGuards');
 
 const JWT_SECRET = getConfig().jwtSecret;
 const JWT_EXPIRES_IN = '1h';
@@ -20,7 +20,7 @@ exports.login = async (req, res, next) => {
 			err.status = 400;
 			return next(err);
 		}
-		const professor = await Professor.findOne({ email });
+		const professor = await Professor.findOne({ email: asText(email) });
 		if (!professor) {
 			const err = new Error('Invalid email or password.');
 			err.code = 'AUTH_ERROR';
@@ -77,7 +77,7 @@ exports.register = async (req, res, next) => {
 			err.status = 400;
 			return next(err);
 		}
-		const existing = await Professor.findOne({ email });
+		const existing = await Professor.findOne({ email: asText(email) });
 		if (existing) {
 			const err = new Error('Email already registered.');
 			err.code = 'DUPLICATE';
@@ -130,7 +130,7 @@ exports.resetPassword = async (req, res, next) => {
 			err.status = 400;
 			return next(err);
 		}
-		const professor = await Professor.findOne({ email });
+		const professor = await Professor.findOne({ email: asText(email) });
 		if (!professor) {
 			// For security, do not reveal if email is not registered
 			return res.status(200).json({ message: 'If the email is registered, a reset link will be sent.' });
@@ -162,7 +162,7 @@ exports.updatePassword = async (req, res, next) => {
 			err.status = 400;
 			return next(err);
 		}
-		const professor = await Professor.findOne({ securityToken: token });
+		const professor = await Professor.findOne({ securityToken: asText(token) });
 		if (!professor || !professor.securityTokenExpires || professor.securityTokenExpires < Date.now()) {
 			const err = new Error('Invalid or expired token.');
 			err.code = 'TOKEN_ERROR';

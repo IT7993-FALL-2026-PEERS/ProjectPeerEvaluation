@@ -1,6 +1,6 @@
 const Course = require('../models/Course');
 const mongoose = require('mongoose');
-const { firstNonText, validationError, escapeRegex } = require('../utils/inputGuards');
+const { asText, firstNonText, validationError, escapeRegex } = require('../utils/inputGuards');
 
 // A course search is a plain substring search; this keeps the pattern short.
 const MAX_SEARCH_LENGTH = 100;
@@ -19,30 +19,30 @@ exports.listCourses = async (req, res, next) => {
 		const nonText = firstNonText(req.query, ['course_name', 'course_number', 'course_section', 'semester', 'course_status']);
 		if (nonText) return next(validationError(`${nonText} must be text.`));
 
-		const tooLong = ['course_name', 'course_number', 'course_section', 'semester'].find((f) => (req.query[f] || '').length > MAX_SEARCH_LENGTH);
+		const tooLong = ['course_name', 'course_number', 'course_section', 'semester'].find((f) => asText(req.query[f]).length > MAX_SEARCH_LENGTH);
 		if (tooLong) return next(validationError(`${tooLong} must be at most ${MAX_SEARCH_LENGTH} characters.`));
 
 		// Build search filter
 		const filter = { professor_id: req.user.id };
 		
 		if (course_name) {
-			filter.course_name = { $regex: escapeRegex(course_name), $options: 'i' };
+			filter.course_name = { $regex: escapeRegex(asText(course_name)), $options: 'i' };
 		}
 		if (course_number) {
 			// Search both new course_number field and old course_code field
 			filter.$or = [
-				{ course_number: { $regex: escapeRegex(course_number), $options: 'i' } },
-				{ course_code: { $regex: escapeRegex(course_number), $options: 'i' } }
+				{ course_number: { $regex: escapeRegex(asText(course_number)), $options: 'i' } },
+				{ course_code: { $regex: escapeRegex(asText(course_number)), $options: 'i' } }
 			];
 		}
 		if (course_section) {
-			filter.course_section = { $regex: escapeRegex(course_section), $options: 'i' };
+			filter.course_section = { $regex: escapeRegex(asText(course_section)), $options: 'i' };
 		}
 		if (semester) {
-			filter.semester = { $regex: escapeRegex(semester), $options: 'i' };
+			filter.semester = { $regex: escapeRegex(asText(semester)), $options: 'i' };
 		}
 		if (course_status) {
-			filter.course_status = course_status;
+			filter.course_status = asText(course_status);
 		}
 
 		let courses = await Course.find(filter);
@@ -100,10 +100,10 @@ exports.createCourse = async (req, res, next) => {
 			}
 			// Check for inactive course with same details
 			let course = await Course.findOne({
-				course_name,
-				course_number,
-				course_section,
-				semester,
+				course_name: asText(course_name),
+				course_number: asText(course_number),
+				course_section: asText(course_section),
+				semester: asText(semester),
 				professor_id: req.user.id,
 				course_status: 'Inactive'
 			});

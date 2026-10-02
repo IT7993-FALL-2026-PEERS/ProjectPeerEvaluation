@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 const Student = require('../models/Student');
 const csv = require('csv-parser');
 const fs = require('fs');
-const { firstNonText, validationError } = require('../utils/inputGuards');
+const { asText, firstNonText, validationError } = require('../utils/inputGuards');
 
 // Manual add student to course
 exports.addStudent = async (req, res, next) => {
@@ -24,7 +24,7 @@ exports.addStudent = async (req, res, next) => {
       return next(err);
     }
     // Check for duplicate student_id in this course
-    const existing = await Student.findOne({ course_id, student_id });
+    const existing = await Student.findOne({ course_id, student_id: asText(student_id) });
     if (existing) {
       const err = new Error('Student with this ID already exists in this course.');
       err.code = 'DUPLICATE';
@@ -149,7 +149,7 @@ exports.updateStudent = async (req, res, next) => {
         err.status = 400;
         return next(err);
       }
-      updates[field] = value;
+      updates[field] = clearsTeam ? null : asText(value);
     }
     
     // Look the student up by ObjectIds, never by the raw request values
