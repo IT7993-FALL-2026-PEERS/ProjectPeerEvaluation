@@ -39,6 +39,16 @@
     ]
   },
   "jest": {
+    "collectCoverageFrom": [
+      "src/frontend/**/*.{js,jsx}",
+      "!src/frontend/**/__tests__/**",
+      "!src/frontend/index.js"
+    ],
+    "coverageReporters": [
+      "json-summary",
+      "lcov",
+      "text-summary"
+    ],
     "testMatch": [
       "<rootDir>/src/frontend/**/__tests__/**/*.{js,jsx}",
       "<rootDir>/src/frontend/**/*.{spec,test}.{js,jsx}"

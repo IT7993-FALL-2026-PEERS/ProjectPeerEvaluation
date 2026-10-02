@@ -138,7 +138,7 @@ The quality gate is enforced today. Production approval is manual.
 |---|---|---|---|
 | Install dependencies and build | `npm ci` and the production build | M1 / M4 | Live (`.github/workflows/ci.yml`) |
 | Workflow lint | `actionlint` checks the workflow files themselves | M1 / M4 | Live |
-| Unit tests | Jest and React Testing Library for the frontend; Node's built-in test runner (`node:test`) for the backend | M4 / M5 | Live for both in CI on every pull request. Coverage still growing, weeks of 5–12 Oct |
+| Unit tests | Jest and React Testing Library for the frontend; Node's built-in test runner (`node:test`) for the backend | M4 / M5 | Live for both in CI on every pull request. Coverage is measured on every pull request and gated by floors just below today's baseline (`coverage-floors.json`; backend about 64% of lines, frontend about 8%), and the floors only go up. Coverage still growing, weeks of 5–12 Oct |
 | Integration tests | Frontend, backend, database, authentication, and email, against a real MongoDB and an isolated email transport (never real student inboxes) | M4 / M5 | Planned, weeks of 12–19 Oct |
 | Functional regression tests | One automated test per critical business workflow | M5 | Planned, week of 19 Oct |
 | End-to-end tests | Playwright: student and instructor workflows | M4 / M5 | Smoke test live. Workflows planned, week of 26 Oct |
@@ -337,10 +337,10 @@ Node 24 (see `.nvmrc`) and run:
 ```bash
 npm ci
 npm run lint
-npm test -- --watchAll=false
+npm test -- --watchAll=false --coverage && node scripts/coverage-gate.js frontend
 npm run build
 npm run test:e2e
-cd src/backend && npm run lint && npm test
+cd src/backend && npm run lint && npm run test:coverage && node ../../scripts/coverage-gate.js backend
 ```
 
 Commit `package.json` and `package-lock.json` together. `npm ci` fails if they are out of sync.

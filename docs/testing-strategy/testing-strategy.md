@@ -205,6 +205,35 @@ The sequence:
 So the enforced minimum on day one is whatever step 1 measures, minus a small margin. 70%
 is where we are heading, and neither number is meaningful until the baseline exists.
 
+**Where it stands (2 Oct 2026, backlog CICD-20).** Every pull request now measures coverage
+in the Frontend and Backend CI jobs, writes a table to the job summary, keeps the report as
+an artifact (30 days), and fails if a number drops below its floor. The baseline and the
+opening floors:
+
+| | Lines | Branches | Functions |
+|---|---|---|---|
+| Backend baseline | 64.32% | 78.79% | 68.60% |
+| Backend floor | 63% | 77% | 67% |
+| Frontend baseline | 8.38% | 7.06% | 8.81% |
+| Frontend floor | 7% | 6% | 7% |
+
+- **What is measured:** the backend's `controllers`, `middleware`, `models`, `routes`, `utils`
+  and `config` folders plus `index.js`; the frontend's `src/frontend` source, excluding tests and
+  `index.js`. Tests, seed scripts and migrations are not counted. Source files that no test loads
+  still count, as 0%: the backend uses `c8 --all` for this (Node's built-in coverage only sees
+  files a test imports, so an untested new controller would not have lowered it; checked with a
+  probe file), and Jest's `collectCoverageFrom` does the same for the frontend. A new folder of
+  backend source has to be added to the `--include` list in `src/backend/package.json`.
+- **Floors live in `coverage-floors.json`** and are checked by `scripts/coverage-gate.js`
+  (a missing or unreadable report fails the gate, so a broken run cannot pass).
+- **Ratchet rule:** floors only go up. When the job summary says a metric is 5 or more points
+  above its floor, raise the floor in the same pull request. Never lower a floor to make a
+  build pass; add tests instead.
+- **Run it locally:** `npm test -- --watchAll=false --coverage && node scripts/coverage-gate.js frontend`,
+  and `cd src/backend && npm run test:coverage && node ../../scripts/coverage-gate.js backend`.
+- **The gap is on the frontend** (about 8%): `CourseManagement.js` alone is 2,687 lines and has to
+  be split before it can be tested meaningfully (see §8). The backend is already near the target.
+
 Coverage is a floor, not a goal. A suite at 90% that never asserts the acceptance criteria in
 `requirements.md` is worth less than one at 60% that does. The RTM, not the coverage number,
 is the measure of whether requirements are actually proven.
