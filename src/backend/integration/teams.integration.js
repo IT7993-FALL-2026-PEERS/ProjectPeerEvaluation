@@ -139,3 +139,11 @@ test('TC-08-33: a roster upload with teams leaves every course consistent', asyn
   assert.equal(res.status, 200);
   await assertCourseConsistent(IDS.courseAda);
 });
+
+test('TC-08-34: the API takes { teams: [...] } and refuses a bare array, which the Create Team dialog used to send (CICD-52)', async () => {
+  const bare = await app.request('POST', teams(), { token: ada, body: [{ team_name: 'Gamma' }] });
+  assert.equal(bare.status, 400);
+  const wrapped = await app.request('POST', teams(), { token: ada, body: { teams: [{ team_name: 'Gamma', team_status: 'Active' }] } });
+  assert.equal(wrapped.status, 201);
+  await assertCourseConsistent(IDS.courseAda);
+});
