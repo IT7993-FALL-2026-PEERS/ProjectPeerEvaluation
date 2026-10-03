@@ -2,9 +2,9 @@
 
 Productionization, Automated Testing, and CI/CD for the PEERS Peer Evaluation System
 
-Last updated: 09/30/2026
+Last updated: 10/02/2026
 Status: Milestone 1 (Assessment & Planning) signed off by the sponsor on 28 Sep 2026 · Milestone 2
-(Quality Automation) starts 5 Oct
+(Quality Automation) starts 5 Oct, and most of its test automation and CI gates already run
 
 A web-based platform for professors to manage peer evaluations in team-based courses: create and
 manage student rosters, assign students to courses/teams, trigger email invitations, and receive
@@ -42,9 +42,9 @@ etc.) are not used for this project even though `DEPLOYMENT_GUIDE.md` documents 
 historical alternatives. Continuous Integration runs on every pull request (see
 [CI/CD Pipeline](#cicd-pipeline)). A staging environment is live on Render, defined in `render.yaml`:
 once CI passes on `main`, Render deploys the frontend and backend automatically. Staging uses
-MongoDB Atlas and a Mailtrap test inbox, so no real student ever receives an email from it. A
-CI-driven deploy step with smoke tests comes in Milestone 3, and production deployment always
-stays a manual sponsor approval.
+MongoDB Atlas and a Mailtrap test inbox, so no real student ever receives an email from it. To keep
+costs down, staging is switched off between checks and demos. A CI-driven deploy step with smoke
+tests comes in Milestone 3, and production deployment always stays a manual sponsor approval.
 
 ---
 
@@ -66,20 +66,21 @@ flowchart TB
             direction TB
             BUILD_APP["Install dependencies<br/>and build"]
             LINT["Static analysis<br/>ESLint"]
-            SEC["Dependency validation<br/>and security scan<br/>Dependabot, OWASP"]
+            SEC["Dependency validation<br/>and security scan<br/>Dependabot, OWASP, CodeQL"]
+            DOCKER["Container build check<br/>Docker Compose smoke test"]
         end
         subgraph TESTS["Automated tests"]
             direction TB
             UNIT["Unit tests<br/>Jest (frontend)<br/>node:test (backend)"]
             INTEG["Integration tests<br/>real MongoDB"]
-            REG["Functional regression<br/>tests"]
+            REG["Functional regression<br/>tests (12 critical workflows)"]
             E2E["End-to-end tests<br/>Playwright"]
         end
     end
 
     PR --> CI
     CI --> REPORT["Test report<br/>results, duration, coverage"]
-    REPORT --> GATE{"Quality gate<br/>all required checks pass"}
+    REPORT --> GATE{"Quality gate<br/>all 8 required checks pass"}
     GATE -- "Fail" --> FIX["Fix and push again"]
     FIX --> PR
     GATE -- "Pass" --> MERGE["Merge to main"]
@@ -106,9 +107,9 @@ flowchart TB
     classDef endpoint fill:#dbeafe,stroke:#2563eb,color:#1e3a8a,stroke-width:3px
     linkStyle default stroke-width:2px
 
-    class BUILD_APP,LINT done
-    class UNIT,E2E,SEC,STG,HEALTH partial
-    class INTEG,REG,REPORT,ARTIFACTS,SMOKE,RC,DREPORT planned
+    class BUILD_APP,LINT,SEC,DOCKER,UNIT,INTEG,REG,E2E done
+    class REPORT,ARTIFACTS,STG,HEALTH partial
+    class SMOKE,RC,DREPORT planned
     class GATE,APPROVE gate
     class DEV,PROD,PR,MERGE,FIX endpoint
 ```
@@ -138,16 +139,17 @@ The quality gate is enforced today. Production approval is manual.
 |---|---|---|---|
 | Install dependencies and build | `npm ci` and the production build | M1 / M4 | Live (`.github/workflows/ci.yml`) |
 | Workflow lint | `actionlint` checks the workflow files themselves | M1 / M4 | Live |
-| Unit tests | Jest and React Testing Library for the frontend; Node's built-in test runner (`node:test`) for the backend | M4 / M5 | Live for both in CI on every pull request. Coverage is measured on every pull request and gated by floors just below today's baseline ( + "coverage-floors.json" + ; backend about 64% of lines, frontend about 8%), and the floors only go up. Coverage still growing, weeks of 5–12 Oct |
-| Integration tests | Frontend, backend, database, authentication, and email, against a real MongoDB and an isolated email transport (never real student inboxes) | M4 / M5 | Planned, weeks of 12–19 Oct |
-| Functional regression tests | One automated test per critical business workflow | M5 | Planned, week of 19 Oct |
-| End-to-end tests | Playwright: student and instructor workflows | M4 / M5 | Smoke test live. Workflows planned, week of 26 Oct |
+| Unit tests | Jest and React Testing Library for the frontend (51 tests); Node's built-in test runner (`node:test`) for the backend (290 tests) | M4 / M5 | Live for both in CI on every pull request. Coverage is measured on every pull request and gated by floors just below today's baseline (`coverage-floors.json`; backend about 66% of lines, frontend about 9%), and the floors only go up. The team's target is 70%; the frontend is far from it |
+| Integration tests | Backend, database, authentication, and email, against a real MongoDB that the tests start themselves and an isolated email transport (never real student inboxes) | M4 / M5 | Live: 131 tests, required job `Integration (real MongoDB)` |
+| Functional regression tests | At least one automated test per critical business workflow | M5 | Live: all twelve critical workflows (CW-01 to CW-12) are covered, see [`docs/requirements/critical-workflows.md`](docs/requirements/critical-workflows.md) |
+| End-to-end tests | Playwright drives the real app in a browser: student and instructor workflows, on a throwaway database with email captured, never sent | M4 / M5 | Live: 16 tests, required job `E2E smoke (Playwright)` |
 | Static analysis | ESLint: frontend (`npm run lint`) and backend (`cd src/backend && npm run lint`) | M1 / M4 | Live |
-| Dependency validation and security scan | Dependabot, OWASP Dependency Check, CodeQL code scanning, secret scanning | M3 | Partly live, report-only: Dependabot raises alerts and opens weekly update pull requests (`.github/dependabot.yml`); OWASP Dependency-Check runs on every pull request, on `main`, and weekly (`.github/workflows/security.yml`); CodeQL (GitHub default setup) scans the code on every pull request; secret scanning and push protection are on. OWASP Dependency-Check now fails on any finding with CVSS 7 or higher that is not an accepted risk (`.github/dependency-check-suppressions.xml`, each entry with an expiry date); the policy, the triage and the 10 accepted react-scripts build-tool findings are in [`docs/security/security-policy.md`](docs/security/security-policy.md). Making the security checks required in the `main` ruleset is the last step, with the team leader's approval |
-| Test report | Executed, passed, and failed tests, duration, and coverage | M4 | Planned, week of 16 Nov |
-| Quality gate | `main-protection` ruleset: a pull request, passing required checks and an up-to-date branch before merge. No approval required, so authors merge their own pull requests. No bypass, and direct pushes are rejected | M1 | Live. Required checks grow as jobs are added, week of 26 Oct |
-| Build artifacts and Docker images | Build the deployment artifacts and the frontend and backend images for the exact commit that passed CI | M2 | Planned, week of 2 Nov |
-| Staging deploy | Automatic deploy to Render.com staging | M2 | Partly live: Render deploys `main` after CI passes (`render.yaml`). CI-driven deploy of the tested commit planned, week of 9 Nov |
+| Container build check | `docker compose up --build --wait` builds the frontend and backend images and starts them with MongoDB, then checks the stack is healthy | M2 | Live, required job `Containers (build + compose smoke)` |
+| Dependency validation and security scan | Dependabot, OWASP Dependency Check, CodeQL code scanning, secret scanning | M3 | Live and blocking: OWASP Dependency-Check runs on every pull request, on `main`, and weekly (`.github/workflows/security.yml`) and fails on any finding with CVSS 7 or higher that is not an accepted risk (`.github/dependency-check-suppressions.xml`, each entry with an expiry date); CodeQL (GitHub default setup) scans the code on every pull request. Both are required checks. Dependabot opens weekly update pull requests (`.github/dependabot.yml`); its alerts, all in `react-scripts` build tooling, are triaged and dismissed as accepted risk. Secret scanning and push protection are on. The policy, the triage and the 10 accepted findings are in [`docs/security/security-policy.md`](docs/security/security-policy.md) |
+| Test report | Executed, passed, and failed tests, duration, and coverage | M4 | Partly live: every run keeps the coverage and Playwright reports as downloadable artifacts. A combined summary is planned, week of 16 Nov |
+| Quality gate | `main-protection` ruleset: a pull request, eight passing required checks and an up-to-date branch before merge. No approval required, so authors merge their own pull requests. No bypass, and direct pushes are rejected | M1 | Live. More checks are added as jobs are added |
+| Build artifacts and Docker images | Build the deployment artifacts and the frontend and backend images for the exact commit that passed CI | M2 | Partly live: the container check builds both images on every pull request. Publishing version-tagged images for the tested commit is planned, week of 2 Nov |
+| Staging deploy | Automatic deploy to Render.com staging | M2 | Partly live: Render deploys `main` after CI passes (`render.yaml`); staging is switched off between checks and demos. CI-driven deploy of the tested commit planned, week of 9 Nov |
 | Smoke tests | Verify the deployment after each release | M5 | Planned, week of 9 Nov |
 | Deployment health check | Poll `/api/health` after deploy | M1 | Partly live: Render checks `/api/health` before switching traffic to a new deploy, and the endpoint reports the deployed commit. CI polling after deploy planned, week of 16 Nov |
 | Release candidate | Produce a release candidate after staging passes | M1 | Planned, week of 16 Nov |
@@ -169,17 +171,18 @@ flowchart TB
         direction TB
         WF02["WF02 Test setup<br/>isolated DB + fixtures"]
         WF03["★ WF03 Install deps + static checks (ESLint)"]
-        UNIT["Unit tests<br/>frontend + backend live · coverage growing"]
-        INTEG["Integration tests"]
-        REG["Functional regression tests"]
+        UNIT["Unit tests<br/>frontend + backend · coverage floors"]
+        INTEG["Integration tests<br/>real MongoDB"]
+        REG["Functional regression tests<br/>12 critical workflows"]
         BUILD["Build"]
-        E2E["End-to-end tests<br/>smoke live · workflows planned"]
-        WF05["WF05 Dependency & security scan<br/>report-only live · gate planned"]
-        WF06["WF06 Publish results<br/>Playwright reports live · full coverage planned"]
-        WF02 --> WF03 --> UNIT --> INTEG --> REG --> BUILD --> E2E --> WF05 --> WF06
+        CONT["Container build check<br/>Docker Compose smoke test"]
+        E2E["End-to-end tests<br/>Playwright workflows"]
+        WF05["WF05 Dependency & security scan<br/>OWASP + CodeQL, blocking"]
+        WF06["WF06 Publish results<br/>coverage + Playwright reports live · combined summary planned"]
+        WF02 --> WF03 --> UNIT --> INTEG --> REG --> BUILD --> CONT --> E2E --> WF05 --> WF06
     end
 
-    WF06 --> GATE{"WF04 Quality gate<br/>all required checks pass"}
+    WF06 --> GATE{"WF04 Quality gate<br/>all 8 required checks pass"}
     GATE -- "Fail: merge blocked" --> FIX["Fix and push again"]
     FIX --> PR
     GATE -- "Pass" --> MERGE["Qualifying merge to main"]
@@ -187,7 +190,7 @@ flowchart TB
 
     subgraph CD["CONTINUOUS DELIVERY · runs after merge to main"]
         direction TB
-        WF07["WF07 Build artifacts and version images"]
+        WF07["WF07 Build artifacts and version images<br/>images built in CI today · publishing planned"]
         WF08["WF08 Deploy to staging · readiness check · smoke tests"]
         WF09{"WF09 Deploy or smoke test failed?"}
         BLOCK["Block promotion · follow recovery procedure"]
@@ -209,15 +212,15 @@ flowchart TB
     classDef gate fill:#fef3c7,stroke:#d97706,color:#78350f,stroke-width:3px
     classDef endpoint fill:#dbeafe,stroke:#2563eb,color:#1e3a8a,stroke-width:3px
 
-    class BUILD done
+    class WF01,WF02,BUILD,CONT,UNIT,INTEG,REG,E2E,WF05 done
     class WF03 highlight
-    class UNIT,E2E,WF05,WF06 partial
-    class WF01,WF02,INTEG,REG,WF07,WF08,WF09,BLOCK,WF10,WF11 planned
+    class WF06,WF07 partial
+    class WF08,WF09,BLOCK,WF10,WF11 planned
     class GATE,APPROVE,WF09 gate
     class DEV,PROD,PR,MERGE,FIX endpoint
 ```
 
-★ = the most recently completed stage.
+★ = the stage shown in the close-up below.
 
 #### WF03 close-up
 
@@ -225,13 +228,14 @@ flowchart TB
 flowchart TB
     PR(["Pull request opened"]) --> WF03["★ WF03<br/>Install dependencies + static checks"]
 
-    subgraph WF03BOX["WF03 · install runs in all three CI jobs; lint runs in the frontend and backend jobs"]
+    subgraph WF03BOX["WF03 · install runs in four CI jobs; lint runs in the frontend and backend jobs"]
         direction TB
         subgraph INSTALL["Install dependencies · npm ci"]
             direction LR
             FE["Frontend job"]
             BE["Backend job"]
             E2E["E2E job"]
+            INT["Integration job"]
         end
         LINT["Lint · npm run lint<br/>its own CI step, frontend and backend jobs"]
         FE --> LINT
@@ -245,7 +249,7 @@ flowchart TB
     classDef highlight fill:#dcfce7,stroke:#b45309,color:#14532d,stroke-width:5px
     classDef endpoint fill:#dbeafe,stroke:#2563eb,color:#1e3a8a,stroke-width:3px
 
-    class FE,BE,E2E,LINT done
+    class FE,BE,E2E,INT,LINT done
     class PR,NEXT endpoint
     class WF03 highlight
 ```
@@ -265,6 +269,8 @@ deliverables signed off by the sponsor)
 - Development environment finalized, containerization completed
 - Unit, integration, functional regression, and end-to-end tests implemented
 - Continuous Integration pipeline operational with automated quality gates
+- Status on 2 Oct: containerization, unit, integration, regression and end-to-end tests and the
+  blocking CI gates already run on every pull request; staging checks and reporting remain
 
 📅 **Milestone 3 — Productionization** — 02 Nov – 06 Dec 2026 (review 30 Nov, final 06 Dec)
 - Continuous Delivery pipeline, automated staging deployment, smoke testing
@@ -348,18 +354,20 @@ The step-by-step version follows.
 - `npm run start:backend` / `npm run start:frontend` — start one side only
 - `npm test` — frontend unit tests (Jest + React Testing Library)
 - `npm run build` then `E2E_START_SERVER=1 npm run test:e2e` — end-to-end tests (Playwright) against the real app on a throwaway database; without `E2E_START_SERVER` only the install check runs
-- `cd src/backend && npm test` — backend unit tests (`node:test`)
+- `cd src/backend && npm test` — backend unit tests (`node:test`); `npm run test:coverage` adds the coverage report
 - `cd src/backend && npm run test:integration` — backend integration tests against a real MongoDB that the tests start themselves (no Docker needed; the first run downloads the MongoDB binary)
 
 ### Continuous Integration
 
 GitHub Actions (`.github/workflows/ci.yml`) runs on every pull request to `main` and on every push
-to `main`. It has four jobs: frontend lint, tests and build; backend lint, a syntax check and tests; the
-Playwright smoke test; and a lint of the workflow files (`actionlint`). Two more scans run on every
-pull request but do not block merging yet: the OWASP Dependency-Check scan
-(`.github/workflows/security.yml`) and GitHub's CodeQL code scanning (default setup, no workflow
-file), so a pull request normally shows eight checks. The `main` branch ruleset requires a pull request, the
-four CI checks, and a branch that is up to date with `main`. To reproduce the checks locally, use
+to `main`, on `ubuntu-24.04` runners. It has six jobs: frontend lint, tests and build; backend lint,
+a syntax check and unit tests; integration tests against a real MongoDB; the Playwright end-to-end
+tests; a Docker Compose build and smoke check; and a lint of the workflow files (`actionlint`). Two
+more scans run on every pull request: the OWASP Dependency-Check scan (`.github/workflows/security.yml`)
+and GitHub's CodeQL code scanning (default setup, no workflow file). A pull request shows ten
+entries in its checks list, and eight of them are required: the six jobs above, OWASP
+Dependency-Check and CodeQL. The `main` branch ruleset requires a pull request, those eight checks,
+and a branch that is up to date with `main`. To reproduce the checks locally, use
 Node 24 (see `.nvmrc`) and run:
 
 ```bash
@@ -367,8 +375,9 @@ npm ci
 npm run lint
 npm test -- --watchAll=false --coverage && node scripts/coverage-gate.js frontend
 npm run build
-npm run test:e2e
+E2E_START_SERVER=1 npm run test:e2e
 cd src/backend && npm run lint && npm run test:coverage && node ../../scripts/coverage-gate.js backend
+cd src/backend && npm run test:integration
 ```
 
 Commit `package.json` and `package-lock.json` together. `npm ci` fails if they are out of sync.
@@ -428,21 +437,24 @@ Primary contact for inquiries: Team Leader (Khoa Ho).
 .github/
   workflows/             # ci.yml (CI), security.yml (OWASP Dependency-Check)
   dependabot.yml         # weekly dependency update pull requests
+  dependency-check-suppressions.xml  # accepted OWASP findings, each with an expiry date
   CODEOWNERS             # reviewers requested automatically
   pull_request_template.md
 .nvmrc                   # pinned Node version (24)
 render.yaml              # Render staging services (Blueprint)
 playwright.config.js
+coverage-floors.json      # coverage floors that CI enforces (they only go up)
 package.json             # frontend dependencies and root scripts (setup, dev, test, lint)
 src/
   frontend/              # React 19 (Create React App)
-  backend/               # Express + MongoDB (Mongoose); own package.json and tests/
-e2e/                     # Playwright end-to-end tests
+  backend/               # Express + MongoDB (Mongoose); own package.json, tests/ (unit) and integration/
+e2e/                     # Playwright end-to-end tests and the throwaway servers they run against
 docs/
   requirements/          # requirements, critical workflows, traceability matrix (RTM)
   architecture/          # system architecture, API and database documentation
   testing-strategy/      # team testing strategy, frontend testing strategy
   technical-assessment/  # Milestone 1 technical assessment and reviews
+  security/              # security policy: accepted risks and triage
   milestones/            # milestone progress reports
   meeting-notes/         # sponsor meeting decisions
   research-report/       # tech stack analysis
@@ -455,7 +467,7 @@ Dockerfile.frontend      # CRA build -> nginx
 docker/nginx.conf        # SPA fallback for the frontend image
 src/backend/Dockerfile   # backend image (non-root)
 .env.example             # Docker Compose settings (src/backend/.env.example is for npm run dev)
-scripts/                 # setup.js (npm run setup), setup.sh, verify-env.sh
+scripts/                 # setup.js (npm run setup), setup.sh, verify-env.sh, coverage-gate.js
 ```
 
 ---
@@ -464,11 +476,12 @@ scripts/                 # setup.js (npm run setup), setup.sh, verify-env.sh
 
 - **Frontend**: React 19, Create React App, MUI, React Router, Axios
 - **Backend**: Node.js, Express, MongoDB via Mongoose, JWT auth, Nodemailer
-- **Testing**: Jest + React Testing Library (frontend unit), `node:test` (backend unit),
-  Playwright (end-to-end)
-- **CI/CD**: GitHub Actions (CI is live); Render.com staging deploys automatically after CI passes;
-  a CI-driven delivery pipeline with smoke tests is planned for Milestone 3
-- **Security scanning**: Dependabot, OWASP Dependency-Check, CodeQL, secret scanning
+- **Testing**: Jest + React Testing Library (frontend unit), `node:test` (backend unit and
+  integration, against a real MongoDB started by `mongodb-memory-server`), Playwright (end-to-end)
+- **CI/CD**: GitHub Actions (CI is live, eight required checks); Render.com staging deploys
+  automatically after CI passes; a CI-driven delivery pipeline with smoke tests is planned for
+  Milestone 3
+- **Security scanning**: Dependabot, OWASP Dependency-Check and CodeQL (both blocking), secret scanning
 - **Containerization**: Docker / Docker Compose (local dev and CI; deployment stays on Render,
   see `docs/docker-setup.md`)
 
@@ -488,7 +501,7 @@ scripts/                 # setup.js (npm run setup), setup.sh, verify-env.sh
 - Never push directly to `main`. Use a feature branch and open a pull request into `main`
 - Fill in the pull request template: what changed, the linked issue or Gantt task, and how it
   was tested
-- All four CI checks must pass and the branch must be up to date with `main` before a pull
+- All eight required checks must pass and the branch must be up to date with `main` before a pull
   request can be merged (see [Continuous Integration](#continuous-integration))
 - CODEOWNERS requests a review automatically; an approval is not required, so authors merge
   their own pull requests once the checks pass
