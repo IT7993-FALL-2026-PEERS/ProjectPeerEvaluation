@@ -98,6 +98,19 @@ test('E2E-07: the report shows the class totals and each student\'s score, and d
     page.getByRole('button', { name: 'Download CSV' }).click(),
   ]);
   expect(download.suggestedFilename()).toMatch(/report\.csv$/);
+
+  // The file name is set by the page, so check what is inside: the header and one row per student,
+  // with the same scores the screen shows (the arithmetic is written out in the integration tests).
+  const chunks = [];
+  for await (const chunk of await download.createReadStream()) chunks.push(chunk);
+  const lines = Buffer.concat(chunks).toString('utf8').trim().split(/\r?\n/);
+  expect(lines[0]).toBe('Student ID,Name,Email,Team,Original Score,Final Score,Letter Grade,Evaluations Received,Improvement');
+  expect(lines.slice(1).sort()).toEqual([
+    '1001,Ann Archer,ann@example.edu,Alpha,100,100,A,1,0',
+    '1002,Ben Baker,ben@example.edu,Alpha,79.17,79.17,C,1,0',
+    '1003,Cy Cole,cy@example.edu,Beta,90,90,A,1,0',
+    '1004,Di Diaz,di@example.edu,Beta,58.33,58.33,F,1,0',
+  ]);
 });
 
 // The team list used to keep showing the old teams after a create, edit or delete, because the

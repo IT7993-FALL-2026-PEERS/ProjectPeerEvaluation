@@ -38,7 +38,9 @@ module.exports = defineConfig({
     ? [
         {
           command: 'node e2e/server/backend.js',
-          url: 'http://localhost:5000/api/health',
+          // The control server answers only for the E2E backend, so a backend someone already runs on
+          // port 5000 is not reused; backend.js refuses to start while that port is taken.
+          url: `${process.env.E2E_CONTROL_URL || 'http://127.0.0.1:5051'}/health`,
           reuseExistingServer: !isCI,
           timeout: 300000, // the first run downloads MongoDB
           stdout: 'pipe',

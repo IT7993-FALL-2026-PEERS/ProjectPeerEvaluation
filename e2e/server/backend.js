@@ -10,10 +10,13 @@
 //   POST   /reset    empties the database, seeds it again, clears the captured email;
 //                    /reset?evaluations=1 also adds the fixed set of submitted evaluations
 //   GET    /emails   the captured emails, oldest first: [{ to, subject, html }]
+//   GET    /health   { e2e: true }: Playwright waits for this, so an ordinary backend that happens to
+//                    be running on the API port is never mistaken for this one
 //
 // The MongoDB binary is downloaded on first use (see the integration tests' notes); set
 // MONGOMS_VERSION to use one you already have.
 const http = require('node:http');
+const net = require('node:net');
 const path = require('node:path');
 const { createRequire } = require('node:module');
 
@@ -37,6 +40,21 @@ Object.assign(process.env, {
   RATE_LIMIT_SIGNUP_MAX: '10000',
 });
 
+// The tests must talk to this backend and its throwaway database, never to a developer's own backend
+// (which may point at a real database and a real mail account). If something already listens on the
+// API port, stop here instead of letting the browser reach it.
+function assertPortFree(port) {
+  return new Promise((resolve, reject) => {
+    const probe = net.createServer();
+    probe.once('error', () => reject(new Error(
+      `Port ${port} is already in use by another server, so the E2E backend cannot start. ` +
+      'Stop that server (for example your local backend) and run the tests again.'
+    )));
+    probe.once('listening', () => probe.close(() => resolve()));
+    probe.listen(port);
+  });
+}
+
 // Capture email before anything loads emailUtils.
 const nodemailer = fromBackend('nodemailer');
 const sentEmails = [];
@@ -53,6 +71,7 @@ nodemailer.createTransport = () => {
 };
 
 async function main() {
+  await assertPortFree(API_PORT);
   const { MongoMemoryReplSet } = fromBackend('mongodb-memory-server');
   const mongoose = fromBackend('mongoose');
   // The models, the database helpers and the seed come from the integration tests.
@@ -86,6 +105,7 @@ async function main() {
         return json(200, { passwords: PASSWORDS, professor: 'ada@example.edu', course: 'CS 4850' });
       }
       if (req.method === 'GET' && req.url === '/emails') return json(200, sentEmails);
+      if (req.method === 'GET' && req.url === '/health') return json(200, { e2e: true });
       return json(404, { error: 'not found' });
     } catch (err) {
       return json(500, { error: err.message });
