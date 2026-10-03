@@ -43,6 +43,12 @@ test('TC-29-33: a pipe in a branch name does not break the table', () => {
   assert.match(md, /a\\\|b/);
 });
 
+test('TC-29-37: a backslash before a pipe in a branch name stays inside its cell', () => {
+  const md = historyTable([{ databaseId: 1, headBranch: 'a\\|b', event: 'push', headSha: 'abcdef1234', status: 'completed', conclusion: 'success' }], '9');
+  // The backslash is doubled and the pipe escaped: \\\|, so the row keeps its six cells.
+  assert.ok(md.includes('a\\\\\\|b'), md);
+});
+
 test('TC-29-34: durations read as seconds, then minutes, and n/a when unknown', () => {
   assert.equal(formatDuration(2500), '2.5 s');
   assert.equal(formatDuration(125000), '2 min 5 s');

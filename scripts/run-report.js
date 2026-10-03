@@ -24,7 +24,8 @@ const ICONS = { success: '✅ passed', failure: '❌ failed', cancelled: '⚪ ca
 const label = (conclusion, status) => ICONS[conclusion] || (status && status !== 'completed' ? `⏳ ${status}` : conclusion || '⏳ running');
 
 // Table cells: a title can contain a pipe or a newline, which would break the table.
-const cell = (text) => String(text ?? '').replace(/\|/g, '\\|').replace(/\s+/g, ' ').trim();
+// Backslashes go first, so a backslash in the text cannot cancel the one added before a pipe.
+const cell = (text) => String(text ?? '').replace(/\\/g, '\\\\').replace(/\|/g, '\\|').replace(/\s+/g, ' ').trim();
 
 function jobsTable(jobsFile, selfName) {
   const jobs = Array.isArray(jobsFile?.jobs) ? jobsFile.jobs : null;
