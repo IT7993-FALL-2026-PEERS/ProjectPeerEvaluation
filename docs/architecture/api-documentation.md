@@ -515,7 +515,7 @@ once the link has expired.
   }]
 }
 ```
-Ratings are 1–5, except `participation`, which is 1–4 (D-19). `overall_feedback` needs at
+Ratings are whole numbers 1–5, except `participation`, which is 1–4 (D-19); 4.5, "4" or `true` get a 400. `overall_feedback` must be text of at
 least 10 characters (FR-14 asks for 50–500). Every evaluation is validated before any is
 saved (FR-16), and they are saved together in one transaction (or, on a database without
 transactions, one by one with a rollback if anything fails), so a submission is all-or-nothing. A

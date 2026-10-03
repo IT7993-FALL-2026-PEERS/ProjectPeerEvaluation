@@ -99,12 +99,15 @@ test('TC-16-24: rating someone outside the team or yourself gets 400 and saves n
   assert.equal((await Student.findById(IDS.ann)).evaluation_completed, false);
 });
 
-test('TC-16-25: invalid ratings or feedback get 400 and save nothing, so the student can try again', async () => {
+test('TC-16-25: invalid ratings (out of range, fractional, not a number) or feedback (too short, not text) get 400 and save nothing, so the student can try again', async () => {
   const token = await tokenFromEmail('ann@example.edu');
   const bad = [
     rating(IDS.ben, { ratings: { communication: 6 } }),
     rating(IDS.ben, { ratings: { participation: 5 } }),
     rating(IDS.ben, { overall_feedback: 'too short' }),
+    rating(IDS.ben, { ratings: { communication: 4.5 } }),
+    rating(IDS.ben, { ratings: { participation: true } }),
+    rating(IDS.ben, { overall_feedback: {} }),
   ];
   for (const evaluation of bad) {
     const res = await app.request('POST', `/api/evaluate/${token}`, { body: { evaluations: [evaluation] } });
