@@ -55,4 +55,9 @@
     <packageUrl regex="true">^pkg:npm/webpack-dev-middleware@5\.3\.4$</packageUrl>
     <vulnerabilityName>GHSA-g84c-rxfj-3j2c</vulnerabilityName>
   </suppress>
+  <suppress until="2026-12-31Z">
+    <notes><![CDATA[Accepted risk (CICD-53, 2 Oct 2026). braces 3.0.3 (GHSA-vfj7-8cjw-p6xm, CVSS 7.5, stack exhaustion on deeply nested brace patterns) is reached only through react-scripts 5.0.1: react-scripts > eslint-webpack-plugin > micromatch > braces and react-scripts > tailwindcss > chokidar > braces. It matches the repository's own file patterns during the build and in the development server, never user input; it is not in the frontend production bundle or the backend. No patched version exists (3.0.3 is the latest), and replacing react-scripts is out of scope. Owner: M3. Review: Milestone 3 review, 30 Nov 2026. See docs/security/security-policy.md.]]></notes>
+    <packageUrl regex="true">^pkg:npm/braces@3\.0\.3$</packageUrl>
+    <vulnerabilityName>GHSA-vfj7-8cjw-p6xm</vulnerabilityName>
+  </suppress>
 </suppressions>
