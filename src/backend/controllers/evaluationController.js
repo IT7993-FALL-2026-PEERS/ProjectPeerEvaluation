@@ -548,9 +548,13 @@ exports.submitEvaluation = async (req, res, next) => {
           err.status = 400;
           return next(err);
         }
+        // The form sends whole numbers; Mongoose alone would also save 4.5 and cast true to 1.
+        if (!Number.isInteger(evalData.ratings[rating])) {
+          return next(validationError(`The rating for ${rating} must be a whole number.`));
+        }
       }
 
-      if (!evalData.overall_feedback || evalData.overall_feedback.trim().length < 10) {
+      if (typeof evalData.overall_feedback !== 'string' || evalData.overall_feedback.trim().length < 10) {
         const err = new Error('Overall feedback is required (minimum 10 characters).');
         err.code = 'VALIDATION_ERROR';
         err.status = 400;
@@ -574,9 +578,9 @@ exports.submitEvaluation = async (req, res, next) => {
         evaluation_token: token
       });
 
-      const validationError = evaluation.validateSync();
-      if (validationError) {
-        const err = new Error(validationError.message);
+      const schemaError = evaluation.validateSync();
+      if (schemaError) {
+        const err = new Error(schemaError.message);
         err.code = 'VALIDATION_ERROR';
         err.status = 400;
         return next(err);
