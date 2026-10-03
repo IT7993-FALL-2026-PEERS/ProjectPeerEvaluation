@@ -32,7 +32,9 @@ services:
     build:
       context: ./src/backend
       dockerfile: Dockerfile
-    image: peers-backend:local
+    # The release workflow (image-build.yml) sets BACKEND_IMAGE / FRONTEND_IMAGE to the ghcr.io
+    # names tagged with the commit SHA. Locally the defaults below apply.
+    image: ${BACKEND_IMAGE:-peers-backend:local}
     restart: unless-stopped
     env_file:
       - path: .env
@@ -67,7 +69,7 @@ services:
       args:
         # Baked into the bundle at build time (see Dockerfile.frontend).
         REACT_APP_API_URL: ${FRONTEND_API_URL:-http://localhost:5000/api}
-    image: peers-frontend:local
+    image: ${FRONTEND_IMAGE:-peers-frontend:local}
     restart: unless-stopped
     ports:
       - "${FRONTEND_PORT:-3000}:80"
