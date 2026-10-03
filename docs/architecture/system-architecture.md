@@ -90,7 +90,7 @@ An Express 4 application started by `index.js`. Requests pass through the same l
 
 ```mermaid
 flowchart TB
-    REQ(["HTTP request"]) --> MW["index.js middleware<br/>CORS · JSON body parser · request log"]
+    REQ(["HTTP request"]) --> MW["index.js middleware<br/>CORS · JSON body parser · request log · rate limits"]
     MW --> R["routes/*.js<br/>URL → handler"]
     R --> AUTH["middleware/auth.js<br/>authenticateToken (JWT)"]
     AUTH --> OWN["middleware/courseOwner.js<br/>requireCourseOwner<br/>(all /courses/:course_id routes)"]
@@ -110,11 +110,11 @@ flowchart TB
 | `routes/` | `auth.js`, `courses.js` (courses and everything under a course), `evaluate.js` (student, public), `professor.js`, `ai.js` |
 | `controllers/` | `authController`, `courseController`, `studentController` (roster CSV, students), `teamController`, `evaluationController` (sending, status, reminders, the student form and submission), `reportController` (scoring, curved grading, flags, CSV), `professorController` (word list), `aiController` (501 stubs) |
 | `models/` | `Professor`, `Course`, `Student`, `Team`, `Evaluation`, `Report` (defined but unused). See [database-schema.md](database-schema.md) |
-| `middleware/` | `auth.js`, `courseOwner.js`, `errorHandler.js` |
-| `config/` | `env.js` (checks `JWT_SECRET` at startup), `health.js`, `serverTimeouts.js` (120-second keep-alive for Render's proxy), `rubric.js` (the hardcoded rubric, D-09) |
-| `utils/` | `emailUtils.js` (Nodemailer transport and email templates), `emailPacer.js` (spaces emails `EMAIL_SEND_INTERVAL_MS` apart), `csv.js` (safe CSV output) |
+| `middleware/` | `auth.js`, `courseOwner.js`, `errorHandler.js`, `requestLogger.js` (redacts evaluation tokens) |
+| `config/` | `env.js` (checks `JWT_SECRET` at startup), `health.js`, `serverTimeouts.js` (120-second keep-alive for Render's proxy), `rateLimit.js` (per-address limits and the proxy hops to trust), `rubric.js` (the hardcoded rubric, D-09) |
+| `utils/` | `emailUtils.js` (Nodemailer transport and email templates), `emailPacer.js` (spaces emails `EMAIL_SEND_INTERVAL_MS` apart), `csv.js` (safe CSV output), `evaluationToken.js` (random tokens with a 14-day expiry), `inputGuards.js` (rejects non-text input), `saveEvaluations.js` (all-or-nothing submission), `ensureIndexes.js` (builds the unique evaluation index at startup) |
 | `scripts/`, `migrations/` | Manual seed and inspection scripts, one old migration (D-14). Not part of the running app |
-| `tests/` | `node:test` unit tests, run by `npm test` and in CI |
+| `tests/`, `integration/` | `node:test` unit tests (`npm test`) and integration tests against a real MongoDB (`npm run test:integration`), both run in CI |
 
 Configuration comes from environment variables: `MONGODB_URI`, `JWT_SECRET`,
 `FRONTEND_URL` (used to build emailed links), `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` /
@@ -211,15 +211,15 @@ the new bcrypt hash and clears the token so the link works once.
 
 | Concern | How it works today | Gap |
 |---|---|---|
-| Professor passwords | bcrypt, cost 10 | No strength rule; no rate limiting on login (API-5) |
+| Professor passwords | bcrypt, cost 10 | No strength rule. Login, register, reset and the student links are rate limited per client address (API-5) |
 | Professor sessions | Stateless JWT (HS256, `JWT_SECRET`), 1 hour, stored in `localStorage` | Requirement is 30 minutes (D-18); no refresh or server-side logout; `localStorage` is readable by any script on the page |
-| Authorization | Every professor endpoint needs a JWT; every course-scoped endpoint checks course ownership | Student and team updates save the body as sent within the professor's own course (API-4) |
-| Student access | A per-student token in the link, the only credential | Generated with `Math.random()` and never expires (API-1); submissions aren't limited to real teammates (API-2) |
+| Authorization | Every professor endpoint needs a JWT; every course-scoped endpoint checks course ownership | Student and team updates change only whitelisted fields, and IDs in a payload are checked against the course (API-4) |
+| Student access | A per-student token in the link, the only credential | Random (`crypto.randomBytes`) and valid for 14 days (API-1); a submission must rate exactly the evaluator's teammates, once each, with whole-number ratings (API-2) |
 | MFA | Model field and login branch exist | Verification returns 501, so MFA can't be used (D-17) |
 | Transport | HTTPS on Render; SMTP over STARTTLS with certificate checking | — |
 | CORS | `localhost:3000` and any `*.onrender.com` origin, credentials allowed | Broader than needed (D-13) |
 | Exported data | CSV fields quoted and formula-prefixed | — |
-| Dependencies | Dependabot weekly, OWASP Dependency-Check on every PR (report-only) | Frontend: 64 npm audit findings, mostly via `react-scripts` (see the tech stack analysis) |
+| Dependencies | Dependabot weekly; OWASP Dependency-Check and CodeQL on every PR, both required (OWASP fails on CVSS 7 or higher unless accepted) | Frontend: findings in `react-scripts` build tooling are accepted risks with expiry dates (`docs/security/security-policy.md`) |
 
 ---
 
@@ -228,17 +228,18 @@ the new bcrypt hash and clears the token so the link works once.
 ```mermaid
 flowchart LR
     DEV(["Developer"]) -->|pull request| GH["GitHub<br/>IT7993-FALL-2026-PEERS/<br/>ProjectPeerEvaluation"]
-    GH --> CI["GitHub Actions<br/>ci.yml: frontend, backend, E2E, actionlint<br/>security.yml: OWASP (report-only)"]
-    CI -->|required checks pass| MAIN["merge to main"]
+    GH --> CI["GitHub Actions (ubuntu-24.04)<br/>ci.yml: frontend, backend, integration,<br/>E2E, containers, actionlint<br/>security.yml: OWASP · CodeQL"]
+    CI -->|"8 required checks pass"| MAIN["merge to main"]
     MAIN -->|"Render autoDeploy: checksPass<br/>(render.yaml, build filters)"| STG["Render staging<br/>peers-backend-staging (Starter)<br/>peers-frontend-staging (static)"]
     STG --> ATLAS[("MongoDB Atlas M0")]
     STG --> MT["Mailtrap sandbox"]
     STG -. "planned: manual sponsor approval" .-> PROD(["Production<br/>out of scope"])
+    MAIN -. "planned: build and push<br/>SHA-tagged images, smoke tests" .-> IMG["Container images<br/>(GHCR)"]
 
     classDef ep fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
     classDef plan fill:#f1f5f9,stroke:#475569,color:#334155,stroke-dasharray: 6 4
     class DEV,GH,MAIN ep
-    class PROD plan
+    class PROD,IMG plan
 ```
 
 - **Local development:** `npm run setup` then `npm run dev` runs the React dev server on
@@ -246,12 +247,15 @@ flowchart LR
 - **Staging:** `render.yaml` defines both services. The backend is a Node web service on
   the paid Starter plan, so it doesn't sleep and can reach SMTP. `/api/health` must report
   the database connected before Render switches traffic, and it reports the deployed
-  commit. Build filters skip deploys for docs-only and test-only changes.
+  commit. Build filters skip deploys for docs-only and test-only changes. Staging is switched off
+  between checks and demos to save cost.
 - **Production:** not hosted by this project. The approved design ends in a manual
   sponsor approval gate (Milestone 3).
-- **Containers:** none yet. There is no Dockerfile, and `docker-compose.yml` describes a
-  PostgreSQL setup the app doesn't use (D-05, D-06). Dockerfiles and Compose are Milestone 2
-  work, and the planned CD pipeline builds images once and deploys them to Render.
+- **Containers:** `Dockerfile.frontend` (React build served by nginx), `src/backend/Dockerfile`
+  (non-root) and `docker-compose.yml` (MongoDB, backend and frontend with health checks) run the
+  whole app with `npm run docker:up`, and the CI job `Containers (build + compose smoke)` builds
+  and starts them on every pull request. Render still builds from source; the planned CD
+  workflow builds and pushes SHA-tagged images and smoke-tests them.
 
 The CI/CD design and status are maintained in the README's
 [CI/CD Pipeline](../../README.md#cicd-pipeline) section.
@@ -265,12 +269,12 @@ New findings from this review. Items already in the defects log keep their D-num
 | # | Finding | Impact | Suggested direction |
 |---|---|---|---|
 | A-1 | Email is sent synchronously inside the HTTP request, one email every `EMAIL_SEND_INTERVAL_MS` | Large classes would hit the 3-minute frontend timeout. Since CICD-36 a request that cannot finish in `EMAIL_REQUEST_BUDGET_MS` (default 150 s, so 14 recipients at 11 s) is refused up front with advice to send team by team | A background queue with progress reporting would remove the limit; a real email provider (no pacing) also does |
-| A-2 | Student evaluation tokens are weak and permanent, and submissions aren't checked against the teammate list (API-1, API-2) | Grade integrity depends on these links | `crypto.randomBytes` tokens with an expiry; accept only the evaluator's own teammates, each once |
-| A-3 | Uploading a roster deletes all evaluations for the course (API-3) | Silent data loss mid-cycle | Keep evaluations on upload, or ask for confirmation |
+| A-2 | **Fixed (CICD-17, CICD-18).** Student evaluation tokens were weak and permanent, and submissions weren't checked against the teammate list (API-1, API-2) | Grade integrity depends on these links | `crypto.randomBytes` tokens with an expiry; accept only the evaluator's own teammates, each once |
+| A-3 | **Partly fixed (CICD-19).** A malformed file is now refused before anything is deleted; a valid roster upload still deletes all evaluations for the course, a question for the sponsor (API-3) | Silent data loss mid-cycle | Keep evaluations on upload, or ask for confirmation |
 | A-4 | Team membership is stored twice (D-10) and reports rely on `Student.team_id` | The two can drift | Treat `Student.team_id` as the source of truth |
 | A-5 | Most of the professor UI is one 2,687-line component | Hard to test and change safely | Split by feature when tests need it; not a rewrite |
 | A-6 | Leftover placeholder files: `config/db.js`, `config/corsConfig.js`, `utils/tokenUtils.js` (one-line comments), the unused `Report` model, and the frontend `Dashboard.js` and `TeamAssignment.js` pages | Confusing; `migrations/migrateCourses.js` requires the empty `config/db.js` and can't run | Delete, and fix or retire the migration |
-| A-7 | No rate limiting anywhere (API-5) | Password guessing and email flooding | Add `express-rate-limit` to auth and evaluation routes |
+| A-7 | **Fixed (CICD-34).** There was no rate limiting anywhere (API-5) | Password guessing and email flooding | Add `express-rate-limit` to auth and evaluation routes |
 | A-8 | Stubs return 501: token refresh, MFA (D-17), team auto-assign, the three `/api/ai/*` endpoints | Features the UI or data model suggest don't exist | Confirm with the sponsor which are in scope |
 
 The two most important of these for the sponsor review are **A-2** (grade integrity) and

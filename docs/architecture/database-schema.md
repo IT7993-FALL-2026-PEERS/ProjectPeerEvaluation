@@ -40,12 +40,16 @@ erDiagram
     ObjectId course_id FK
     ObjectId team_id FK
     string evaluation_token
+    date evaluation_token_expires_at
+    boolean evaluation_completed
   }
   EVALUATION {
     ObjectId course_id FK
     ObjectId student_id FK
     ObjectId evaluator_id FK
+    object ratings
     string overall_feedback
+    string evaluation_token
   }
   REPORT {
     ObjectId course_id FK
