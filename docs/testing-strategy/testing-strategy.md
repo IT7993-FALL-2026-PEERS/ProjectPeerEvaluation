@@ -142,7 +142,9 @@ static files. A small control server resets the data before each test and return
 email, so the student tests take the link from the invitation email. Specs: `e2e/instructor.spec.js`
 (E2E-01 to 09: login, session, roster upload and its error message, teams, invitations, reports,
 CSV download) and `e2e/student.spec.js` (E2E-10 to 14: opening the link without a login, rating and
-submitting, the professor's count, no second submission, a bad link, missing feedback). Without
+submitting, the professor's count, no second submission, a bad link, missing feedback). The run
+refuses to start if another server already holds port 5000 or the build points at a hosted
+backend, so it can never reach a real database or mail account. Without
 `E2E_START_SERVER` only `e2e/setup.spec.js` (the Playwright install check) runs. In CI this is the
 required job `E2E smoke (Playwright)`.
 

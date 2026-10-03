@@ -21,6 +21,27 @@ if (!fs.existsSync(path.join(buildDir, 'index.html'))) {
   process.exit(1);
 }
 
+// The tests must reach the E2E backend on localhost. A build made with REACT_APP_API_URL pointing at a
+// hosted backend (staging, say) would send every request there, with real data and a real mail
+// account. The only hosted URL a local build may contain is the old fallback in services/apiUrl.js.
+const LEGACY_API_URL = 'https://peer-evaluation-backend.onrender.com/api';
+function hostedApiUrlsInBuild() {
+  const jsDir = path.join(buildDir, 'static', 'js');
+  if (!fs.existsSync(jsDir)) return [];
+  const found = new Set();
+  for (const name of fs.readdirSync(jsDir).filter((n) => n.endsWith('.js'))) {
+    const text = fs.readFileSync(path.join(jsDir, name), 'utf8');
+    for (const url of text.match(/https:\/\/[a-z0-9.-]+\.onrender\.com[^"'\s)]*/g) || []) found.add(url);
+  }
+  found.delete(LEGACY_API_URL);
+  return [...found];
+}
+const hosted = hostedApiUrlsInBuild();
+if (hosted.length > 0) {
+  console.error(`The build points at a hosted backend (${hosted.join(', ')}). Unset REACT_APP_API_URL and run \`npm run build\` again.`);
+  process.exit(1);
+}
+
 http.createServer((req, res) => {
   let requested;
   try {

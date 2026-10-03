@@ -5,6 +5,7 @@ const { resetData, loginAsAda, courseAction, invitationPath } = require('./suppo
 // opens the link without logging in, rates a teammate, submits, and the professor sees it.
 // Run with E2E_START_SERVER=1 (see playwright.config.js).
 let passwords;
+const API = process.env.E2E_API_URL || 'http://localhost:5000/api';
 
 test.skip(!process.env.E2E_START_SERVER, 'needs the E2E servers: run with E2E_START_SERVER=1');
 
@@ -58,6 +59,9 @@ test('E2E-12: the same link cannot be used to submit twice', async ({ page, brow
   await sendInvitationsAsAda(page);
   const link = await invitationPath('ann@example.edu');
   const student = await (await browser.newContext()).newPage();
+  // Who the student may rate, taken from the form before it is used (it is not served afterwards).
+  const token = link.split('/').pop();
+  const form = await (await student.request.get(`${API}/evaluate/${token}`)).json();
   await student.goto(link);
   await rate(student, [4, 5, 4, 3, 4, 3]);
   await student.getByPlaceholder(/constructive feedback/i).fill('Reliable, prepared and easy to work with.');
@@ -67,6 +71,25 @@ test('E2E-12: the same link cannot be used to submit twice', async ({ page, brow
   await student.goto(link);
   await expect(student.getByRole('heading', { name: 'Evaluation Completed!' })).toBeVisible();
   await expect(student.getByRole('button', { name: /submit evaluation/i })).toHaveCount(0);
+
+  // The page hides the form, but the server has to refuse a second submission too: post it again
+  // through the API, as anyone holding the link could.
+  const again = await student.request.post(`${API}/evaluate/${token}`, {
+    data: {
+      evaluations: form.teammates.map((mate) => ({
+        student_id: mate._id,
+        ratings: { professionalism: 5, communication: 5, work_ethic: 5, content_knowledge_skills: 5, overall_contribution: 5, participation: 4 },
+        overall_feedback: 'A second attempt with the same link.',
+      })),
+    },
+  });
+  expect(again.status()).toBe(409);
+  expect((await again.json()).error.code).toBe('ALREADY_COMPLETED');
+
+  // And still only the first submission is counted.
+  await loginAsAda(page, passwords);
+  await courseAction(page, 'Evaluation Status').click();
+  await expect(page.getByText('Progress: 1/4 evaluations completed')).toBeVisible();
 });
 
 test('E2E-13: a link that does not exist shows a clear message, not a form', async ({ page }) => {
