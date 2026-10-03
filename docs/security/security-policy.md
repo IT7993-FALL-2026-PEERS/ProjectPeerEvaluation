@@ -72,10 +72,11 @@ Dependabot lists the same tooling: 9 high, 13 medium, 1 low, all in the frontend
 Dependabot's severity differs from OWASP's CVSS for some (for example `underscore`, "high" in Dependabot,
 CVSS 5.9 in OWASP), so the blocking threshold above is the one that counts.
 
-**Proposed disposition (not yet applied):** dismiss these as "tolerable risk" with a comment pointing to this
-document, once the team leader or M3 agrees, so the Dependabot tab shows only alerts nobody has looked at.
-Dismissing an alert is a security decision and is done by a repository admin, not by automation. This is also
-"fix A" of backlog CICD-12 (the failed Dependabot security-update checks on `main`).
+**Disposition (applied 2 Oct 2026):** the team leader dismissed all 23 as "tolerable risk" with a comment
+pointing to this document, so the Dependabot tab shows only alerts nobody has looked at. Dismissing an alert is
+a security decision and is done by a repository admin, not by automation. New alerts on the same packages are
+dismissed the same way. This is also "fix A" of backlog CICD-12 (the failed Dependabot security-update checks
+on `main`).
 
 ## 5. CodeQL alerts (4 open on 2 Oct 2026, after rate limiting and injection fixes closed 86)
 
