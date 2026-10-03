@@ -19,7 +19,7 @@
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^8.18.1",
     "multer": "^2.0.2",
-    "nodemailer": "^10.0.10"
+    "nodemailer": "^10.0.12"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
