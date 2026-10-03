@@ -2,6 +2,10 @@ name: CI
 
 # The job names below (`name:`) are the required status checks in the `main` branch ruleset.
 # Renaming a job means updating the ruleset too, or merges will wait for a check that never runs.
+#
+# Runners are pinned to ubuntu-24.04: GitHub moves `ubuntu-latest` to Ubuntu 26.04 from 19 Oct 2026
+# (backlog CICD-54). Change the label on a test branch first, then here, once MongoDB, Playwright and
+# Docker are green on it.
 
 on:
   pull_request:
@@ -21,7 +25,7 @@ permissions:
 jobs:
   frontend:
     name: Frontend (test + build)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
@@ -71,7 +75,7 @@ jobs:
 
   backend:
     name: Backend (install + syntax check)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     defaults:
       run:
@@ -122,7 +126,7 @@ jobs:
   # throwaway MongoDB with email captured, and the production frontend build. See playwright.config.js.
   e2e-smoke:
     name: E2E smoke (Playwright)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
       MONGOMS_DOWNLOAD_DIR: ${{ github.workspace }}/.mongodb-binaries
@@ -187,7 +191,7 @@ jobs:
   # ruleset, like the others (backlog CICD-25).
   containers:
     name: Containers (build + compose smoke)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
@@ -229,7 +233,7 @@ jobs:
   # until it has been stable for a while; then it becomes a required check.
   integration:
     name: Integration (real MongoDB)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     defaults:
       run:
@@ -272,7 +276,7 @@ jobs:
   # instead of at the next run.
   workflow-lint:
     name: Workflow lint (actionlint)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v7
