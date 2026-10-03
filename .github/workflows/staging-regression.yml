@@ -1,0 +1,120 @@
+name: Staging regression
+
+# Scheduled smoke and end-to-end run against staging (backlog CICD-43).
+#
+# It must not send email: the Mailtrap sandbox allows 50 a month. So it only runs
+#   1. read-only checks (GET /api/health and the frontend root), written here, and
+#   2. Playwright tests tagged @staging, which must be read-only and must not trigger email
+#      (no invitations, reminders, password resets or evaluation submissions).
+# The existing E2E specs reset a throwaway database through a local control server, so they
+# cannot run here; tests meant for staging carry the @staging tag in their title.
+#
+# Weekly, not nightly: staging is suspended to save money, and each run would fail while it is.
+# Ask Khoa to resume staging before a manual run. Set the repository variables STAGING_URL
+# (frontend) and STAGING_API_URL (backend, ending in /api) under Settings > Variables; they are
+# not secrets. A manual run can override both to point at a broken URL and should fail.
+
+on:
+  schedule:
+    - cron: "0 6 * * 2" # Tuesdays 06:00 UTC, away from the Monday security scan
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: Frontend URL to test (default is the STAGING_URL repository variable).
+        type: string
+        required: false
+      api_url:
+        description: Backend API URL ending in /api (default is the STAGING_API_URL variable).
+        type: string
+        required: false
+
+concurrency:
+  group: staging-regression
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    name: Smoke and end-to-end tests (staging)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      BASE_URL: ${{ inputs.base_url || vars.STAGING_URL }}
+      API_URL: ${{ inputs.api_url || vars.STAGING_API_URL }}
+      # Read by tests tagged @staging: they must refuse to do anything that sends email.
+      STAGING_NO_EMAIL: "1"
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            src/backend/package-lock.json
+
+      - name: Check the staging URLs are set
+        run: |
+          missing=0
+          [ -n "$BASE_URL" ] || { echo "::error::No frontend URL. Set the STAGING_URL variable or the base_url input."; missing=1; }
+          [ -n "$API_URL" ] || { echo "::error::No API URL. Set the STAGING_API_URL variable or the api_url input."; missing=1; }
+          exit "$missing"
+
+      # Render free instances sleep, so allow a few minutes for the first answer. Read-only GETs.
+      - name: Staging is up (health and frontend)
+        run: |
+          health="${API_URL%/}/health"
+          BACKEND_URL="$health" FRONTEND_URL="$BASE_URL" TIMEOUT=240 bash scripts/verify-env.sh
+          body=$(curl -sf --max-time 10 "$health")
+          echo "$body"
+          echo "$body" | grep -q '"status":"OK"'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Count the @staging tests
+        id: count
+        run: |
+          count=$(npx playwright test --list --grep "@staging" 2>/dev/null | grep -c "›" || true)
+          echo "count=${count}" >> "$GITHUB_OUTPUT"
+          if [ "$count" -eq 0 ]; then
+            echo "::warning::No tests are tagged @staging yet, so only the health and frontend checks ran."
+            {
+              echo "### Staging regression"
+              echo ""
+              echo "The health and frontend checks passed. **No Playwright tests are tagged \`@staging\` yet**, so none ran."
+              echo "Add the tag to the smoke tests (Kylee) and end-to-end tests (Khoa) that are safe to run against staging."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      # BASE_URL is read by playwright.config.js. E2E_START_SERVER is not set, so no local servers start.
+      - name: Run the @staging tests
+        id: e2e
+        if: ${{ steps.count.outputs.count != '0' }}
+        run: npx playwright test --grep "@staging"
+        env:
+          CI: "true"
+
+      - name: Test summary (staging)
+        if: ${{ !cancelled() && steps.e2e.outcome != 'skipped' }}
+        run: node scripts/test-summary.js "Staging regression tests" playwright playwright-results/results.json
+
+      - name: Upload Playwright report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: staging-regression-report
+          path: |
+            playwright-report/
+            playwright-results/
+            test-results/
+          retention-days: 30
+          if-no-files-found: ignore

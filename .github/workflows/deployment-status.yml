@@ -1,0 +1,80 @@
+name: Deployment status
+
+# Reusable. cd.yml calls it after its deploy job, even when the deploy failed, so every CD run
+# shows a "Deployment status" section in its summary and keeps deployment-status.json as an
+# artifact (backlog CICD-29). It does not deploy anything and needs no token.
+#
+#   report:
+#     needs: [images, deploy]
+#     if: ${{ !cancelled() }}
+#     uses: ./.github/workflows/deployment-status.yml
+#     with:
+#       environment: staging
+#       result: ${{ needs.deploy.result }}
+#       url: https://<staging frontend>
+#       health_url: https://<staging backend>/api/health
+#       image_tag: ${{ needs.images.outputs.tag }}
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: Name shown in the report, e.g. staging.
+        type: string
+        required: true
+      result:
+        description: Result of the deploy job (success, failure, cancelled or skipped).
+        type: string
+        required: true
+      url:
+        description: Public URL of the deployed app.
+        type: string
+        required: false
+        default: ""
+      health_url:
+        description: Backend /api/health URL. When set and the deploy succeeded, it must answer OK.
+        type: string
+        required: false
+        default: ""
+      image_tag:
+        description: Tag of the images that were deployed (the commit SHA).
+        type: string
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  status:
+    name: Deployment status
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+
+      - name: Report deployment status
+        run: node scripts/deployment-status.js reports/deployment-status.json
+        env:
+          ENVIRONMENT: ${{ inputs.environment }}
+          RESULT: ${{ inputs.result }}
+          URL: ${{ inputs.url }}
+          HEALTH_URL: ${{ inputs.health_url }}
+          IMAGE_TAG: ${{ inputs.image_tag }}
+          COMMIT: ${{ github.sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+      - name: Upload deployment status
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: deployment-status-${{ inputs.environment }}
+          path: reports/deployment-status.json
+          retention-days: 30
+          if-no-files-found: ignore

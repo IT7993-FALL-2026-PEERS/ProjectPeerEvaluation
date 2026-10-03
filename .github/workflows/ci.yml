@@ -310,6 +310,52 @@ jobs:
           retention-days: 30
           if-no-files-found: ignore
 
+  # Run overview and build history in the summary of every CI run (backlog CICD-29). Test counts,
+  # durations and coverage are in each job's own section; this adds the result and duration of every
+  # job and the outcome of the latest runs. It reports only, so it is not a required check.
+  report:
+    name: Run report (overview + build history)
+    needs: [frontend, backend, e2e-smoke, containers, integration, workflow-lint]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+
+      - name: Fetch this run's jobs and the latest runs
+        run: |
+          mkdir -p reports
+          gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}/jobs?per_page=100" > reports/run-jobs.json
+          gh run list --repo "$GITHUB_REPOSITORY" --workflow ci.yml --limit 10 \
+            --json databaseId,headBranch,headSha,event,status,conclusion,createdAt,updatedAt,url > reports/run-history.json
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_ID: ${{ github.run_id }}
+
+      - name: Write the report
+        run: node scripts/run-report.js reports/run-jobs.json reports/run-history.json "$RUN_ID" "$SELF"
+        env:
+          RUN_ID: ${{ github.run_id }}
+          SELF: Run report (overview + build history)
+
+      - name: Upload run report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: run-report
+          path: reports/
+          retention-days: 30
+          if-no-files-found: ignore
+
   # Lints the workflow files themselves, so a YAML or expression mistake fails here
   # instead of at the next run.
   workflow-lint:
