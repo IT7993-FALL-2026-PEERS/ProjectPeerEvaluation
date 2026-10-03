@@ -231,6 +231,8 @@ opening floors:
 | Backend floor | 63% | 77% | 67% |
 | Frontend baseline | 8.38% | 7.06% | 8.81% |
 | Frontend floor | 7% | 6% | 7% |
+| Frontend after the page tests (3 Oct) | 30.34% | 27.46% | 29.39% |
+| Frontend floor, raised (3 Oct) | 29% | 26% | 28% |
 
 - **What is measured:** the backend's `controllers`, `middleware`, `models`, `routes`, `utils`
   and `config` folders plus `index.js`; the frontend's `src/frontend` source, excluding tests and
@@ -246,8 +248,10 @@ opening floors:
   build pass; add tests instead.
 - **Run it locally:** `npm test -- --watchAll=false --coverage && node scripts/coverage-gate.js frontend`,
   and `cd src/backend && npm run test:coverage && node ../../scripts/coverage-gate.js backend`.
-- **The gap is on the frontend** (about 8%): `CourseManagement.js` alone is 2,687 lines and has to
-  be split before it can be tested meaningfully (see §8). The backend is already near the target.
+- **The gap is on the frontend** (about 30%, up from 8% once the Reports, StudentEvaluation and
+  Settings pages were tested on 3 Oct): `CourseManagement.js` alone is 2,687 lines, 62% of the
+  frontend's executable lines, and has to be split before it can be tested meaningfully (see §8).
+  The backend is already near the target.
 
 Coverage is a floor, not a goal. A suite at 90% that never asserts the acceptance criteria in
 `requirements.md` is worth less than one at 60% that does. The RTM, not the coverage number,
