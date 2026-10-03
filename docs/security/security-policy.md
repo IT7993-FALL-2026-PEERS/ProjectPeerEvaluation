@@ -59,6 +59,9 @@ bundle with `npm run build` and serves only its output. Upgrading is not possibl
 | GHSA-r28c-9q8g-f849 | postcss@7.0.39 | 7.5 | react-scripts > resolve-url-loader | build: CSS loader |
 | GHSA-w5hq-g745-h8pq | uuid@8.3.2 | 7.5 | react-scripts > webpack-dev-server > sockjs | development server only |
 | GHSA-g84c-rxfj-3j2c | webpack-dev-middleware@5.3.4 | 7.4 | react-scripts > webpack-dev-server | development server only |
+| GHSA-vfj7-8cjw-p6xm | braces@3.0.3 | 7.5 | react-scripts > eslint-webpack-plugin > micromatch, and react-scripts > tailwindcss > chokidar | build: file-pattern matching (no patched version exists) |
+
+The braces entry was added the same evening (backlog CICD-53): OWASP started reporting GHSA-vfj7-8cjw-p6xm (published 18 Sep 2026, no patched version) after the first nine were triaged, and the check blocked every pull request. It is the tenth accepted risk.
 
 **Owner:** M3 · **Review:** Milestone 3 review (30 Nov 2026) · **Entries expire:** 31 Dec 2026. The
 14 findings below CVSS 7 do not block and are not suppressed; they appear in the job summary and the
