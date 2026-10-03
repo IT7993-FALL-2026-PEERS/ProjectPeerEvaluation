@@ -50,9 +50,18 @@ jobs:
         run: npm run lint
 
       - name: Unit tests (Jest + React Testing Library)
-        run: npm test -- --watchAll=false --coverage
+        id: unit
+        run: |
+          mkdir -p reports
+          npm test -- --watchAll=false --coverage --json --outputFile=reports/frontend-tests.json
         env:
           CI: true
+
+      # Tests run, passed, failed, skipped and duration, in the job summary (backlog CICD-29).
+      # Runs after a failed test step too, so the summary shows what failed.
+      - name: Test summary (frontend)
+        if: ${{ !cancelled() && steps.unit.outcome != 'skipped' }}
+        run: node scripts/test-summary.js "Frontend unit tests" jest reports/frontend-tests.json
 
       # Fails when frontend coverage drops below the floors in coverage-floors.json and
       # writes the numbers to the job summary. Floors only go up.
@@ -64,12 +73,14 @@ jobs:
         env:
           CI: true
 
-      - name: Upload frontend coverage report
+      - name: Upload frontend coverage and test results
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
         with:
           name: coverage-frontend
-          path: coverage/
+          path: |
+            coverage/
+            reports/
           retention-days: 30
           if-no-files-found: ignore
 
@@ -106,19 +117,26 @@ jobs:
       # Runs every tests/**/*.test.js, so a new test file is picked up without
       # touching this workflow. Measures coverage over the source folders in the same run.
       - name: Backend tests (node:test, with coverage)
+        id: unit
         run: npm run test:coverage
+
+      - name: Test summary (backend)
+        if: ${{ !cancelled() && steps.unit.outcome != 'skipped' }}
+        run: node ../../scripts/test-summary.js "Backend unit tests" node reports/backend-tests.xml
 
       # Fails when backend coverage drops below the floors in coverage-floors.json and
       # writes the numbers to the job summary. Floors only go up.
       - name: Coverage gate (backend)
         run: node ../../scripts/coverage-gate.js backend
 
-      - name: Upload backend coverage report
+      - name: Upload backend coverage and test results
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
         with:
           name: coverage-backend
-          path: src/backend/coverage/
+          path: |
+            src/backend/coverage/
+            src/backend/reports/
           retention-days: 30
           if-no-files-found: ignore
 
@@ -170,9 +188,15 @@ jobs:
           key: ${{ steps.mongo.outputs.key }}
 
       - name: Run Playwright tests
+        id: e2e
         run: npm run test:e2e
         env:
           E2E_START_SERVER: "1"
+
+      # Playwright's json reporter (playwright.config.js) writes the results this reads.
+      - name: Test summary (end-to-end)
+        if: ${{ !cancelled() && steps.e2e.outcome != 'skipped' }}
+        run: node scripts/test-summary.js "End-to-end tests" playwright playwright-results/results.json
 
       - name: Upload Playwright report
         if: ${{ !cancelled() }}
@@ -270,7 +294,21 @@ jobs:
           key: ${{ steps.mongo.outputs.key }}
 
       - name: Integration tests
+        id: integration
         run: npm run test:integration
+
+      - name: Test summary (integration)
+        if: ${{ !cancelled() && steps.integration.outcome != 'skipped' }}
+        run: node ../../scripts/test-summary.js "Integration tests" node reports/integration-tests.xml
+
+      - name: Upload integration test results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: integration-test-results
+          path: src/backend/reports/
+          retention-days: 30
+          if-no-files-found: ignore
 
   # Lints the workflow files themselves, so a YAML or expression mistake fails here
   # instead of at the next run.

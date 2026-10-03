@@ -6,8 +6,10 @@
     "start": "node index.js",
     "lint": "eslint .",
     "test": "node --test \"tests/**/*.test.js\"",
-    "test:integration": "node --test \"integration/**/*.integration.js\"",
-    "test:coverage": "c8 --all --src=. --include=\"controllers/**/*.js\" --include=\"middleware/**/*.js\" --include=\"models/**/*.js\" --include=\"routes/**/*.js\" --include=\"utils/**/*.js\" --include=\"config/**/*.js\" --include=\"index.js\" --reporter=lcov --reporter=text-summary --report-dir=coverage node --test \"tests/**/*.test.js\""
+    "pretest:integration": "node -e \"require('node:fs').mkdirSync('reports',{recursive:true})\"",
+    "test:integration": "node --test --test-reporter=spec --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination=reports/integration-tests.xml \"integration/**/*.integration.js\"",
+    "pretest:coverage": "node -e \"require('node:fs').mkdirSync('reports',{recursive:true})\"",
+    "test:coverage": "c8 --all --src=. --include=\"controllers/**/*.js\" --include=\"middleware/**/*.js\" --include=\"models/**/*.js\" --include=\"routes/**/*.js\" --include=\"utils/**/*.js\" --include=\"config/**/*.js\" --include=\"index.js\" --reporter=lcov --reporter=text-summary --report-dir=coverage node --test --test-reporter=spec --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination=reports/backend-tests.xml \"tests/**/*.test.js\""
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

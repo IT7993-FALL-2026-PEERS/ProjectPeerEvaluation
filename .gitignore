@@ -12,3 +12,6 @@ test-results
 # Generated: the compiled frontend (npm run build) and files uploaded at runtime
 /build/
 /src/backend/uploads/
+
+# Test result files written by the test scripts (see scripts/test-summary.js)
+reports/
