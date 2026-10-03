@@ -107,8 +107,8 @@ flowchart TB
     classDef endpoint fill:#dbeafe,stroke:#2563eb,color:#1e3a8a,stroke-width:3px
     linkStyle default stroke-width:2px
 
-    class BUILD_APP,LINT,SEC,DOCKER,UNIT,INTEG,REG,E2E done
-    class REPORT,ARTIFACTS,STG,HEALTH partial
+    class BUILD_APP,LINT,SEC,DOCKER,UNIT,INTEG,REG,E2E,REPORT done
+    class ARTIFACTS,STG,HEALTH partial
     class SMOKE,RC,DREPORT planned
     class GATE,APPROVE gate
     class DEV,PROD,PR,MERGE,FIX endpoint
@@ -146,14 +146,14 @@ The quality gate is enforced today. Production approval is manual.
 | Static analysis | ESLint: frontend (`npm run lint`) and backend (`cd src/backend && npm run lint`) | M1 / M4 | Live |
 | Container build check | `docker compose up --build --wait` builds the frontend and backend images and starts them with MongoDB, then checks the stack is healthy | M2 | Live, required job `Containers (build + compose smoke)` |
 | Dependency validation and security scan | Dependabot, OWASP Dependency Check, CodeQL code scanning, secret scanning | M3 | Live and blocking: OWASP Dependency-Check runs on every pull request, on `main`, and weekly (`.github/workflows/security.yml`) and fails on any finding with CVSS 7 or higher that is not an accepted risk (`.github/dependency-check-suppressions.xml`, each entry with an expiry date); CodeQL (GitHub default setup) scans the code on every pull request. Both are required checks. Dependabot opens weekly update pull requests (`.github/dependabot.yml`); its alerts, all in `react-scripts` build tooling, are triaged and dismissed as accepted risk. Secret scanning and push protection are on. The policy, the triage and the 10 accepted findings are in [`docs/security/security-policy.md`](docs/security/security-policy.md) |
-| Test report | Executed, passed, and failed tests, duration, and coverage | M4 | Partly live: every run keeps the coverage and Playwright reports as downloadable artifacts. A combined summary is planned, week of 16 Nov |
+| Test report | Executed, passed, and failed tests, duration, and coverage | M4 | Live in CI: each test job writes tests run, passed, failed, skipped and duration to its run summary (`scripts/test-summary.js`) next to the coverage table, and keeps the result files as downloadable artifacts |
 | Quality gate | `main-protection` ruleset: a pull request, eight passing required checks and an up-to-date branch before merge. No approval required, so authors merge their own pull requests. No bypass, and direct pushes are rejected | M1 | Live. More checks are added as jobs are added |
 | Build artifacts and Docker images | Build the deployment artifacts and the frontend and backend images for the exact commit that passed CI | M2 | Partly live: the container check builds both images on every pull request. Publishing version-tagged images for the tested commit is planned, week of 2 Nov |
 | Staging deploy | Automatic deploy to Render.com staging | M2 | Partly live: Render deploys `main` after CI passes (`render.yaml`); staging is switched off between checks and demos. CI-driven deploy of the tested commit planned, week of 9 Nov |
 | Smoke tests | Verify the deployment after each release | M5 | Planned, week of 9 Nov |
 | Deployment health check | Poll `/api/health` after deploy | M1 | Partly live: Render checks `/api/health` before switching traffic to a new deploy, and the endpoint reports the deployed commit. CI polling after deploy planned, week of 16 Nov |
 | Release candidate | Produce a release candidate after staging passes | M1 | Planned, week of 16 Nov |
-| Build and deployment reports | Build history and deployment status | M2 | Planned, week of 16 Nov |
+| Build and deployment reports | Build history and deployment status | M2 | Planned, week of 16 Nov (the CD workflow adds them to the same run summaries) |
 | Production deploy | Manual sponsor approval. Not automated | Sponsor | By design |
 
 ### Detailed workflow reference (WF01–WF12)
@@ -178,7 +178,7 @@ flowchart TB
         CONT["Container build check<br/>Docker Compose smoke test"]
         E2E["End-to-end tests<br/>Playwright workflows"]
         WF05["WF05 Dependency & security scan<br/>OWASP + CodeQL, blocking"]
-        WF06["WF06 Publish results<br/>coverage + Playwright reports live · combined summary planned"]
+        WF06["WF06 Publish results<br/>test and coverage summaries live · build and deploy history planned"]
         WF02 --> WF03 --> UNIT --> INTEG --> REG --> BUILD --> CONT --> E2E --> WF05 --> WF06
     end
 
