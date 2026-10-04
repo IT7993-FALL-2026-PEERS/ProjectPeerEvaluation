@@ -15,8 +15,9 @@ name: Staging regression
 # not secrets. A manual run can override both to point at a broken URL and should fail.
 
 on:
-  schedule:
-    - cron: "0 6 * * 2" # Tuesdays 06:00 UTC, away from the Monday security scan
+  # Re-enable once staging is running and the STAGING_URL / STAGING_API_URL variables are set:
+  # schedule:
+  #   - cron: "0 6 * * 2" # Tuesdays 06:00 UTC, away from the Monday security scan
   workflow_dispatch:
     inputs:
       base_url:
