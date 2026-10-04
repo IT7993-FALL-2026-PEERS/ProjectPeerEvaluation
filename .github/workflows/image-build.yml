@@ -1,0 +1,162 @@
+name: Image build and push
+
+# Builds the backend and frontend images from their Dockerfiles, starts them with Compose, checks
+# /api/health, and only then pushes both to GitHub Container Registry (backlog CICD-28). This is the
+# first job Donald's cd.yml calls. Per the Docker ADR (option C) the images are built, pushed and
+# tested, while Render still builds from the same commit.
+#
+#   jobs:
+#     images:
+#       uses: ./.github/workflows/image-build.yml
+#       permissions:
+#         contents: read
+#         packages: write      # a called workflow cannot have more than its caller grants
+#
+# Both images get the same tag: the full commit SHA. There is no `latest` tag, anywhere.
+#
+# workflow_dispatch is there so the workflow can be run on its own from a branch (Actions tab >
+# Image build and push > Run workflow) without waiting for cd.yml.
+
+on:
+  workflow_call:
+    inputs:
+      frontend_api_url:
+        description: >-
+          URL the browser uses for the API. Compiled into the frontend image at build time, so it
+          is public; never put a secret in it.
+        type: string
+        required: false
+        default: http://localhost:5000/api
+    outputs:
+      tag:
+        description: The tag both images were pushed with (the commit SHA).
+        value: ${{ jobs.images.outputs.tag }}
+      backend_image:
+        description: Backend image with its tag, e.g. ghcr.io/owner/repo/backend:<sha>.
+        value: ${{ jobs.images.outputs.backend_image }}
+      frontend_image:
+        description: Frontend image with its tag.
+        value: ${{ jobs.images.outputs.frontend_image }}
+  workflow_dispatch:
+    inputs:
+      frontend_api_url:
+        description: URL the browser uses for the API (compiled into the frontend image).
+        type: string
+        required: false
+        default: http://localhost:5000/api
+
+permissions:
+  contents: read
+
+jobs:
+  images:
+    name: Build, test and push images
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    # The only job in the repo that can write packages, and only this one gets the permission.
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      tag: ${{ steps.names.outputs.tag }}
+      backend_image: ${{ steps.names.outputs.backend_image }}
+      frontend_image: ${{ steps.names.outputs.frontend_image }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+
+      # Registry paths must be lower case, and the organisation name is not (IT7993-FALL-2026-PEERS).
+      - name: Work out the image names
+        id: names
+        run: |
+          repo="${GITHUB_REPOSITORY,,}"
+          tag="${GITHUB_SHA}"
+          case "$tag" in
+            latest|"") echo "Refusing to use '$tag' as an image tag." >&2; exit 1 ;;
+          esac
+          {
+            echo "tag=${tag}"
+            echo "backend_image=ghcr.io/${repo}/backend:${tag}"
+            echo "frontend_image=ghcr.io/${repo}/frontend:${tag}"
+          } >> "$GITHUB_OUTPUT"
+
+      # Same step a new teammate runs: creates the root .env with a random JWT_SECRET.
+      - name: Create .env (scripts/setup.js)
+        run: node scripts/setup.js --env-only
+
+      # docker-compose.yml reads BACKEND_IMAGE and FRONTEND_IMAGE, so the images Compose builds
+      # and starts are the ones that get pushed, not a second build of the same thing.
+      - name: Build and start the stack
+        run: docker compose up --build -d --wait --wait-timeout 300
+        env:
+          BACKEND_IMAGE: ${{ steps.names.outputs.backend_image }}
+          FRONTEND_IMAGE: ${{ steps.names.outputs.frontend_image }}
+          FRONTEND_API_URL: ${{ inputs.frontend_api_url }}
+
+      - name: Smoke check (backend and frontend)
+        run: bash scripts/verify-env.sh
+
+      # The health route answers 503 when MongoDB is not connected; this also checks the body.
+      - name: Health body reports the database connected
+        run: |
+          body=$(curl -sf http://localhost:5000/api/health)
+          echo "$body"
+          echo "$body" | grep -q '"status":"OK"'
+
+      - name: Show container logs on failure
+        if: ${{ failure() }}
+        run: docker compose ps -a && docker compose logs --no-color --tail 100
+        env:
+          BACKEND_IMAGE: ${{ steps.names.outputs.backend_image }}
+          FRONTEND_IMAGE: ${{ steps.names.outputs.frontend_image }}
+
+      - name: Stop the stack
+        if: ${{ always() }}
+        run: docker compose down -v
+        env:
+          BACKEND_IMAGE: ${{ steps.names.outputs.backend_image }}
+          FRONTEND_IMAGE: ${{ steps.names.outputs.frontend_image }}
+
+      # Only reached when every check above passed, so a failed build never leaves an image behind.
+      # The token is used here and nowhere earlier. It goes in on stdin, never on the command line.
+      - name: Log in to ghcr.io
+        run: echo "$REGISTRY_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+        env:
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push both images
+        run: |
+          docker push "$BACKEND_IMAGE"
+          docker push "$FRONTEND_IMAGE"
+        env:
+          BACKEND_IMAGE: ${{ steps.names.outputs.backend_image }}
+          FRONTEND_IMAGE: ${{ steps.names.outputs.frontend_image }}
+
+      - name: Log out of ghcr.io
+        if: ${{ always() }}
+        run: docker logout ghcr.io
+
+      # Names, tag and digests for Donald's release record.
+      - name: Image summary
+        run: |
+          backend_digest=$(docker inspect --format '{{ index .RepoDigests 0 }}' "$BACKEND_IMAGE")
+          frontend_digest=$(docker inspect --format '{{ index .RepoDigests 0 }}' "$FRONTEND_IMAGE")
+          {
+            echo "### Images pushed to ghcr.io"
+            echo ""
+            echo "| Image | Tag | Digest |"
+            echo "|---|---|---|"
+            echo "| \`${BACKEND_IMAGE%:*}\` | \`${TAG}\` | \`${backend_digest#*@}\` |"
+            echo "| \`${FRONTEND_IMAGE%:*}\` | \`${TAG}\` | \`${frontend_digest#*@}\` |"
+            echo ""
+            echo "Commit \`${TAG}\`. Both images were started with Compose and \`/api/health\` reported the database connected before the push."
+          } >> "$GITHUB_STEP_SUMMARY"
+        env:
+          BACKEND_IMAGE: ${{ steps.names.outputs.backend_image }}
+          FRONTEND_IMAGE: ${{ steps.names.outputs.frontend_image }}
+          TAG: ${{ steps.names.outputs.tag }}
