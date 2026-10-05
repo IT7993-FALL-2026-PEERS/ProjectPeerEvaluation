@@ -75,6 +75,17 @@ test('TC-29-46: main writes the summary and JSON file, and exits 1 only when a d
   }
 });
 
+// GitHub reports `abandoned` when no runner picked up the deploy job (seen on 5 Oct 2026). Before this
+// was accepted, the report itself failed with "set ENVIRONMENT and RESULT" and hid what happened.
+test('TC-29-48: a deploy job no runner picked up is reported as failed, not as bad settings', async (t) => {
+  t.mock.method(console, 'log', () => {});
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'deployment-status-'));
+  const file = path.join(dir, 'status.json');
+  assert.equal(describe('abandoned', null), 'Failed');
+  assert.equal(await main({ ENVIRONMENT: 'staging', RESULT: 'abandoned', HEALTH_URL: 'https://x/api/health' }, file, fast), 0);
+  assert.equal(JSON.parse(fs.readFileSync(file, 'utf8')).status, 'Failed');
+});
+
 test('TC-29-47: missing or unknown settings exit 2', async () => {
   assert.equal(await main({ RESULT: 'success' }, 'x.json', fast), 2);
   assert.equal(await main({ ENVIRONMENT: 'staging', RESULT: 'maybe' }, 'x.json', fast), 2);

@@ -6,7 +6,7 @@
 //   ENVIRONMENT=staging RESULT=success URL=https://... HEALTH_URL=https://.../api/health \
 //   COMMIT=<sha> IMAGE_TAG=<sha> RUN_URL=<run url> node scripts/deployment-status.js [output file]
 //
-//   RESULT      the deploy job's result: success, failure, cancelled or skipped
+//   RESULT      the deploy job's result: success, failure, cancelled, skipped or abandoned
 //   HEALTH_URL  optional; when set and RESULT is success, the app must answer 200 with status OK
 //
 // Exit codes: 0 reported (including a failed deploy: the deploy job is what fails), 1 the deploy
@@ -14,7 +14,8 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
-const RESULTS = ['success', 'failure', 'cancelled', 'skipped'];
+// `abandoned`: GitHub's result for a job no runner ever picked up. It deployed nothing, so it reports as Failed.
+const RESULTS = ['success', 'failure', 'cancelled', 'skipped', 'abandoned'];
 
 // One probe of the health URL. fetchImpl and the clock are injectable for the tests.
 async function probeHealth(url, { fetchImpl = fetch, attempts = 5, delayMs = 10000, sleep = (ms) => new Promise((r) => setTimeout(r, ms)) } = {}) {

@@ -23,7 +23,7 @@ on:
         type: string
         required: true
       result:
-        description: Result of the deploy job (success, failure, cancelled or skipped).
+        description: Result of the deploy job (success, failure, cancelled, skipped or abandoned).
         type: string
         required: true
       url:
