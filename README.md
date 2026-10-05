@@ -2,9 +2,9 @@
 
 Productionization, Automated Testing, and CI/CD for the PEERS Peer Evaluation System
 
-Last updated: 10/02/2026
+Last updated: 10/05/2026
 Status: Milestone 1 (Assessment & Planning) signed off by the sponsor on 28 Sep 2026 · Milestone 2
-(Quality Automation) starts 5 Oct, and most of its test automation and CI gates already run
+(Quality Automation) began 5 Oct (review 26 Oct), and most of its test automation and CI gates already run
 
 A web-based platform for professors to manage peer evaluations in team-based courses: create and
 manage student rosters, assign students to courses/teams, trigger email invitations, and receive
@@ -108,8 +108,8 @@ flowchart TB
     linkStyle default stroke-width:2px
 
     class BUILD_APP,LINT,SEC,DOCKER,UNIT,INTEG,REG,E2E,REPORT done
-    class ARTIFACTS,STG,HEALTH partial
-    class SMOKE,RC,DREPORT planned
+    class ARTIFACTS,STG,HEALTH,DREPORT partial
+    class SMOKE,RC planned
     class GATE,APPROVE gate
     class DEV,PROD,PR,MERGE,FIX endpoint
 ```
@@ -148,12 +148,13 @@ The quality gate is enforced today. Production approval is manual.
 | Dependency validation and security scan | Dependabot, OWASP Dependency Check, CodeQL code scanning, secret scanning | M3 | Live and blocking: OWASP Dependency-Check runs on every pull request, on `main`, and weekly (`.github/workflows/security.yml`) and fails on any finding with CVSS 7 or higher that is not an accepted risk (`.github/dependency-check-suppressions.xml`, each entry with an expiry date); CodeQL (GitHub default setup) scans the code on every pull request. Both are required checks. Dependabot opens weekly update pull requests (`.github/dependabot.yml`); its alerts, all in `react-scripts` build tooling, are triaged and dismissed as accepted risk. Secret scanning and push protection are on. The policy, the triage and the 10 accepted findings are in [`docs/security/security-policy.md`](docs/security/security-policy.md) |
 | Test report | Executed, passed, and failed tests, duration, and coverage | M4 | Live in CI: each test job writes tests run, passed, failed, skipped and duration to its run summary (`scripts/test-summary.js`) next to the coverage table, and keeps the result files as downloadable artifacts |
 | Quality gate | `main-protection` ruleset: a pull request, eight passing required checks and an up-to-date branch before merge. No approval required, so authors merge their own pull requests. No bypass, and direct pushes are rejected | M1 | Live. More checks are added as jobs are added |
-| Build artifacts and Docker images | Build the deployment artifacts and the frontend and backend images for the exact commit that passed CI | M2 | Partly live: the container check builds both images on every pull request. Publishing version-tagged images for the tested commit is planned, week of 2 Nov |
+| Build artifacts and Docker images | Build the deployment artifacts and the frontend and backend images for the exact commit that passed CI | M2 | Partly live: the container check builds both images on every pull request, and `image-build.yml` (reusable, or run by hand from the Actions tab) builds them, checks they start healthy and pushes both to GitHub Container Registry tagged with the commit SHA (see [`docs/cd-pipeline.md`](docs/cd-pipeline.md)). It has not yet run on a real commit and no CD workflow calls it yet; planned, week of 2 Nov |
 | Staging deploy | Automatic deploy to Render.com staging | M2 | Partly live: Render deploys `main` after CI passes (`render.yaml`); staging is switched off between checks and demos. CI-driven deploy of the tested commit planned, week of 9 Nov |
 | Smoke tests | Verify the deployment after each release | M5 | Planned, week of 9 Nov |
 | Deployment health check | Poll `/api/health` after deploy | M1 | Partly live: Render checks `/api/health` before switching traffic to a new deploy, and the endpoint reports the deployed commit. CI polling after deploy planned, week of 16 Nov |
 | Release candidate | Produce a release candidate after staging passes | M1 | Planned, week of 16 Nov |
-| Build and deployment reports | Build history and deployment status | M2 | Planned, week of 16 Nov (the CD workflow adds them to the same run summaries) |
+| Build and deployment reports | Build history and deployment status | M2 | Partly live: the `Run report` job adds every job's result and duration and the last ten runs to each CI run summary. `deployment-status.yml` produces the deployment status for a CD run to call; it shows once the CD workflow exists, planned week of 16 Nov |
+| Scheduled staging regression | Weekly smoke and end-to-end run against staging, without sending email | M5 | Workflow written (`staging-regression.yml`), manual runs only for now: staging is switched off between checks, and no tests are tagged `@staging` yet |
 | Production deploy | Manual sponsor approval. Not automated | Sponsor | By design |
 
 ### Detailed workflow reference (WF01–WF12)
@@ -269,8 +270,10 @@ deliverables signed off by the sponsor)
 - Development environment finalized, containerization completed
 - Unit, integration, functional regression, and end-to-end tests implemented
 - Continuous Integration pipeline operational with automated quality gates
-- Status on 2 Oct: containerization, unit, integration, regression and end-to-end tests and the
-  blocking CI gates already run on every pull request; staging checks and reporting remain
+- Status on 5 Oct: containerization, unit, integration, regression and end-to-end tests, the blocking
+  CI gates, and test and run reports in every CI summary already run on every pull request. Left:
+  frontend coverage (about 42% today against the 70% target, as `CourseManagement.js` is split into
+  tested components) and the items that need staging running
 
 📅 **Milestone 3 — Productionization** — 02 Nov – 06 Dec 2026 (review 30 Nov, final 06 Dec)
 - Continuous Delivery pipeline, automated staging deployment, smoke testing
@@ -360,13 +363,15 @@ The step-by-step version follows.
 ### Continuous Integration
 
 GitHub Actions (`.github/workflows/ci.yml`) runs on every pull request to `main` and on every push
-to `main`, on `ubuntu-24.04` runners. It has six jobs: frontend lint, tests and build; backend lint,
+to `main`, on `ubuntu-24.04` runners. It has six checking jobs: frontend lint, tests and build; backend lint,
 a syntax check and unit tests; integration tests against a real MongoDB; the Playwright end-to-end
-tests; a Docker Compose build and smoke check; and a lint of the workflow files (`actionlint`). Two
+tests; a Docker Compose build and smoke check; and a lint of the workflow files (`actionlint`). A
+seventh job, `Run report`, writes the result and duration of every job and the last ten runs to the
+run summary; it only reports and is not required. Two
 more scans run on every pull request: the OWASP Dependency-Check scan (`.github/workflows/security.yml`)
-and GitHub's CodeQL code scanning (default setup, no workflow file). A pull request shows ten
-entries in its checks list, and eight of them are required: the six jobs above, OWASP
-Dependency-Check and CodeQL. The `main` branch ruleset requires a pull request, those eight checks,
+and GitHub's CodeQL code scanning (default setup, no workflow file). A pull request shows eleven
+entries in its checks list (the seven jobs, OWASP Dependency-Check, and three CodeQL entries), and
+eight of them are required: the six checking jobs, OWASP Dependency-Check and CodeQL. The `main` branch ruleset requires a pull request, those eight checks,
 and a branch that is up to date with `main`. To reproduce the checks locally, use
 Node 24 (see `.nvmrc`) and run:
 
@@ -435,7 +440,8 @@ Primary contact for inquiries: Team Leader (Khoa Ho).
 
 ```
 .github/
-  workflows/             # ci.yml (CI), security.yml (OWASP Dependency-Check)
+  workflows/             # ci.yml (CI), security.yml (OWASP Dependency-Check), image-build.yml (images to
+                         # GHCR), deployment-status.yml (CD report), staging-regression.yml (manual for now)
   dependabot.yml         # weekly dependency update pull requests
   dependency-check-suppressions.xml  # accepted OWASP findings, each with an expiry date
   CODEOWNERS             # reviewers requested automatically
@@ -460,6 +466,8 @@ docs/
   research-report/       # tech stack analysis
   user-manual/
   gantt/                 # sponsor-approved schedule
+  cd-pipeline.md         # image build, reporting and staging regression workflows
+  docker-setup.md, team-guide.md, csv-upload-format.md
   deployment-review.md, dev-environment-review.md, containerization-recommendations.md
 DEPLOYMENT_GUIDE.md      # historical deployment notes (Render.com is the one in use)
 docker-compose.yml       # mongo + backend + frontend with health checks (docs/docker-setup.md)
@@ -467,7 +475,8 @@ Dockerfile.frontend      # CRA build -> nginx
 docker/nginx.conf        # SPA fallback for the frontend image
 src/backend/Dockerfile   # backend image (non-root)
 .env.example             # Docker Compose settings (src/backend/.env.example is for npm run dev)
-scripts/                 # setup.js (npm run setup), setup.sh, verify-env.sh, coverage-gate.js
+scripts/                 # setup.js (npm run setup), setup.sh, verify-env.sh, coverage-gate.js,
+                         # test-summary.js, run-report.js, deployment-status.js (CI reports)
 ```
 
 ---
@@ -478,9 +487,9 @@ scripts/                 # setup.js (npm run setup), setup.sh, verify-env.sh, co
 - **Backend**: Node.js, Express, MongoDB via Mongoose, JWT auth, Nodemailer
 - **Testing**: Jest + React Testing Library (frontend unit), `node:test` (backend unit and
   integration, against a real MongoDB started by `mongodb-memory-server`), Playwright (end-to-end)
-- **CI/CD**: GitHub Actions (CI is live, eight required checks); Render.com staging deploys
-  automatically after CI passes; a CI-driven delivery pipeline with smoke tests is planned for
-  Milestone 3
+- **CI/CD**: GitHub Actions (CI is live, eight required checks, with test and run reports in each
+  summary); Render.com staging deploys automatically after CI passes; a reusable image build to
+  GHCR is written, and a CI-driven delivery pipeline with smoke tests is planned for Milestone 3
 - **Security scanning**: Dependabot, OWASP Dependency-Check and CodeQL (both blocking), secret scanning
 - **Containerization**: Docker / Docker Compose (local dev and CI; deployment stays on Render,
   see `docs/docker-setup.md`)
