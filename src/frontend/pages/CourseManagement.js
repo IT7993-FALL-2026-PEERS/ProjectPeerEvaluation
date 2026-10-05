@@ -1,12 +1,11 @@
 // ...existing code...
 
 // ...existing code...
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 
 // Test comment for GitHub upload - Preston
 
 import {
-  Grid,
   Paper,
   Typography,
   Button,
@@ -16,10 +15,6 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
   TextField,
   IconButton,
   Chip,
@@ -67,6 +62,10 @@ import EvaluationStatusDialog from '../components/EvaluationStatusDialog';
 import TeamsDialog from '../components/TeamsDialog';
 import { EditTeamDialog, CreateTeamDialog } from '../components/TeamFormDialogs';
 import TeamStudentsDialog from '../components/TeamStudentsDialog';
+import StudentsDialog from '../components/StudentsDialog';
+import { CreateCourseDialog, EditCourseDialog } from '../components/CourseFormDialogs';
+import DeleteCourseDialog from '../components/DeleteCourseDialog';
+import CourseRosterUploadDialog from '../components/CourseRosterUploadDialog';
 import styles from '../styles/CourseManagement.module.css';
 import '../App.css';
 
@@ -367,17 +366,6 @@ function CourseManagement() {
   // The lists shown in the dialogs are worked out from the full list and the search fields, so they
   // can never be out of date: change `students`, `teams` or a search field and they follow. (They used
   // to be separate state set by hand, which showed the old list after a refresh.)
-  const filteredStudents = useMemo(() => students.filter(student => {
-    const matchesId = studentSearch.student_id === '' || 
-      student.student_id.toLowerCase().includes(studentSearch.student_id.toLowerCase());
-    const matchesName = studentSearch.name === '' || 
-      student.name.toLowerCase().includes(studentSearch.name.toLowerCase());
-    const matchesEmail = studentSearch.email === '' || 
-      student.email.toLowerCase().includes(studentSearch.email.toLowerCase());
-    const matchesTeam = studentSearch.team === '' || 
-      (student.group_assignment && student.group_assignment.toLowerCase().includes(studentSearch.team.toLowerCase()));
-    return matchesId && matchesName && matchesEmail && matchesTeam;
-  }), [students, studentSearch]);
 
 
   // Clear student search
@@ -1105,6 +1093,55 @@ function CourseManagement() {
         onClose={() => setCreateTeamDialogOpen(false)}
         onCreate={handleCreateTeam}
       />
+      <StudentsDialog
+        open={studentsDialogOpen}
+        course={studentsCourse}
+        students={students}
+        loading={studentsLoading}
+        search={studentSearch}
+        showSearch={showStudentSearch}
+        onToggleSearch={() => setShowStudentSearch(!showStudentSearch)}
+        onSearchChange={handleStudentSearchChange}
+        onClearSearch={clearStudentSearch}
+        onUploadCsv={() => setCsvUploadOpen(true)}
+        onAddStudent={() => setAddStudentOpen(true)}
+        onEdit={handleEditStudent}
+        onDelete={handleDeleteStudent}
+        onDeleteAll={() => setDeleteAllStudentsOpen(true)}
+        onClose={() => { setStudentsDialogOpen(false); fetchCoursesWithCounts(); }}
+      />
+      <CreateCourseDialog
+        open={createDialogOpen}
+        form={newCourse}
+        onFormChange={setNewCourse}
+        onClose={() => setCreateDialogOpen(false)}
+        onCreate={handleCreateCourse}
+      />
+      <EditCourseDialog
+        open={editDialogOpen}
+        form={editCourse}
+        onFormChange={setEditCourse}
+        onClose={() => setEditDialogOpen(false)}
+        onSave={handleEditCourse}
+      />
+      <DeleteCourseDialog
+        open={deleteDialogOpen}
+        onClose={() => setDeleteDialogOpen(false)}
+        onConfirm={handleDeleteCourse}
+      />
+      <CourseRosterUploadDialog
+        open={uploadDialogOpen}
+        file={uploadFile}
+        progress={uploadProgress}
+        onFileChange={setUploadFile}
+        onClose={() => setUploadDialogOpen(false)}
+        onCancel={() => {
+          setUploadDialogOpen(false);
+          setUploadFile(null);
+          setUploadProgress(0);
+        }}
+        onUpload={handleUploadRoster}
+      />
       <TeamStudentsDialog
         open={manageStudentsDialogOpen}
         team={selectedTeam}
@@ -1360,148 +1397,6 @@ function CourseManagement() {
                         >
                           <PersonIcon />
                         </IconButton>
-      {/* Manage Students Dialog */}
-  <Dialog open={studentsDialogOpen} onClose={() => { setStudentsDialogOpen(false); fetchCoursesWithCounts(); }} maxWidth="md" fullWidth>
-        <DialogTitle>Manage Students for {studentsCourse?.course_number || studentsCourse?.course_code} {studentsCourse?.course_section || ''} - {studentsCourse?.course_name}</DialogTitle>
-        <DialogContent>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-            <Button
-              variant="outlined"
-              startIcon={<FilterListIcon />}
-              onClick={() => setShowStudentSearch(!showStudentSearch)}
-              size="small"
-            >
-              {showStudentSearch ? 'Hide Search' : 'Show Search'}
-            </Button>
-            <Box sx={{ display: 'flex', gap: 1 }}>
-              <Button variant="outlined" size="small" startIcon={<UploadIcon />} onClick={() => setCsvUploadOpen(true)}>
-                Upload CSV
-              </Button>
-              <Button variant="contained" size="small" startIcon={<AddIcon />} onClick={() => setAddStudentOpen(true)}>
-                Add Student
-              </Button>
-            </Box>
-          </Box>
-
-          {/* Student Search Filters */}
-          <Collapse in={showStudentSearch}>
-            <Card sx={{ mb: 2 }}>
-              <CardContent>
-                <Typography variant="h6" gutterBottom>
-                  Search Students ({filteredStudents.length} of {students.length})
-                </Typography>
-                <Box sx={{ display: 'flex', gap: 2, mb: 2, flexWrap: 'wrap' }}>
-                  <TextField
-                    size="small"
-                    label="Student ID"
-                    value={studentSearch.student_id}
-                    onChange={(e) => handleStudentSearchChange('student_id', e.target.value)}
-                    placeholder="Search by ID..."
-                    sx={{ minWidth: 150, flex: 1 }}
-                  />
-                  <TextField
-                    size="small"
-                    label="Name"
-                    value={studentSearch.name}
-                    onChange={(e) => handleStudentSearchChange('name', e.target.value)}
-                    placeholder="Search by name..."
-                    sx={{ minWidth: 150, flex: 1 }}
-                  />
-                  <TextField
-                    size="small"
-                    label="Email"
-                    value={studentSearch.email}
-                    onChange={(e) => handleStudentSearchChange('email', e.target.value)}
-                    placeholder="Search by email..."
-                    sx={{ minWidth: 150, flex: 1 }}
-                  />
-                  <TextField
-                    size="small"
-                    label="Team"
-                    value={studentSearch.team}
-                    onChange={(e) => handleStudentSearchChange('team', e.target.value)}
-                    placeholder="Search by team..."
-                    sx={{ minWidth: 150, flex: 1 }}
-                  />
-                </Box>
-                <Box sx={{ display: 'flex', gap: 1 }}>
-                  <Button
-                    variant="outlined"
-                    size="small"
-                    startIcon={<ClearIcon />}
-                    onClick={clearStudentSearch}
-                    disabled={!studentSearch.student_id && !studentSearch.name && !studentSearch.email && !studentSearch.team}
-                  >
-                    Clear Search
-                  </Button>
-                </Box>
-              </CardContent>
-            </Card>
-          </Collapse>
-          {studentsLoading ? (
-            <LinearProgress />
-          ) : filteredStudents.length === 0 ? (
-            <Box sx={{ textAlign: 'center', py: 4 }}>
-              {students.length === 0 ? (
-                <Typography>No students found for this course.</Typography>
-              ) : (
-                <Typography>No students match your search criteria.</Typography>
-              )}
-            </Box>
-          ) : (
-            <TableContainer component={Paper} sx={{ mt: 2 }}>
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Student ID</TableCell>
-                    <TableCell>Name</TableCell>
-                    <TableCell>Email</TableCell>
-                    <TableCell>Team</TableCell>
-                    <TableCell align="center">Actions</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {filteredStudents.map((student) => (
-                    <TableRow key={student.id || student._id}>
-                      <TableCell>{student.student_id}</TableCell>
-                      <TableCell>{student.name}</TableCell>
-                      <TableCell>{student.email}</TableCell>
-                      <TableCell>
-                        {student.group_assignment ? (
-                          <Chip label={student.group_assignment} size="small" variant="outlined" />
-                        ) : (
-                          <Typography variant="body2" color="text.secondary">Not assigned</Typography>
-                        )}
-                      </TableCell>
-                      <TableCell align="center">
-                        <IconButton size="small" color="primary" onClick={() => handleEditStudent(student)} title="Edit Student">
-                          <EditIcon />
-                        </IconButton>
-                        <IconButton size="small" color="error" onClick={() => handleDeleteStudent(student)} title="Delete Student">
-                          <DeleteIcon />
-                        </IconButton>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button 
-            onClick={() => setDeleteAllStudentsOpen(true)}
-            color="error"
-            variant="outlined"
-            disabled={!students || students.length === 0}
-            startIcon={<DeleteIcon />}
-          >
-            Delete All Students
-          </Button>
-          <Box sx={{ flex: 1 }} />
-          <Button onClick={() => { setStudentsDialogOpen(false); fetchCoursesWithCounts(); }}>Close</Button>
-        </DialogActions>
-      </Dialog>
 
                         <IconButton
                           size="small"
@@ -1564,204 +1459,6 @@ function CourseManagement() {
           </Table>
         </TableContainer>
       </div>
-
-      {/* Create Course Dialog */}
-      <Dialog open={createDialogOpen} onClose={() => setCreateDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Create New Course</DialogTitle>
-        <DialogContent>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mt: 1 }}>
-            <TextField
-              fullWidth
-              variant="outlined"
-              label="Course Name"
-              value={newCourse.course_name}
-              onChange={(e) => setNewCourse({ ...newCourse, course_name: e.target.value })}
-              placeholder="Software Engineering"
-              autoFocus
-              margin="normal"
-            />
-            <TextField
-              fullWidth
-              variant="outlined"
-              label="Course Number"
-              value={newCourse.course_number}
-              onChange={(e) => setNewCourse({ ...newCourse, course_number: e.target.value })}
-              placeholder="CS 4850"
-              margin="normal"
-            />
-            <TextField
-              fullWidth
-              variant="outlined"
-              label="Course Section"
-              value={newCourse.course_section}
-              onChange={(e) => setNewCourse({ ...newCourse, course_section: e.target.value })}
-              placeholder="01"
-              margin="normal"
-            />
-            <TextField
-              fullWidth
-              variant="outlined"
-              label="Semester"
-              value={newCourse.semester}
-              onChange={(e) => setNewCourse({ ...newCourse, semester: e.target.value })}
-              placeholder="Fall 2025"
-              margin="normal"
-            />
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setCreateDialogOpen(false)}>Cancel</Button>
-          <Button 
-            onClick={handleCreateCourse} 
-            variant="contained"
-            disabled={!newCourse.course_name || !newCourse.course_number || !newCourse.course_section || !newCourse.semester}
-          >
-            Create
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Edit Course Dialog */}
-  <Dialog open={editDialogOpen} onClose={() => setEditDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Edit Course</DialogTitle>
-        <DialogContent>
-          <Grid container columns={12} columnSpacing={2} sx={{ mt: 1 }}>
-            <Grid sx={{ width: '100%' }}>
-              <TextField
-                fullWidth
-                variant="outlined"
-                label="Course Name"
-                value={editCourse.course_name}
-                onChange={(e) => setEditCourse({ ...editCourse, course_name: e.target.value })}
-                placeholder="Software Engineering"
-                autoComplete="off"
-                autoFocus
-                margin="normal"
-              />
-            </Grid>
-            <Grid sx={{ width: '100%' }}>
-              <TextField
-                fullWidth
-                variant="outlined"
-                label="Course Number"
-                value={editCourse.course_number}
-                onChange={(e) => setEditCourse({ ...editCourse, course_number: e.target.value })}
-                placeholder="CS 4850"
-                autoComplete="off"
-                margin="normal"
-              />
-            </Grid>
-            <Grid sx={{ width: '100%' }}>
-              <TextField
-                fullWidth
-                variant="outlined"
-                label="Course Section"
-                value={editCourse.course_section}
-                onChange={(e) => setEditCourse({ ...editCourse, course_section: e.target.value })}
-                placeholder="01"
-                autoComplete="off"
-                margin="normal"
-              />
-            </Grid>
-            <Grid sx={{ width: '100%' }}>
-              <TextField
-                fullWidth
-                variant="outlined"
-                label="Semester"
-                value={editCourse.semester}
-                onChange={(e) => setEditCourse({ ...editCourse, semester: e.target.value })}
-                placeholder="Fall 2025"
-                autoComplete="off"
-                margin="normal"
-              />
-            </Grid>
-            <Grid sx={{ width: '100%' }}>
-              <FormControl fullWidth margin="normal">
-                <InputLabel>Course Status</InputLabel>
-                <Select
-                  value={editCourse.course_status}
-                  label="Course Status"
-                  onChange={(e) => setEditCourse({ ...editCourse, course_status: e.target.value })}
-                >
-                  <MenuItem value="Active">Active</MenuItem>
-                  <MenuItem value="Inactive">Inactive</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-          </Grid>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setEditDialogOpen(false)}>Cancel</Button>
-          <Button 
-            onClick={handleEditCourse} 
-            variant="contained"
-            disabled={!editCourse.course_name || !editCourse.course_number || !editCourse.course_section || !editCourse.semester}
-          >
-            Save
-          </Button>
-        </DialogActions>
-      </Dialog>
-      {/* Delete Course Dialog */}
-      <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle>Delete Course</DialogTitle>
-        <DialogContent>
-          <Typography>Are you sure you want to delete this course?</Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
-          <Button onClick={handleDeleteCourse} color="error" variant="contained">Delete</Button>
-        </DialogActions>
-      </Dialog>
-      <Dialog open={uploadDialogOpen} onClose={() => setUploadDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Upload Student Roster</DialogTitle>
-        <DialogContent>
-          <Box sx={{ mt: 2 }}>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-              Upload a CSV file with the following columns:
-            </Typography>
-            <span style={{ fontWeight: 'bold', color: 'red', fontSize: '1.1em' }}>student_id,name,email,team_name</span>
-            <Button
-              variant="outlined"
-              component="label"
-              fullWidth
-              sx={{ mt: 2 }}
-              startIcon={<UploadIcon />}
-            >
-              Select CSV File
-              <input
-                type="file"
-                hidden
-                accept=".csv"
-                onChange={(e) => setUploadFile(e.target.files[0])}
-              />
-            </Button>
-            {uploadFile && (
-              <Typography variant="body2" sx={{ mt: 1 }}>
-                Selected: {uploadFile.name}
-              </Typography>
-            )}
-            {uploadProgress > 0 && (
-              <LinearProgress variant="determinate" value={uploadProgress} sx={{ mt: 2 }} />
-            )}
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => {
-            setUploadDialogOpen(false);
-            setUploadFile(null);
-            setUploadProgress(0);
-          }}>
-            Cancel
-          </Button>
-          <Button 
-            onClick={handleUploadRoster} 
-            variant="contained"
-            disabled={!uploadFile || uploadProgress > 0}
-          >
-            Upload
-          </Button>
-        </DialogActions>
-      </Dialog>
 
       <EvaluationStatusDialog
         open={evaluationStatusOpen}

@@ -145,7 +145,7 @@ teams, invitations, reports, CSV download), `e2e/students.spec.js` (E2E-17 to 20
 upload and delete-all on the Manage Students dialogs) and `e2e/evaluations.spec.js` (E2E-21 to 24: the
 evaluation status dialog, reminders, resetting, and the "Evaluations Already Sent" confirmation), `e2e/teams.spec.js` (E2E-25 to 30: moving
 students in and out of a team, team search, editing a team, sending to one team, Clear All Teams,
-and one dialog, not one per course) and `e2e/student.spec.js` (E2E-10 to 14: opening the link without a login, rating and
+and one dialog, not one per course), `e2e/courses.spec.js` (E2E-31 to 36: the Manage Students list with its search and single delete, and creating, editing and deleting a course) and `e2e/student.spec.js` (E2E-10 to 14: opening the link without a login, rating and
 submitting, the professor's count, no second submission, a bad link, missing feedback). The run
 refuses to start if another server already holds port 5000 or the build points at a hosted
 backend, so it can never reach a real database or mail account. Without
@@ -245,6 +245,8 @@ opening floors:
 | Frontend floor, raised a third time (4 Oct) | 37% | 41% | 39% |
 | Frontend after the team dialogs were split out (5 Oct) | 39.45% | 46.65% | 46.58% |
 | Frontend floor, raised a fourth time (5 Oct) | 39% | 46% | 46% |
+| Frontend after the student list and course dialogs were split out (5 Oct) | 41.97% | 52.41% | 54.61% |
+| Frontend floor, raised a fifth time (5 Oct) | 41% | 52% | 54% |
 
 - **What is measured:** the backend's `controllers`, `middleware`, `models`, `routes`, `utils`
   and `config` folders plus `index.js`; the frontend's `src/frontend` source, excluding tests and
@@ -260,9 +262,9 @@ opening floors:
   build pass; add tests instead.
 - **Run it locally:** `npm test -- --watchAll=false --coverage && node scripts/coverage-gate.js frontend`,
   and `cd src/backend && npm run test:coverage && node ../../scripts/coverage-gate.js backend`.
-- **The gap is on the frontend** (about 33%, up from 8% once the Reports, StudentEvaluation,
-  Settings and LoginPage pages were tested on 3 and 4 Oct): `CourseManagement.js` alone is 2,687 lines, 62% of the
-  frontend's executable lines, and has to be split before it can be tested meaningfully (see §8).
+- **The gap is on the frontend** (about 42% on 5 Oct, up from 8% on 2 Oct): `CourseManagement.js` was
+  2,687 lines, 62% of the frontend's executable lines, and is being split into tested components
+  (CICD-57); 1,478 lines are left, mostly its data loading and handlers (see §8).
   The backend is already near the target.
 
 Coverage is a floor, not a goal. A suite at 90% that never asserts the acceptance criteria in
@@ -312,9 +314,9 @@ with the backend and database work.
 
 One of M4's open questions affects more than the frontend and belongs to the team:
 
-- `CourseManagement.js` is 2,687 lines. Testing it meaningfully means splitting it first.
-  That is refactoring work nobody currently owns, and it will otherwise become the reason
-  the coverage threshold cannot be met.
+- `CourseManagement.js` was 2,687 lines. Testing it meaningfully means splitting it first (CICD-57,
+  under way: the dialogs are out, the data handling is next). Without that work it would have
+  become the reason the coverage threshold cannot be met.
 
 **Resolved since M4's document was written.** `ProtectedRoute` is no longer a passthrough —
 it reads the stored token and redirects to the login page when there is none
