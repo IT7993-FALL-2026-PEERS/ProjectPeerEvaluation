@@ -168,7 +168,7 @@ The numbers move as steps land.
 | Release candidate | Produce a release candidate after staging passes | M1 | Planned, week of 16 Nov |
 | Build and deployment reports | Build history and deployment status | M2 | Partly live: the `Run report` job adds every job's result and duration and the last ten runs to each CI run summary. `deployment-status.yml` produces the deployment status for a CD run to call; it shows once the CD workflow exists, planned week of 16 Nov |
 | Scheduled staging regression | Weekly smoke and end-to-end run against staging, without sending email | M5 | Workflow written (`staging-regression.yml`), manual runs only for now: staging is switched off between checks, and no tests are tagged `@staging` yet |
-| Production deploy | Manual sponsor approval. Not automated | Sponsor | By design |
+| Production deploy | Manual sponsor approval. Not automated | Sponsor | By design. The approval gate is written: `promote.yml` waits for Dr. Vyas or Khoa to approve in the `production` environment (no self-review, `rc-*` tags only), then publishes a GitHub Release. The deploy itself is a placeholder, because production hosting is out of scope (CICD-30, [`docs/cd-pipeline.md`](docs/cd-pipeline.md)) |
 
 ### Detailed workflow reference (WF01–WF12)
 
