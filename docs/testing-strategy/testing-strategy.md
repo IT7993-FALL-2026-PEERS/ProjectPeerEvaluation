@@ -233,6 +233,8 @@ opening floors:
 | Frontend floor | 7% | 6% | 7% |
 | Frontend after the page tests (3 Oct) | 30.34% | 27.46% | 29.39% |
 | Frontend floor, raised (3 Oct) | 29% | 26% | 28% |
+| Frontend after the LoginPage tests (4 Oct) | 33.06% | 29.78% | 32.09% |
+| Frontend floor, raised (4 Oct) | 32% | 28% | 31% |
 
 - **What is measured:** the backend's `controllers`, `middleware`, `models`, `routes`, `utils`
   and `config` folders plus `index.js`; the frontend's `src/frontend` source, excluding tests and
@@ -248,8 +250,8 @@ opening floors:
   build pass; add tests instead.
 - **Run it locally:** `npm test -- --watchAll=false --coverage && node scripts/coverage-gate.js frontend`,
   and `cd src/backend && npm run test:coverage && node ../../scripts/coverage-gate.js backend`.
-- **The gap is on the frontend** (about 30%, up from 8% once the Reports, StudentEvaluation and
-  Settings pages were tested on 3 Oct): `CourseManagement.js` alone is 2,687 lines, 62% of the
+- **The gap is on the frontend** (about 33%, up from 8% once the Reports, StudentEvaluation,
+  Settings and LoginPage pages were tested on 3 and 4 Oct): `CourseManagement.js` alone is 2,687 lines, 62% of the
   frontend's executable lines, and has to be split before it can be tested meaningfully (see §8).
   The backend is already near the target.
 
