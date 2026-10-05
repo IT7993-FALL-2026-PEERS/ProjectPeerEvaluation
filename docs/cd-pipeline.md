@@ -42,7 +42,8 @@ Production hosting is out of scope, so staging is the only deploy target. The re
 On 5 October 2026 we removed the leftovers from the unmerged `with-test-coverage` branch (audit A-05, A-06):
 the `production-backend`, `production-frontend` and `with-test-coverage - peer-evaluation-backend` environments, the
 `deploy-{backend,frontend}-production-*` tags, and all four `RENDER_*_DEPLOY_HOOK_URL` repo secrets, which no workflow on
-`main` used. No production or other unused Render services exist in any workspace.
+`main` used. We deleted their 8 deployment records from 22 September as well, so the environments can't come back,
+and suspended the unused Render services.
 
 If `cd.yml` needs a Render deploy hook, regenerate it in Render and store it as a secret of the staging environment that
 the deploy job targets, not as a repository secret. A hook URL works like a password: anyone who has it can deploy.
