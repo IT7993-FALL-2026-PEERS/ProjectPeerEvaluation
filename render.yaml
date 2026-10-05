@@ -32,6 +32,9 @@ services:
         value: "24" # keep in sync with .nvmrc
       - key: NODE_ENV
         value: production
+      # Turns on the staging email guard (src/backend/utils/emailGuard.js, CICD-44).
+      - key: DEPLOY_ENV
+        value: staging
       - key: JWT_SECRET
         generateValue: true
       - key: MONGODB_URI
@@ -39,8 +42,9 @@ services:
       # Links in invitation and reset emails point here.
       - key: FRONTEND_URL
         value: https://peers-frontend-staging.onrender.com
-      # Staging must never email real students: point these at a test inbox
-      # (e.g. a Mailtrap sandbox), not a real mail account.
+      # Staging must never email real students. The backend enforces it: with
+      # DEPLOY_ENV=staging it refuses to send unless SMTP_HOST is the Mailtrap
+      # sandbox (sandbox.smtp.mailtrap.io) and SMTP_SERVICE is unset.
       - key: SMTP_HOST
         sync: false
       - key: SMTP_PORT

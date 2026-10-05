@@ -1,4 +1,5 @@
 const nodemailer = require('nodemailer');
+const { checkTransport } = require('./emailGuard');
 
 // Email configuration
 // In production, these should come from environment variables
@@ -19,6 +20,14 @@ const EMAIL_CONFIG = {
 
 // Create transporter
 const transporter = nodemailer.createTransport(EMAIL_CONFIG);
+
+// Every message goes through here. On staging, anything but the Mailtrap sandbox is refused
+// before sending (utils/emailGuard.js); the callers' catch blocks turn that into success: false.
+async function deliver(mailOptions) {
+  const guard = checkTransport(process.env);
+  if (!guard.allowed) throw new Error(guard.reason);
+  return transporter.sendMail(mailOptions);
+}
 
 /**
  * Send evaluation invitation email to a student
@@ -92,7 +101,7 @@ async function sendEvaluationInvitation(student, course, evaluationToken, fronte
   };
 
   try {
-    const info = await transporter.sendMail(mailOptions);
+    const info = await deliver(mailOptions);
     console.log('Email sent successfully:', info.messageId);
     return { success: true, messageId: info.messageId };
   } catch (error) {
@@ -134,7 +143,7 @@ async function sendEvaluationReminder(student, course, evaluationToken, frontend
   };
 
   try {
-    const info = await transporter.sendMail(mailOptions);
+    const info = await deliver(mailOptions);
     return { success: true, messageId: info.messageId };
   } catch (error) {
     console.error('Error sending reminder email:', error);
@@ -177,7 +186,7 @@ async function sendPasswordResetEmail(email, token, frontendUrl = 'http://localh
     html: htmlContent
   };
   try {
-    const info = await transporter.sendMail(mailOptions);
+    const info = await deliver(mailOptions);
     console.log('Password reset email sent:', info.messageId);
     return { success: true, messageId: info.messageId };
   } catch (error) {

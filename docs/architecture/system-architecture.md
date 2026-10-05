@@ -217,6 +217,7 @@ the new bcrypt hash and clears the token so the link works once.
 | Student access | A per-student token in the link, the only credential | Random (`crypto.randomBytes`) and valid for 14 days (API-1); a submission must rate exactly the evaluator's teammates, once each, with whole-number ratings (API-2) |
 | MFA | Model field and login branch exist | Verification returns 501, so MFA can't be used (D-17) |
 | Transport | HTTPS on Render; SMTP over STARTTLS with certificate checking | — |
+| Staging email | With `DEPLOY_ENV=staging` (or a `*-staging` Render service) the mailer sends only through the Mailtrap sandbox and refuses any other transport (`utils/emailGuard.js`) | — (CICD-44) |
 | CORS | `localhost:3000` and any `*.onrender.com` origin, credentials allowed | Broader than needed (D-13) |
 | Exported data | CSV fields quoted and formula-prefixed | — |
 | Dependencies | Dependabot weekly; OWASP Dependency-Check and CodeQL on every PR, both required (OWASP fails on CVSS 7 or higher unless accepted) | Frontend: findings in `react-scripts` build tooling are accepted risks with expiry dates (`docs/security/security-policy.md`) |
