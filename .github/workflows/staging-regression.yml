@@ -18,6 +18,17 @@ on:
   # Re-enable once staging is running and the STAGING_URL / STAGING_API_URL variables are set:
   # schedule:
   #   - cron: "0 6 * * 2" # Tuesdays 06:00 UTC, away from the Monday security scan
+  # cd.yml calls it as the post-deploy smoke tests (CICD-28), with the staging URLs as inputs.
+  workflow_call:
+    inputs:
+      base_url:
+        description: Frontend URL to test.
+        type: string
+        required: false
+      api_url:
+        description: Backend API URL ending in /api.
+        type: string
+        required: false
   workflow_dispatch:
     inputs:
       base_url:
