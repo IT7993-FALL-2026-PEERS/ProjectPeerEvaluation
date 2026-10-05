@@ -142,7 +142,8 @@ static files. A small control server resets the data before each test and return
 email, so the student tests take the link from the invitation email. Specs: `e2e/instructor.spec.js`
 (E2E-01 to 09, 15 and 16: login, session, roster upload and its error message, one upload dialog,
 teams, invitations, reports, CSV download), `e2e/students.spec.js` (E2E-17 to 20: add, edit, CSV
-upload and delete-all on the Manage Students dialogs) and `e2e/student.spec.js` (E2E-10 to 14: opening the link without a login, rating and
+upload and delete-all on the Manage Students dialogs) and `e2e/evaluations.spec.js` (E2E-21 to 24: the
+evaluation status dialog, reminders, resetting, and the "Evaluations Already Sent" confirmation) and `e2e/student.spec.js` (E2E-10 to 14: opening the link without a login, rating and
 submitting, the professor's count, no second submission, a bad link, missing feedback). The run
 refuses to start if another server already holds port 5000 or the build points at a hosted
 backend, so it can never reach a real database or mail account. Without
@@ -238,6 +239,8 @@ opening floors:
 | Frontend floor, raised (4 Oct) | 32% | 28% | 31% |
 | Frontend after the student dialogs were split out (4 Oct) | 34.42% | 35.14% | 35.81% |
 | Frontend floor, raised again (4 Oct) | 34% | 34% | 35% |
+| Frontend after the evaluation dialogs were split out (4 Oct) | 37.17% | 41.83% | 39.38% |
+| Frontend floor, raised a third time (4 Oct) | 37% | 41% | 39% |
 
 - **What is measured:** the backend's `controllers`, `middleware`, `models`, `routes`, `utils`
   and `config` folders plus `index.js`; the frontend's `src/frontend` source, excluding tests and

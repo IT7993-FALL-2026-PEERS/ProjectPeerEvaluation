@@ -63,6 +63,8 @@ import AddStudentDialog from '../components/AddStudentDialog';
 import EditStudentDialog from '../components/EditStudentDialog';
 import CsvUploadDialog from '../components/CsvUploadDialog';
 import DeleteAllStudentsDialog from '../components/DeleteAllStudentsDialog';
+import EvaluationResetDialog from '../components/EvaluationResetDialog';
+import EvaluationStatusDialog from '../components/EvaluationStatusDialog';
 import styles from '../styles/CourseManagement.module.css';
 import '../App.css';
 
@@ -117,11 +119,6 @@ function CourseManagement() {
   const [evaluationStatus, setEvaluationStatus] = useState(null);
   const [selectedCourseForEval, setSelectedCourseForEval] = useState(null);
 
-  // State for test evaluation
-  const [testEvaluationOpen, setTestEvaluationOpen] = useState(false);
-  const [testEvaluationData] = useState(null);
-  const [testEvaluationLoading] = useState(false);
-  
 
   // State for sending evaluations (per course)
   const [sendingEvaluations, setSendingEvaluations] = useState({});
@@ -1042,23 +1039,11 @@ function CourseManagement() {
           </Typography>
         </Box>
       </Box>
-      {/* Evaluation Reset Confirmation Dialog */}
-      <Dialog open={showEvalResetDialog} onClose={handleCancelEvalReset} maxWidth="xs" fullWidth>
-        {console.log('Eval Reset Dialog rendered', { showEvalResetDialog, pendingEvalResetCourseId, pendingTeamAction })}
-        <DialogTitle>Evaluations Already Sent</DialogTitle>
-        <DialogContent>
-          <Typography variant="body1" sx={{ mb: 2 }}>
-            Evaluations have already been sent for this course. If you continue, the evaluation state will be reset and you will need to resend evaluations. This will clear all evaluation tokens and responses for this course.
-          </Typography>
-          <Typography variant="body2" color="error" sx={{ mb: 2 }}>
-            This action cannot be undone. Do you want to continue?
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCancelEvalReset} color="secondary">Cancel</Button>
-          <Button onClick={handleConfirmEvalReset} color="warning" variant="contained">Continue</Button>
-        </DialogActions>
-      </Dialog>
+      <EvaluationResetDialog
+        open={showEvalResetDialog}
+        onCancel={handleCancelEvalReset}
+        onConfirm={handleConfirmEvalReset}
+      />
       <AddStudentDialog
         open={addStudentOpen}
         form={studentForm}
@@ -2088,312 +2073,18 @@ function CourseManagement() {
         </DialogActions>
       </Dialog>
 
-      {/* Evaluation Status Dialog */}
-      <Dialog 
-        open={evaluationStatusOpen} 
-        onClose={() => setEvaluationStatusOpen(false)} 
-        maxWidth="lg" 
-        fullWidth
-      >
-        <DialogTitle>
-          Evaluation Status - {selectedCourseForEval?.course_number || selectedCourseForEval?.course_code} {selectedCourseForEval?.course_section || ''} - {selectedCourseForEval?.course_name}
-        </DialogTitle>
-        <DialogContent>
-          {evaluationStatusLoading ? (
-            <Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}>
-              <LinearProgress sx={{ width: '100%' }} />
-            </Box>
-          ) : evaluationStatus ? (
-            <Box>
-              {/* Check if evaluations have been sent */}
-              {!evaluationStatus.evaluations_sent ? (
-                <Alert severity="info" sx={{ textAlign: 'center', py: 4 }}>
-                  <Typography variant="h6" gutterBottom>
-                    Evaluations Have Not Been Sent
-                  </Typography>
-                  <Typography variant="body1" sx={{ mb: 2 }}>
-                    Send evaluations to students to begin tracking completion status.
-                  </Typography>
-                  <Button
-                    variant="contained"
-                    color="primary"
-                    startIcon={sendingEvaluations[selectedCourseForEval._id || selectedCourseForEval.id] ? <CircularProgress size={20} color="inherit" /> : <SendIcon />}
-                    onClick={() => {
-                      handleSendInvitations(selectedCourseForEval._id || selectedCourseForEval.id);
-                    }}
-                    size="large"
-                    disabled={sendingEvaluations[selectedCourseForEval._id || selectedCourseForEval.id]}
-                  >
-                    {sendingEvaluations[selectedCourseForEval._id || selectedCourseForEval.id] ? 'Sending Evaluations...' : 'Send Evaluations Now'}
-                  </Button>
-                </Alert>
-              ) : (
-                <>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                    <Typography variant="h6">
-                      Progress: {evaluationStatus.completed_count}/{evaluationStatus.total_count} evaluations completed
-                    </Typography>
-                    <Button
-                      variant="contained"
-                      color="primary"
-                      startIcon={<SendIcon />}
-                      onClick={() => handleSendReminders(selectedCourseForEval._id || selectedCourseForEval.id)}
-                      disabled={evaluationStatus.completed_count === evaluationStatus.total_count}
-                    >
-                      Send Reminders
-                    </Button>
-                  </Box>
-                  
-                  <LinearProgress 
-                    variant="determinate" 
-                    value={evaluationStatus.total_count > 0 ? (evaluationStatus.completed_count / evaluationStatus.total_count) * 100 : 0}
-                    sx={{ height: 10, borderRadius: 5, mb: 3 }}
-                  />
-                  
-                  {/* Team-based view */}
-                  {(() => {
-                    // Group students by team
-                    const teamGroups = evaluationStatus.students?.reduce((acc, student) => {
-                      const teamName = student.team || 'No Team';
-                      if (!acc[teamName]) {
-                        acc[teamName] = [];
-                      }
-                      acc[teamName].push(student);
-                      return acc;
-                    }, {}) || {};
-
-                    const sortedTeams = Object.entries(teamGroups).sort(([a], [b]) => {
-                      // Sort teams by name, with "No Team" last
-                      if (a === 'No Team') return 1;
-                      if (b === 'No Team') return -1;
-                      
-                      // Handle team names with numbers (e.g., "Team 1", "Team 10", "Team 2")
-                      const aMatch = a.match(/^(.+?)(\d+)(.*)$/);
-                      const bMatch = b.match(/^(.+?)(\d+)(.*)$/);
-                      
-                      if (aMatch && bMatch) {
-                        // Both have numbers - compare prefix first
-                        const prefixCompare = aMatch[1].localeCompare(bMatch[1]);
-                        if (prefixCompare !== 0) return prefixCompare;
-                        
-                        // Same prefix - compare numbers numerically
-                        const numA = parseInt(aMatch[2]);
-                        const numB = parseInt(bMatch[2]);
-                        if (numA !== numB) return numA - numB;
-                        
-                        // Same number - compare suffix
-                        return aMatch[3].localeCompare(bMatch[3]);
-                      }
-                      
-                      // Fallback to regular string comparison
-                      return a.localeCompare(b);
-                    });
-
-                    return (
-                      <Grid container spacing={2}>
-                        {sortedTeams.map(([teamName, teamStudents]) => {
-                          const completedCount = teamStudents.filter(s => s.completed).length;
-                          const totalCount = teamStudents.length;
-                          const completionRate = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
-                          
-                          return (
-                            <Grid item xs={12} sm={6} md={4} lg={2.4} key={teamName}>
-                              <Card variant="outlined">
-                                <CardContent>
-                                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                                    <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center' }}>
-                                      <GroupIcon sx={{ mr: 1 }} />
-                                      {teamName}
-                                    </Typography>
-                                    <Chip
-                                      label={`${completedCount}/${totalCount}`}
-                                      color={completionRate === 100 ? 'success' : completionRate > 50 ? 'warning' : 'error'}
-                                      size="small"
-                                    />
-                                  </Box>
-                                  
-                                  <LinearProgress 
-                                    variant="determinate" 
-                                    value={completionRate}
-                                    sx={{ 
-                                      height: 8, 
-                                      borderRadius: 4, 
-                                      mb: 2,
-                                      '& .MuiLinearProgress-bar': {
-                                        backgroundColor: completionRate === 100 ? '#4caf50' : completionRate > 50 ? '#ff9800' : '#f44336'
-                                      }
-                                    }}
-                                  />
-                                  
-                                  <Box sx={{ maxHeight: 200, overflowY: 'auto' }}>
-                                    {teamStudents.map((student, index) => (
-                                      <Box key={student.student_id || index} sx={{ 
-                                        display: 'flex', 
-                                        justifyContent: 'space-between', 
-                                        alignItems: 'center',
-                                        py: 0.5,
-                                        borderBottom: index < teamStudents.length - 1 ? '1px solid #eee' : 'none'
-                                      }}>
-                                        <Box>
-                                          <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                            {student.name}
-                                          </Typography>
-                                          <Typography variant="caption" color="text.secondary">
-                                            {student.student_id}
-                                          </Typography>
-                                        </Box>
-                                        <Box sx={{ textAlign: 'right' }}>
-                                          <Chip 
-                                            label={student.completed ? 'Done' : 'Pending'} 
-                                            color={student.completed ? 'success' : 'warning'}
-                                            size="small"
-                                            sx={{ mb: 0.5 }}
-                                          />
-                                          <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                                            {student.last_activity ? new Date(student.last_activity).toLocaleDateString() : 'Never'}
-                                          </Typography>
-                                        </Box>
-                                      </Box>
-                                    ))}
-                                  </Box>
-                                </CardContent>
-                              </Card>
-                            </Grid>
-                          );
-                        })}
-                      </Grid>
-                    );
-                  })()}
-                </>
-              )}
-            </Box>
-          ) : (
-            <Alert severity="info">No evaluation data available for this course.</Alert>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button 
-            onClick={() => handleResetEvaluationState(selectedCourseForEval._id || selectedCourseForEval.id)}
-            color="warning"
-            disabled={resettingEvaluations}
-            startIcon={resettingEvaluations ? <CircularProgress size={16} /> : <ClearIcon />}
-          >
-            {resettingEvaluations ? 'Resetting...' : 'Reset Evaluation State'}
-          </Button>
-          <Button onClick={() => setEvaluationStatusOpen(false)}>Close</Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Test Evaluation Dialog */}
-      <Dialog 
-        open={testEvaluationOpen} 
-        onClose={() => setTestEvaluationOpen(false)} 
-        maxWidth="md" 
-        fullWidth
-      >
-        <DialogTitle>
-          Test Evaluation Form - {testEvaluationData?.course?.course_number || testEvaluationData?.course?.course_code} {testEvaluationData?.course?.course_section || ''} - {testEvaluationData?.course?.course_name}
-        </DialogTitle>
-        <DialogContent>
-          {testEvaluationLoading ? (
-            <Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}>
-              <LinearProgress sx={{ width: '100%' }} />
-            </Box>
-          ) : testEvaluationData ? (
-            <Box>
-              {!testEvaluationData.evaluations_sent ? (
-                <Alert severity="info" sx={{ textAlign: 'center', py: 4 }}>
-                  <Typography variant="h6" gutterBottom>
-                    Evaluations Have Not Been Sent
-                  </Typography>
-                  <Typography variant="body1">
-                    You must send evaluations to students before you can test the evaluation form.
-                    Use the "Send Evaluations" button in the course management interface.
-                  </Typography>
-                </Alert>
-              ) : (
-                <>
-                  <Alert severity="info" sx={{ mb: 2 }}>
-                    This allows you to test the student evaluation form using real student data from your course.
-                  </Alert>
-                  
-                  <Typography variant="h6" gutterBottom>
-                    Test Student: {testEvaluationData.student.name} ({testEvaluationData.student.student_id})
-                  </Typography>
-                  
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                    Email: {testEvaluationData.student.email}
-                  </Typography>
-                  
-                  <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
-                    <Button
-                      variant="contained"
-                      color="primary"
-                      onClick={() => window.open(testEvaluationData.evaluationUrl, '_blank')}
-                      startIcon={<BarChartIcon />}
-                    >
-                      Open Evaluation Form
-                    </Button>
-                    
-                    <Button
-                      variant="outlined"
-                      onClick={() => {
-                        navigator.clipboard.writeText(testEvaluationData.evaluationUrl);
-                        setAlert({ severity: 'success', message: 'Evaluation URL copied to clipboard' });
-                      }}
-                    >
-                      Copy URL
-                    </Button>
-                  </Box>
-                  
-                  <Typography variant="body2" sx={{ mb: 1 }}>
-                    <strong>Evaluation URL:</strong>
-                  </Typography>
-                  <TextField
-                    fullWidth
-                    value={testEvaluationData.evaluationUrl}
-                    InputProps={{
-                      readOnly: true,
-                    }}
-                    size="small"
-                    sx={{ mb: 2 }}
-                  />
-                  
-                  {testEvaluationData.allStudents.length > 1 && (
-                    <Box>
-                      <Typography variant="body2" sx={{ mb: 1 }}>
-                        <strong>Other students in course:</strong>
-                      </Typography>
-                      <Box sx={{ maxHeight: 200, overflow: 'auto' }}>
-                        {testEvaluationData.allStudents.slice(1).map((student) => (
-                          <Box key={student.student_id} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 1, borderBottom: '1px solid #eee' }}>
-                            <Typography variant="body2">
-                              {student.name} ({student.student_id})
-                            </Typography>
-                            <Button
-                              size="small"
-                              onClick={() => {
-                                window.open(`${window.location.origin}/evaluate/${student.evaluation_token}`, '_blank');
-                              }}
-                            >
-                              Test
-                            </Button>
-                          </Box>
-                        ))}
-                      </Box>
-                    </Box>
-                  )}
-                </>
-              )}
-            </Box>
-          ) : (
-            <Alert severity="warning">No evaluation data available for testing.</Alert>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setTestEvaluationOpen(false)}>Close</Button>
-        </DialogActions>
-      </Dialog>
+      <EvaluationStatusDialog
+        open={evaluationStatusOpen}
+        course={selectedCourseForEval}
+        status={evaluationStatus}
+        loading={evaluationStatusLoading}
+        sending={Boolean(selectedCourseForEval && sendingEvaluations[selectedCourseForEval._id || selectedCourseForEval.id])}
+        resetting={resettingEvaluations}
+        onSend={() => handleSendInvitations(selectedCourseForEval._id || selectedCourseForEval.id)}
+        onRemind={() => handleSendReminders(selectedCourseForEval._id || selectedCourseForEval.id)}
+        onReset={() => handleResetEvaluationState(selectedCourseForEval._id || selectedCourseForEval.id)}
+        onClose={() => setEvaluationStatusOpen(false)}
+      />
     </div>
   );
 }
