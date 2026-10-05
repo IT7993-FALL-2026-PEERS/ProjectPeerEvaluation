@@ -1,0 +1,90 @@
+name: CD
+
+# Deploys main to staging after CI passes on it (backlog CICD-12, first slice of the CD pipeline).
+#
+# Render's autoDeployTrigger is off in render.yaml, so this workflow is the only thing that deploys.
+# That takes Render's "deploy only if checks pass" out of the loop: it waited for every check on the
+# commit, Dependabot's included, and failed Dependabot checks kept staging from deploying after 27 Sep.
+#
+# Each service is deployed with its Render deploy hook, for the exact commit CI tested, and the job
+# waits until the service reports that commit (backend /api/health, frontend /version.txt). A service
+# is skipped when no file it uses changed since the commit that is live (scripts/render-deploy.js),
+# which saves Render build minutes the way render.yaml's buildFilter used to.
+#
+# Secrets, in the `staging` environment (Settings > Environments), never as repository secrets:
+#   RENDER_BACKEND_DEPLOY_HOOK_URL   Render > peers-backend-staging > Settings > Deploy Hook
+#   RENDER_FRONTEND_DEPLOY_HOOK_URL  Render > peers-frontend-staging > Settings > Deploy Hook
+# A hook URL works like a password: anyone who has it can deploy. Regenerate it in Render if it leaks.
+#
+# Run it by hand (Actions > CD > Run workflow, on main) to redeploy main, with "force" to deploy even
+# when nothing changed.
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      force:
+        description: Deploy both services even when no file they use changed.
+        type: boolean
+        default: false
+
+# One deploy at a time. A newer run waits instead of cancelling one that is halfway through a deploy.
+concurrency:
+  group: cd-staging
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy ${{ matrix.service }} to staging
+    # Only a CI run for a push to main, and only when it passed. Manual runs only from main.
+    if: >-
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success'
+       && github.event.workflow_run.event == 'push')
+      || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment:
+      name: staging
+      url: https://peers-frontend-staging.onrender.com
+    strategy:
+      # Deploy the other service even if one fails; the report shows both.
+      fail-fast: false
+      matrix:
+        service: [backend, frontend]
+    steps:
+      # main as it is now, not the commit being deployed: the script that holds the hook secret
+      # only ever runs from main. That commit is in main's history, which is all the script reads.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The whole history, so the script can diff the live commit against the deployed one.
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Deploy and wait until live
+        run: node scripts/render-deploy.js
+        env:
+          SERVICE: ${{ matrix.service }}
+          SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+          HOOK_URL: ${{ matrix.service == 'backend' && secrets.RENDER_BACKEND_DEPLOY_HOOK_URL || secrets.RENDER_FRONTEND_DEPLOY_HOOK_URL }}
+          FORCE: ${{ inputs.force || false }}
+
+  report:
+    needs: [deploy]
+    if: ${{ !cancelled() && needs.deploy.result != 'skipped' }}
+    uses: ./.github/workflows/deployment-status.yml
+    with:
+      environment: staging
+      result: ${{ needs.deploy.result }}
+      url: https://peers-frontend-staging.onrender.com
+      health_url: https://peers-backend-staging.onrender.com/api/health
+      commit: ${{ github.event.workflow_run.head_sha || github.sha }}

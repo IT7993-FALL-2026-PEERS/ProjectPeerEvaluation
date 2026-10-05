@@ -41,6 +41,11 @@ on:
         type: string
         required: false
         default: ""
+      commit:
+        description: Commit that was deployed. Defaults to the commit the run started from.
+        type: string
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -67,7 +72,7 @@ jobs:
           URL: ${{ inputs.url }}
           HEALTH_URL: ${{ inputs.health_url }}
           IMAGE_TAG: ${{ inputs.image_tag }}
-          COMMIT: ${{ github.sha }}
+          COMMIT: ${{ inputs.commit || github.sha }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
       - name: Upload deployment status

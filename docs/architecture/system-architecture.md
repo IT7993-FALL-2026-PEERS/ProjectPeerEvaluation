@@ -230,7 +230,7 @@ flowchart LR
     DEV(["Developer"]) -->|pull request| GH["GitHub<br/>IT7993-FALL-2026-PEERS/<br/>ProjectPeerEvaluation"]
     GH --> CI["GitHub Actions (ubuntu-24.04)<br/>ci.yml: frontend, backend, integration,<br/>E2E, containers, actionlint<br/>security.yml: OWASP · CodeQL"]
     CI -->|"8 required checks pass"| MAIN["merge to main"]
-    MAIN -->|"Render autoDeploy: checksPass<br/>(render.yaml, build filters)"| STG["Render staging<br/>peers-backend-staging (Starter)<br/>peers-frontend-staging (static)"]
+    MAIN -->|"cd.yml after CI passes:<br/>Render deploy hooks, tested commit"| STG["Render staging<br/>peers-backend-staging (Starter)<br/>peers-frontend-staging (static)"]
     STG --> ATLAS[("MongoDB Atlas M0")]
     STG --> MT["Mailtrap sandbox"]
     STG -. "planned: manual sponsor approval" .-> PROD(["Production<br/>out of scope"])
@@ -247,7 +247,8 @@ flowchart LR
 - **Staging:** `render.yaml` defines both services. The backend is a Node web service on
   the paid Starter plan, so it doesn't sleep and can reach SMTP. `/api/health` must report
   the database connected before Render switches traffic, and it reports the deployed
-  commit. Build filters skip deploys for docs-only and test-only changes. Staging is switched off
+  commit. Render's auto-deploy is off: `cd.yml` deploys the commit CI tested, and skips a service
+  when no file it uses changed (`scripts/render-deploy.js`). Staging is switched off
   between checks and demos to save cost.
 - **Production:** not hosted by this project. The approved design ends in a manual
   sponsor approval gate (Milestone 3).
