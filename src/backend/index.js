@@ -23,6 +23,11 @@ app.use(express.json());
 // Request logger middleware (redacts student evaluation tokens)
 app.use(requestLogger);
 
+// Staging may only email through the Mailtrap sandbox (utils/emailGuard.js). Sends are refused
+// either way; this says so in the log at startup instead of at the first send.
+const emailTransport = require('./utils/emailGuard').checkTransport();
+if (!emailTransport.allowed) console.error(`❌ ${emailTransport.reason}`);
+
 // Connect to MongoDB
 mongoose.connect(process.env.MONGODB_URI || process.env.MONGO_URI || 'mongodb://localhost:27017/peer-evaluation')
   .then(() => {

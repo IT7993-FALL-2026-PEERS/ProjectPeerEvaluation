@@ -42,7 +42,8 @@ etc.) are not used for this project even though `DEPLOYMENT_GUIDE.md` documents 
 historical alternatives. Continuous Integration runs on every pull request (see
 [CI/CD Pipeline](#cicd-pipeline)). A staging environment is live on Render, defined in `render.yaml`:
 once CI passes on `main`, `cd.yml` deploys that exact commit to the frontend and backend. Staging uses
-MongoDB Atlas and a Mailtrap test inbox, so no real student ever receives an email from it. To keep
+MongoDB Atlas and a Mailtrap test inbox, so no real student ever receives an email from it; the backend
+refuses to send through anything but the Mailtrap sandbox on staging (CICD-44). To keep
 costs down, staging is switched off between checks and demos. A CI-driven deploy step with smoke
 tests comes in Milestone 3, and production deployment always stays a manual sponsor approval.
 
