@@ -107,6 +107,10 @@ test('E2E-29: Clear All Teams asks first, then empties the list and the course\'
   await expect(alertWith(page, 'All teams cleared successfully. 2 teams deleted.')).toBeVisible();
   await expect(top(page).getByText('No teams found for this course.')).toBeVisible();
   await expect(top(page).getByRole('button', { name: 'Clear All Teams' })).toBeDisabled();
+
+  // The course row's team count follows (Teams is the sixth column).
+  await top(page).getByRole('button', { name: 'Close' }).click();
+  await expect(page.getByRole('row', { name: /CS 4850/ }).getByRole('cell').nth(5)).toHaveText('0');
 });
 
 test('E2E-30: with two courses, Manage Teams opens one dialog, not one per course', async ({ page }) => {

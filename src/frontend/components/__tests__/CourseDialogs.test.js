@@ -297,7 +297,7 @@ describe('DeleteCourseDialog', () => {
 
 describe('CourseRosterUploadDialog', () => {
   const props = (overrides = {}) => ({
-    open: true, file: null, progress: 0, onFileChange: () => {}, onClose: () => {}, onCancel: () => {}, onUpload: () => {},
+    open: true, file: null, progress: 0, onFileChange: () => {}, onClose: () => {}, onUpload: () => {},
     ...overrides,
   });
   const csv = new File(['student_id,name,email,team_name'], 'roster.csv', { type: 'text/csv' });
@@ -346,14 +346,21 @@ describe('CourseRosterUploadDialog', () => {
   });
 
   test('Cancel and Upload call the page\'s handlers', async () => {
-    const onCancel = jest.fn();
+    const onClose = jest.fn();
     const onUpload = jest.fn();
-    render(<CourseRosterUploadDialog {...props({ file: csv, onCancel, onUpload })} />);
+    render(<CourseRosterUploadDialog {...props({ file: csv, onClose, onUpload })} />);
 
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
-    expect(onCancel).toHaveBeenCalledTimes(1);
+    expect(onClose).toHaveBeenCalledTimes(1);
     expect(onUpload).not.toHaveBeenCalled();
     await user.click(screen.getByRole('button', { name: 'Upload' }));
     expect(onUpload).toHaveBeenCalledTimes(1);
+  });
+
+  test('Escape closes it the same way as Cancel, so the page forgets the file', async () => {
+    const onClose = jest.fn();
+    render(<CourseRosterUploadDialog {...props({ file: csv, onClose })} />);
+    await user.keyboard('{Escape}');
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });

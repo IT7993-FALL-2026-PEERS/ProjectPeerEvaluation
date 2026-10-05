@@ -1134,8 +1134,7 @@ function CourseManagement() {
         file={uploadFile}
         progress={uploadProgress}
         onFileChange={setUploadFile}
-        onClose={() => setUploadDialogOpen(false)}
-        onCancel={() => {
+        onClose={() => {
           setUploadDialogOpen(false);
           setUploadFile(null);
           setUploadProgress(0);
