@@ -11,7 +11,8 @@ name: Promote release candidate
 #   - prevent self-review: the person who started the run cannot approve it.
 #   - deployment tags: rc-* only, so a run from main or any other ref is refused.
 #
-# check    the ref is an rc-* tag, its pre-release exists and its release record names this commit
+# check    the ref is an rc-* tag, its pre-release exists, and its release record names this commit, links
+#          the CD run that made it and says the smoke tests passed
 # promote  waits for approval, runs the production deploy placeholder, then publishes the release
 #
 # Production hosting is out of scope for this project (CICD-38), so the deploy step is a documented
@@ -63,6 +64,18 @@ jobs:
           recorded=$(jq -r .commit record/release-record.json)
           if [ "$recorded" != "$GITHUB_SHA" ]; then
             echo "::error::The release record of ${rc} names ${recorded:0:7}, but the tag points at ${GITHUB_SHA:0:7}. Not promoting."
+            exit 1
+          fi
+          # Only the pipeline's own release candidates (Khoa's review of #147): a CD run link, and smoke
+          # tests that passed. A hand-made pre-release with a matching record is refused here.
+          run_link=$(jq -r '.run // ""' record/release-record.json)
+          smoke=$(jq -r '.smokeTests // ""' record/release-record.json)
+          if ! [[ "$run_link" =~ ^https://github\.com/${GITHUB_REPOSITORY}/actions/runs/[0-9]+ ]]; then
+            echo "::error::${rc} was not made by the CD pipeline (its record has no CD run link). Not promoting."
+            exit 1
+          fi
+          if [[ "$smoke" != passed* ]]; then
+            echo "::error::${rc}'s smoke tests did not pass (${smoke:-no result}). Not promoting."
             exit 1
           fi
           if gh release view "$release" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then

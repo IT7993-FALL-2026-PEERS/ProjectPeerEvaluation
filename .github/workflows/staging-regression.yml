@@ -20,6 +20,10 @@ on:
   #   - cron: "0 6 * * 2" # Tuesdays 06:00 UTC, away from the Monday security scan
   # cd.yml calls it as the post-deploy smoke tests (CICD-28), with the staging URLs as inputs.
   workflow_call:
+    outputs:
+      tests:
+        description: How many @staging Playwright tests ran (0 means only the health and frontend checks).
+        value: ${{ jobs.regression.outputs.tests }}
     inputs:
       base_url:
         description: Frontend URL to test.
@@ -51,6 +55,8 @@ jobs:
   regression:
     name: Smoke and end-to-end tests (staging)
     runs-on: ubuntu-24.04
+    outputs:
+      tests: ${{ steps.count.outputs.count }}
     timeout-minutes: 30
     env:
       BASE_URL: ${{ inputs.base_url || vars.STAGING_URL }}

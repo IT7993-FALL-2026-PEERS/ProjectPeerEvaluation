@@ -44,7 +44,8 @@ curl -s https://peers-frontend-staging.onrender.com/version.txt   # <sha>
 
 The two commits can differ: a service keeps its commit until a change touches files it uses. To deploy both
 services anyway, for example after changing an environment variable in Render, run **Actions > CD > Run workflow**
-on `main` with **force** ticked.
+on `main` with **force** ticked. A manual run only deploys a commit whose CI run on `main` passed, and force never
+deploys an older commit than the live one (going back is [rollback](rollback-and-recovery.md#r1-staging-is-broken-after-a-deploy)'s job).
 
 If the deploy fails, go to [Rollback and recovery, R2](rollback-and-recovery.md#r2-a-cd-run-failed).
 
@@ -54,12 +55,14 @@ With the release stages on, the same CD run also:
 
 1. builds both images, checks they're healthy, and pushes them to GHCR tagged with the commit (`images`);
 2. after the deploy, runs Staging regression (`smoke`);
-3. if all of that passed, creates the tag `rc-<yyyymmdd>-<hhmm>-<sha7>` and a **pre-release** with
-   `release-record.json` attached (`Tag release candidate`). The record lists both services' commits as staging
-   reported them, the images, the smoke result, the previous release, and how to recover.
+3. if all of that passed, and **at least one `@staging` test ran**, creates the tag `rc-<yyyymmdd>-<hhmm>-<sha7>`
+   and a **pre-release** with `release-record.json` attached (`Tag release candidate`). The record lists both
+   services' commits as staging reported them, the images and their digests, the smoke result and test count, the
+   CI run and its coverage, the previous release, and how to recover.
 
 A failed step means **no tag**, a failed run, and an automatic rollback to the previous release
-([R2](rollback-and-recovery.md#r2-a-cd-run-failed)). Release candidates are under the repository's **Releases**,
+([R2](rollback-and-recovery.md#r2-a-cd-run-failed)). The very first release candidate has nothing to roll back to,
+so make it from a commit where staging is known to be good. Release candidates are under the repository's **Releases**,
 marked *Pre-release*.
 
 ## 4. Promote a release candidate (optional)
@@ -69,7 +72,8 @@ The production deploy step is a placeholder.
 
 1. Actions > **Promote release candidate** > Run workflow > **Use workflow from > Tags >** `rc-…`.
    Leave **dry_run** ticked for a rehearsal. A dry run publishes a *draft* release, which only maintainers can see.
-2. `Check the release candidate` confirms it's a real `rc-*` from CD whose record names the tag's commit.
+2. `Check the release candidate` confirms it's a real `rc-*` from CD: its record names the tag's commit, links the
+   CD run that made it, and says the smoke tests passed. A hand-made release candidate is refused.
 3. `Promote to production` **waits for approval**. Ask Dr. Vyas or Khoa: one approval is enough, and whoever
    started the run can't approve it. The approver opens the run > **Review deployments** > tick `production` >
    **Approve and deploy**.

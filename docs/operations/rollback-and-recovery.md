@@ -22,11 +22,15 @@ Releases, whose `release-record.json` lists both services' commits.
 
 The app misbehaves, but `/api/health` still answers.
 
-**Option A: roll back to a release candidate** (needs an `rc-*` release, so `CD_RELEASE=on`).
+**Option A: roll back to a release candidate** (needs an `rc-*` release the pipeline made, so `CD_RELEASE=on` and
+at least one release since then).
 1. Actions > **CD** > Run workflow > branch `main` > **rollback_to** = the last good `rc-…` tag.
-2. The `Roll back` jobs force-redeploy each service to the commit in that release's record, and wait until
-   staging reports it.
-3. Confirm: `/api/health` and `/version.txt` show the release's commits.
+2. The `Roll back` jobs redeploy each service to the commit in that release's record, in rollback mode, and wait
+   until staging reports it. `rollback-report` then checks health, and `rollback-smoke` runs the smoke tests.
+3. Confirm: both checks are green, and `/api/health` and `/version.txt` show the release's commits.
+
+A hand-made release (like the #147 test candidate) is refused as a target. Before the first real release
+candidate exists, use B or C.
 
 **Option B: Render's own rollback** (fastest; needs the Render account, Khoa).
 Render > the service > **Events** > an earlier successful deploy > **Rollback**, or Manual Deploy > *Deploy a
@@ -45,13 +49,16 @@ Open the run and find the first red job.
 
 | Failed job | Meaning | Do |
 |---|---|---|
-| Prepare | Bad `rollback_to` value, or no release record for it | Use an exact `rc-…` tag name from Releases |
+| Prepare: "No successful CI run on main for …" | A manual run for a commit whose CI on `main` failed or hasn't finished | Wait for CI (or re-run it if an outage cancelled it), then run CD again |
+| Prepare: rollback_to errors | Bad `rollback_to` value, or the tag isn't a release the pipeline made | Use an exact `rc-…` tag name from Releases, of a pipeline release |
 | images | The images didn't build or weren't healthy in Compose | Same as a red `Containers` check in CI: reproduce with `npm run docker:up` |
 | Deploy to staging: "set SERVICE, SHA and HOOK_URL" | A deploy hook secret is missing | Add it to the `staging` environment ([Render handover](render-handover.md#render-settings-to-know)) |
 | Deploy: "Render refused the deploy hook (HTTP 4xx)" | The hook was regenerated or deleted in Render | New hook from Render > service > Settings > Deploy Hook, saved to the `staging` environment secret |
 | Deploy: "was not live after 20 minutes" | Render's build failed, the service is suspended, or the new version doesn't start | Render > service > **Events / Logs**. Suspended: R3. Build or start error: fix in a pull request, or roll back (R1) |
 | smoke | Staging regression failed after the deploy | Its report artifact names the failing test. CD has already rolled back (`Roll back` jobs) if an earlier release exists |
 | Tag release candidate: "staging did not report its commits" | A service couldn't be asked which commit it runs | Check both URLs above. Re-run CD by hand once they answer |
+| Tag release candidate: "no @staging tests ran" | Smoke passed with only the health and frontend checks | Tag at least one read-only Playwright test `@staging` (see `staging-regression.yml`) |
+| rollback-report or rollback-smoke | The rollback finished, but the old release isn't healthy either | The problem isn't the new code (database, settings, Render). Work through R3 to R6 |
 | report: "Deployment status: set ENVIRONMENT and RESULT" | Should no longer happen (an `abandoned` result was fixed in #156) | Re-run the run |
 | Jobs cancelled, "not acquired by Runner" | A GitHub Actions outage | Wait for https://www.githubstatus.com, then **Re-run failed jobs** |
 
