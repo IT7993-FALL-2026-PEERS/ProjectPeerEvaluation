@@ -33,3 +33,17 @@ A caller must also grant `packages: write` to the job that calls this workflow.
 Manual only (Actions tab > Run workflow) while staging is switched off and the variables below are not set. The weekly schedule (Tuesday 06:00 UTC) is kept as a comment in the workflow and comes back once staging is running. Read-only health and frontend checks, then Playwright tests tagged `@staging`.
 Tests with that tag must not send email (Mailtrap allows 50 a month) and must not need the local E2E control server.
 Set the `STAGING_URL` and `STAGING_API_URL` repository variables; a manual run can override both.
+
+## Environments and secrets (CICD-38)
+
+Production hosting is out of scope, so staging is the only deploy target. The repository has two GitHub environments,
+`main - peers-backend-staging` and `main - peers-frontend-staging`. Render creates them when it deploys `main`.
+
+On 5 October 2026 we removed the leftovers from the unmerged `with-test-coverage` branch (audit A-05, A-06):
+the `production-backend`, `production-frontend` and `with-test-coverage - peer-evaluation-backend` environments, the
+`deploy-{backend,frontend}-production-*` tags, and all four `RENDER_*_DEPLOY_HOOK_URL` repo secrets, which no workflow on
+`main` used. We deleted their 8 deployment records from 22 September as well, so the environments can't come back,
+and suspended the unused Render services.
+
+If `cd.yml` needs a Render deploy hook, regenerate it in Render and store it as a secret of the staging environment that
+the deploy job targets, not as a repository secret. A hook URL works like a password: anyone who has it can deploy.
