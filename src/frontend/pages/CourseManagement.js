@@ -2151,22 +2151,6 @@ function CourseManagement() {
         </DialogActions>
       </Dialog>
 
-  {/* Upload Roster Dialog */}
-  <Dialog open={uploadDialogOpen} onClose={() => setUploadDialogOpen(false)} maxWidth="sm" fullWidth>
-    <DialogTitle>Upload Roster</DialogTitle>
-    <DialogContent>
-      <Box sx={{ mb: 2 }}>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Upload a CSV file with the following columns:
-        </Typography>
-        <Box sx={{ mt: 1, pl: 2 }}>
-          <span style={{ fontWeight: 'bold', color: 'red', fontSize: '1.1em' }}>student_id,name,email,team_name</span>
-        </Box>
-      </Box>
-      {/* ...existing upload controls and content... */}
-    </DialogContent>
-  </Dialog>
-
       {/* Edit Course Dialog */}
   <Dialog open={editDialogOpen} onClose={() => setEditDialogOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle>Edit Course</DialogTitle>

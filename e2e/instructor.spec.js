@@ -58,6 +58,17 @@ test('E2E-04: a roster with no students is refused with the server\'s reason, an
   await expect(page.getByRole('row', { name: /Capstone/ }).getByRole('cell', { name: '4', exact: true })).toBeVisible();
 });
 
+// The roster upload used to mount two dialogs on the same flag: a leftover stub with no buttons and the
+// real one. Both were in the page, one hidden behind the other (CICD-57).
+test('E2E-16: the roster upload from the course row opens one dialog, the real one', async ({ page }) => {
+  await loginAsAda(page, passwords);
+  await courseAction(page, 'Upload Roster').click();
+
+  await expect(page.locator('[role=dialog]')).toHaveCount(1);
+  await expect(page.getByRole('dialog', { name: 'Upload Student Roster' })).toBeVisible();
+  await expect(page.locator('input[type=file]')).toHaveCount(1);
+});
+
 test('E2E-05: the Create Team dialog creates a team (CICD-52)', async ({ page }) => {
   await loginAsAda(page, passwords);
   await courseAction(page, 'Manage Teams').click();

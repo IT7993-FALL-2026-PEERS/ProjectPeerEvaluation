@@ -140,8 +140,8 @@ starts two servers from `e2e/server/`: the real backend on a seeded in-memory Mo
 fixture as the integration tests, with email captured, never sent) and the frontend build as
 static files. A small control server resets the data before each test and returns the captured
 email, so the student tests take the link from the invitation email. Specs: `e2e/instructor.spec.js`
-(E2E-01 to 09: login, session, roster upload and its error message, teams, invitations, reports,
-CSV download) and `e2e/student.spec.js` (E2E-10 to 14: opening the link without a login, rating and
+(E2E-01 to 09, 15 and 16: login, session, roster upload and its error message, one upload dialog,
+teams, invitations, reports, CSV download) and `e2e/student.spec.js` (E2E-10 to 14: opening the link without a login, rating and
 submitting, the professor's count, no second submission, a bad link, missing feedback). The run
 refuses to start if another server already holds port 5000 or the build points at a hosted
 backend, so it can never reach a real database or mail account. Without
