@@ -72,3 +72,35 @@ When every box is ticked, write in CICD-31 who did it, on which date, and what w
 | Staging database | MongoDB Atlas M0 |
 | Staging email | Mailtrap sandbox: catches every message and delivers nothing |
 | Container images | GitHub Container Registry, `ghcr.io/it7993-fall-2026-peers/projectpeerevaluation/{backend,frontend}:<commit>` (once `CD_RELEASE` is on) |
+
+## Future work
+
+Recommended, not started. The people who take this over decide whether and when.
+
+### Move the frontend from Create React App to Vite
+
+**Why.** The frontend is built and tested with Create React App (`react-scripts` 5.0.1), which is no longer
+maintained. All ten accepted security findings come from its build tooling ([Security policy, accepted
+risks](../security/security-policy.md#3-accepted-risks-owasp-dependency-check-2-oct-2026)); none of that code is
+in the deployed site. The acceptances expire on 31 Dec 2026 and the checks fail from 17 Dec, so they are reviewed
+again before then. Moving to Vite would remove the source of those findings. The background is in the
+[tech stack analysis](../research-report/tech-stack-analysis.md).
+
+**Why it was not done in this project.** Replacing the technology stack was out of the project's scope, the sponsor
+had not asked for it, and the work would have competed with the delivery pipeline and testing that were the
+deliverables.
+
+**What it involves** (an estimate of 2 to 3 working days, 3 to 5 with review and deploy cycles):
+
+- Replace `react-scripts` with Vite: its config, a root `index.html`, JSX in `.js` files (configure it, or rename
+  about 40 files to `.jsx`), `REACT_APP_*` variables to `VITE_*`, and the `/api` dev proxy from `package.json`.
+- The delivery path assumes CRA's `build/` folder: `render.yaml` (build command, publish path and `version.txt`),
+  `Dockerfile.frontend`, `e2e/server/frontend.js` and the CI steps. Setting Vite's output folder to `build` keeps
+  most of that unchanged.
+- Move the frontend tests from Jest to Vitest (about 20 suites, 72 `jest.*` calls) and re-check all of them.
+- Coverage is measured by Jest today, so the floors in `coverage-floors.json` and `scripts/coverage-gate.js` must be
+  re-baselined, and the change explained.
+- Verify with lint, the end-to-end tests, the container check and a real deploy to staging through CD.
+
+**Do it sooner if** the December review finds a finding in the CRA tooling that can't be accepted, or the sponsor
+or the new owner asks for it. Do it as one separate, clearly labelled pull request, not mixed with other work.
