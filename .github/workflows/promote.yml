@@ -1,0 +1,146 @@
+name: Promote release candidate
+
+# Manual production approval gate (backlog CICD-30). Promotes an rc-* release candidate made by cd.yml
+# to a GitHub Release, after someone other than the person who started it approves it.
+#
+# Run it from the release candidate's tag: Actions > Promote release candidate > Run workflow >
+# "Use workflow from" > Tags > rc-... . The `production` environment (Settings > Environments) is what
+# makes this a gate:
+#   - required reviewers: Dr. Vyas (geetikavyas) and Khoa (KhoaHo-kho6). GitHub needs one approval
+#     from either of them; it cannot require both.
+#   - prevent self-review: the person who started the run cannot approve it.
+#   - deployment tags: rc-* only, so a run from main or any other ref is refused.
+#
+# check    the ref is an rc-* tag, its pre-release exists and its release record names this commit
+# promote  waits for approval, runs the production deploy placeholder, then publishes the release
+#
+# Production hosting is out of scope for this project (CICD-38), so the deploy step is a documented
+# placeholder that deploys nothing. dry_run (the default) publishes the release as a draft, which only
+# maintainers can see and which can be deleted; untick it for a real, public release.
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Publish the release as a draft (dry run). Untick for a real release.
+        type: boolean
+        default: true
+
+# One promotion at a time, and never cancel one that is waiting for approval.
+concurrency:
+  group: promote-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Check the release candidate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      rc_tag: ${{ steps.rc.outputs.rc_tag }}
+      release_tag: ${{ steps.rc.outputs.release_tag }}
+    steps:
+      - name: Check the release candidate
+        id: rc
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          if [ "$GITHUB_REF_TYPE" != "tag" ] || ! [[ "$GITHUB_REF_NAME" =~ ^rc-[0-9]{8}-[0-9]{4}-[0-9a-f]{7}$ ]]; then
+            echo "::error::Run this from an rc-* tag (Use workflow from > Tags), not from ${GITHUB_REF_TYPE} ${GITHUB_REF_NAME}."
+            exit 1
+          fi
+          rc="$GITHUB_REF_NAME"
+          release="release-${rc#rc-}"
+          if ! gh release view "$rc" --repo "$GITHUB_REPOSITORY" --json isPrerelease --jq .isPrerelease | grep -qx true; then
+            echo "::error::${rc} has no pre-release. Only release candidates that cd.yml created can be promoted."
+            exit 1
+          fi
+          gh release download "$rc" --repo "$GITHUB_REPOSITORY" --pattern release-record.json --dir record
+          recorded=$(jq -r .commit record/release-record.json)
+          if [ "$recorded" != "$GITHUB_SHA" ]; then
+            echo "::error::The release record of ${rc} names ${recorded:0:7}, but the tag points at ${GITHUB_SHA:0:7}. Not promoting."
+            exit 1
+          fi
+          if gh release view "$release" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::error::${release} already exists (a draft from an earlier dry run counts too). Delete it first to promote again."
+            exit 1
+          fi
+          { echo "rc_tag=${rc}"; echo "release_tag=${release}"; } >> "$GITHUB_OUTPUT"
+          publish="\`${release}\`"
+          [ "$DRY_RUN" = "true" ] && publish="${publish} as a **draft** (dry run)"
+          {
+            echo "### Promotion request"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Release candidate | \`${rc}\` |"
+            echo "| Commit | \`${GITHUB_SHA:0:7}\` |"
+            echo "| Backend on staging | \`$(jq -r '.components.backend.commit[0:7]' record/release-record.json)\` |"
+            echo "| Frontend on staging | \`$(jq -r '.components.frontend.commit[0:7]' record/release-record.json)\` |"
+            echo "| Smoke tests | $(jq -r .smokeTests record/release-record.json) |"
+            echo "| Will publish | ${publish} |"
+            echo "| Requested by | @${GITHUB_ACTOR} |"
+            echo ""
+            echo "Waiting for approval in the \`production\` environment (Dr. Vyas or Khoa, not the requester)."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  promote:
+    name: Promote to production
+    needs: [check]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    # The gate: the job waits here until a required reviewer approves.
+    environment:
+      name: production
+    # The only job that can write: it publishes the release.
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      # Placeholder, deliberately: production hosting is out of scope (CICD-38). If a production
+      # environment is ever approved, its deploy goes here, using the commits in the release record
+      # (the same way cd.yml deploys staging with scripts/render-deploy.js), before the release is
+      # published, so a failed deploy publishes nothing.
+      - name: Deploy to production (placeholder)
+        env:
+          RC_TAG: ${{ needs.check.outputs.rc_tag }}
+        run: |
+          echo "::notice::Production deploy skipped: production hosting is out of scope (CICD-38). ${RC_TAG} stays on staging."
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RC_TAG: ${{ needs.check.outputs.rc_tag }}
+          RELEASE_TAG: ${{ needs.check.outputs.release_tag }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          approvers=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/approvals" \
+            --jq '[.[] | select(.state == "approved") | "@\(.user.login)"] | unique | join(", ")')
+          gh release view "$RC_TAG" --repo "$GITHUB_REPOSITORY" --json body --jq .body > notes.md
+          {
+            echo ""
+            echo "### Promotion"
+            echo ""
+            echo "Promoted from \`${RC_TAG}\`. Requested by @${GITHUB_ACTOR}, approved by ${approvers:-unknown} in the \`production\` environment."
+            echo "Production deploy: placeholder, nothing deployed (production hosting is out of scope)."
+            echo ""
+            echo "[Promotion run](${RUN_URL})"
+          } >> notes.md
+          draft=()
+          [ "$DRY_RUN" = "true" ] && draft=(--draft)
+          gh release create "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --title "$RELEASE_TAG" --notes-file notes.md "${draft[@]}"
+          {
+            echo "### Released"
+            echo ""
+            if [ "$DRY_RUN" = "true" ]; then
+              echo "\`${RELEASE_TAG}\` created as a **draft** (dry run), approved by ${approvers:-unknown}. Delete the draft under Releases when done."
+            else
+              echo "\`${RELEASE_TAG}\` published, approved by ${approvers:-unknown}."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
