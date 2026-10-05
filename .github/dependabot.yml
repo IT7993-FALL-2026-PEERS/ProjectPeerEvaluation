@@ -43,7 +43,10 @@ updates:
       backend-minor-and-patch:
         update-types: [minor, patch]
 
-  # Actions used in .github/workflows
+  # Actions used in .github/workflows. Every action is pinned to a full commit
+  # SHA with the release in a trailing comment ("@<sha> # v7.0.1"); Dependabot
+  # bumps both the SHA and the comment together. Repository settings require
+  # SHA pinning, so a workflow using a tag like @v7 will fail to start.
   - package-ecosystem: github-actions
     directory: /
     schedule:
