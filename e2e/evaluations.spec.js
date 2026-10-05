@@ -45,7 +45,10 @@ test('E2E-22: Send Reminders emails the students who have not finished and says 
   await top(page).getByRole('button', { name: 'Send Reminders' }).click();
 
   await expect(alertWith(page, /reminder/i)).toBeVisible();
-  expect((await capturedEmails()).length).toBeGreaterThan(before);
+  // Nobody has finished, so all four students get exactly one reminder each.
+  await expect.poll(async () => (await capturedEmails()).length).toBe(before + 4);
+  const sent = (await capturedEmails()).slice(before).map((e) => e.to).sort();
+  expect(sent).toEqual(['ann@example.edu', 'ben@example.edu', 'cy@example.edu', 'di@example.edu']);
 });
 
 test('E2E-23: Reset Evaluation State clears the links and returns the dialog to "not sent"', async ({ page }) => {
