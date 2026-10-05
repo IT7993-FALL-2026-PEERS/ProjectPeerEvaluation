@@ -87,12 +87,12 @@ flowchart TB
 
     subgraph CD["Continuous Delivery (CD) · runs automatically after merge to main"]
         direction TB
-        ARTIFACTS["Build deployment artifacts<br/>and Docker images"]
-        STG["Deploy to staging<br/>Render.com"]
+        ARTIFACTS["Build deployment artifacts<br/>and Docker images<br/><b>50% working</b>"]
+        STG["Deploy to staging<br/>Render.com<br/><b>50% working</b>"]
         SMOKE["Smoke tests"]
-        HEALTH["Verify deployment health<br/>/api/health"]
+        HEALTH["Verify deployment health<br/>/api/health<br/><b>67% working</b>"]
         RC["Produce release candidate"]
-        DREPORT["Publish reports<br/>build history, deployment status"]
+        DREPORT["Publish reports<br/>build history, deployment status<br/><b>50% working</b>"]
         ARTIFACTS --> STG --> SMOKE --> HEALTH --> RC --> DREPORT
     end
 
@@ -118,7 +118,7 @@ flowchart TB
 
 ```mermaid
 flowchart LR
-    L1["Running today"] ~~~ L2["Partly running<br/>(see the table)"] ~~~ L3["Planned"] ~~~ L4["Gate"] ~~~ L5["Start, end, or<br/>pull request step"]
+    L1["Running today"] ~~~ L2["Partly running<br/>(% of its steps working)"] ~~~ L3["Planned"] ~~~ L4["Gate"] ~~~ L5["Start, end, or<br/>pull request step"]
 
     classDef done fill:#dcfce7,stroke:#15803d,color:#14532d,stroke-width:3px
     classDef partial fill:#ecfccb,stroke:#4d7c0f,color:#365314,stroke-width:3px,stroke-dasharray: 9 6
@@ -134,6 +134,18 @@ flowchart LR
 ```
 
 The quality gate is enforced today. Production approval is manual.
+
+**How the percentages are counted** (5 Oct 2026). A partly running box is scored as the steps that
+run today out of the steps it needs. A step that is written but has never run counts as not done.
+The numbers move as steps land.
+
+| Box | Running today | Not yet | Score |
+|---|---|---|---|
+| Build deployment artifacts and Docker images (also WF07) | Both images build in CI; they start and pass a health check | Push to GitHub Container Registry tagged with the commit (written, never run); run automatically after merge on the tested commit | 2 of 4, 50% |
+| Deploy to staging | Render deploys `main` after CI passes | CI deploys the exact tested commit | 1 of 2, 50% |
+| Verify deployment health | `/api/health` reports the deployed commit; Render checks it before switching traffic | CI polls it after a deploy | 2 of 3, 67% |
+| Publish reports | Build history of the last ten CI runs | Deployment status of a CD run (workflow written, no CD run yet) | 1 of 2, 50% |
+| WF06 Publish results | Test summaries, coverage summaries, build history | Deployment status | 3 of 4, 75% |
 
 | Stage | What it does | Owner | Status and target (per the Gantt chart) |
 |---|---|---|---|
@@ -179,7 +191,7 @@ flowchart TB
         CONT["Container build check<br/>Docker Compose smoke test"]
         E2E["End-to-end tests<br/>Playwright workflows"]
         WF05["WF05 Dependency & security scan<br/>OWASP + CodeQL, blocking"]
-        WF06["WF06 Publish results<br/>test and coverage summaries live · build and deploy history planned"]
+        WF06["WF06 Publish results<br/>test and coverage summaries live · build and deploy history planned<br/><b>75% working</b>"]
         WF02 --> WF03 --> UNIT --> INTEG --> REG --> BUILD --> CONT --> E2E --> WF05 --> WF06
     end
 
@@ -191,7 +203,7 @@ flowchart TB
 
     subgraph CD["CONTINUOUS DELIVERY · runs after merge to main"]
         direction TB
-        WF07["WF07 Build artifacts and version images<br/>images built in CI today · publishing planned"]
+        WF07["WF07 Build artifacts and version images<br/>images built in CI today · publishing planned<br/><b>50% working</b>"]
         WF08["WF08 Deploy to staging · readiness check · smoke tests"]
         WF09{"WF09 Deploy or smoke test failed?"}
         BLOCK["Block promotion · follow recovery procedure"]
