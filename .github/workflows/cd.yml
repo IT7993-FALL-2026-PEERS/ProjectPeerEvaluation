@@ -58,10 +58,11 @@ jobs:
       matrix:
         service: [backend, frontend]
     steps:
+      # main as it is now, not the commit being deployed: the script that holds the hook secret
+      # only ever runs from main. That commit is in main's history, which is all the script reads.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
-          # The whole history, so the script can diff the live commit against this one.
+          # The whole history, so the script can diff the live commit against the deployed one.
           fetch-depth: 0
           persist-credentials: false
 
