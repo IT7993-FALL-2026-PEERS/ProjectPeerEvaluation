@@ -1,23 +1,33 @@
 name: CD
 
-# Deploys main to staging after CI passes on it (backlog CICD-12, first slice of the CD pipeline).
+# Delivery pipeline for staging (backlog CICD-12 and CICD-28). Runs after CI passes on a push to main:
+#
+#   prepare -> images -> deploy -> smoke -> release           (and rollback if deploy or smoke fails)
+#                          \-> report (deployment status)
+#
+#   prepare  works out the commit, the mode and the previous good release (rollback target)
+#   images   image-build.yml: builds, health-checks and pushes both images to ghcr.io, tagged with the SHA
+#   deploy   each service's Render deploy hook for that commit, then waits until the service reports it
+#   smoke    staging-regression.yml: health, frontend and the Playwright tests tagged @staging
+#   release  an rc-* tag and a GitHub release whose record lists both components' commits, the images,
+#            the smoke result and how to recover. Only when every step before it passed.
+#   rollback redeploys the previous release's commits when deploy or smoke failed. The run still fails.
+#
+# The release stages (images, smoke, release, rollback) are switched off until the repository variable
+# CD_RELEASE is "on" (Settings > Secrets and variables > Actions > Variables). While it is off, deploy
+# works as it does today (CICD-12) and prepare writes a dry-run plan of the rest to the run summary.
 #
 # Render's autoDeployTrigger is off in render.yaml, so this workflow is the only thing that deploys.
-# That takes Render's "deploy only if checks pass" out of the loop: it waited for every check on the
-# commit, Dependabot's included, and failed Dependabot checks kept staging from deploying after 27 Sep.
-#
-# Each service is deployed with its Render deploy hook, for the exact commit CI tested, and the job
-# waits until the service reports that commit (backend /api/health, frontend /version.txt). A service
-# is skipped when no file it uses changed since the commit that is live (scripts/render-deploy.js),
-# which saves Render build minutes the way render.yaml's buildFilter used to.
+# A service is skipped when no file it uses changed since the commit that is live, which saves Render
+# build minutes (scripts/render-deploy.js), so backend and frontend can be on different commits.
 #
 # Secrets, in the `staging` environment (Settings > Environments), never as repository secrets:
 #   RENDER_BACKEND_DEPLOY_HOOK_URL   Render > peers-backend-staging > Settings > Deploy Hook
 #   RENDER_FRONTEND_DEPLOY_HOOK_URL  Render > peers-frontend-staging > Settings > Deploy Hook
 # A hook URL works like a password: anyone who has it can deploy. Regenerate it in Render if it leaks.
 #
-# Run it by hand (Actions > CD > Run workflow, on main) to redeploy main, with "force" to deploy even
-# when nothing changed.
+# By hand (Actions > CD > Run workflow, on main): redeploy main, with "force" to deploy even when nothing
+# changed, or set "rollback_to" to an rc-* tag to redeploy that release instead.
 
 on:
   workflow_run:
@@ -30,6 +40,10 @@ on:
         description: Deploy both services even when no file they use changed.
         type: boolean
         default: false
+      rollback_to:
+        description: An rc-* tag. Redeploys that release's commits instead of main.
+        type: string
+        default: ""
 
 # One deploy at a time. A newer run waits instead of cancelling one that is halfway through a deploy.
 concurrency:
@@ -39,14 +53,145 @@ concurrency:
 permissions:
   contents: read
 
+env:
+  STAGING_URL: https://peers-frontend-staging.onrender.com
+  STAGING_API_URL: https://peers-backend-staging.onrender.com/api
+
 jobs:
-  deploy:
-    name: Deploy ${{ matrix.service }} to staging
+  prepare:
+    name: Prepare
     # Only a CI run for a push to main, and only when it passed. Manual runs only from main.
     if: >-
       (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success'
        && github.event.workflow_run.event == 'push')
       || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      sha: ${{ steps.what.outputs.sha }}
+      stale: ${{ steps.what.outputs.stale }}
+      release: ${{ steps.what.outputs.release }}
+      previous_tag: ${{ steps.previous.outputs.tag }}
+      previous_backend: ${{ steps.previous.outputs.backend }}
+      previous_frontend: ${{ steps.previous.outputs.frontend }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+
+      # Every job works on main as it is now (github.sha), never on a checkout of another ref. When main
+      # has moved on since CI started, this run stands down: the CD run for the newer commit deploys it.
+      - name: Work out the commit and the mode
+        id: what
+        env:
+          SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+          MAIN_SHA: ${{ github.sha }}
+          CD_RELEASE: ${{ vars.CD_RELEASE }}
+        run: |
+          stale=false
+          if [ "$SHA" != "$MAIN_SHA" ]; then
+            stale=true
+            echo "::notice::main has moved on to ${MAIN_SHA:0:7}. The CD run for that commit deploys it."
+          fi
+          release=off
+          [ "$CD_RELEASE" = "on" ] && release=on
+          { echo "sha=${SHA}"; echo "stale=${stale}"; echo "release=${release}"; } >> "$GITHUB_OUTPUT"
+
+      # The rollback target: the release named in rollback_to, or else the newest rc-* release.
+      - name: Find the previous good release
+        id: previous
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ROLLBACK_TO: ${{ inputs.rollback_to }}
+        run: |
+          tag="$ROLLBACK_TO"
+          if [ -n "$tag" ] && ! [[ "$tag" =~ ^rc-[0-9]{8}-[0-9]{4}-[0-9a-f]{7}$ ]]; then
+            echo "::error::rollback_to must be an rc-* tag such as rc-20261105-1432-1a2b3c4."
+            exit 1
+          fi
+          if [ -z "$tag" ]; then
+            tag=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 100 --json tagName \
+              --jq '[.[].tagName | select(startswith("rc-"))][0] // ""')
+          fi
+          file=""
+          if [ -n "$tag" ] && gh release download "$tag" --repo "$GITHUB_REPOSITORY" --pattern release-record.json --dir previous; then
+            file=previous/release-record.json
+          fi
+          node scripts/release-record.js previous "$file" | tee -a "$GITHUB_OUTPUT"
+          if [ -n "$ROLLBACK_TO" ] && ! grep -q '^backend=.' "$GITHUB_OUTPUT"; then
+            echo "::error::No usable release record for ${ROLLBACK_TO}."
+            exit 1
+          fi
+
+      - name: Plan
+        env:
+          SHA: ${{ steps.what.outputs.sha }}
+          STALE: ${{ steps.what.outputs.stale }}
+          RELEASE: ${{ steps.what.outputs.release }}
+          ROLLBACK_TO: ${{ inputs.rollback_to }}
+          PREVIOUS_TAG: ${{ steps.previous.outputs.tag }}
+        run: |
+          short="${SHA:0:7}"
+          repo="${GITHUB_REPOSITORY,,}"
+          {
+            echo "### CD plan for \`${short}\`"
+            echo ""
+            if [ "$STALE" = "true" ]; then
+              echo "main has moved on since CI started, so this run does nothing. The run for the newer commit deploys it."
+            elif [ -n "$ROLLBACK_TO" ]; then
+              echo "Manual rollback: redeploy both services to the commits recorded in \`${ROLLBACK_TO}\`."
+            else
+              if [ "$RELEASE" = "on" ]; then
+                echo "Release stages are on (CD_RELEASE)."
+              else
+                echo "Release stages are switched off (CD_RELEASE is not \"on\"), so only the deploy runs. The rest is a dry run."
+              fi
+              echo ""
+              echo "| Stage | What this run does |"
+              echo "|---|---|"
+              if [ "$RELEASE" = "on" ]; then
+                echo "| Images | build, check and push \`ghcr.io/${repo}/{backend,frontend}:${SHA}\` |"
+              else
+                echo "| Images | would build, check and push \`ghcr.io/${repo}/{backend,frontend}:${SHA}\` |"
+              fi
+              echo "| Deploy | deploy \`${short}\` to each service whose files changed, and wait until it reports it |"
+              if [ "$RELEASE" = "on" ]; then
+                echo "| Smoke tests | run Staging regression against ${STAGING_URL} |"
+                echo "| Release | tag \`rc-<date>-<time>-${short}\` and publish its release record |"
+                echo "| Rollback if deploy or smoke fails | ${PREVIOUS_TAG:-none yet: there is no earlier release} |"
+              else
+                echo "| Smoke tests | would run Staging regression against ${STAGING_URL} |"
+                echo "| Release | would tag \`rc-<date>-<time>-${short}\` and publish its release record |"
+                echo "| Rollback if deploy or smoke fails | would redeploy ${PREVIOUS_TAG:-nothing: there is no earlier release} |"
+              fi
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  images:
+    needs: [prepare]
+    if: >-
+      needs.prepare.outputs.release == 'on' && needs.prepare.outputs.stale != 'true'
+      && inputs.rollback_to == ''
+    uses: ./.github/workflows/image-build.yml
+    permissions:
+      contents: read
+      packages: write
+    with:
+      frontend_api_url: https://peers-backend-staging.onrender.com/api
+
+  deploy:
+    # No matrix value in the name: GitHub adds "(backend)" itself, and a skipped job would
+    # otherwise show the expression unexpanded.
+    name: Deploy to staging
+    needs: [prepare, images]
+    # images is skipped while CD_RELEASE is off, which must not stop the deploy.
+    if: >-
+      !cancelled() && needs.prepare.result == 'success' && needs.prepare.outputs.stale != 'true'
+      && inputs.rollback_to == '' && contains(fromJSON('["success", "skipped"]'), needs.images.result)
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     environment:
@@ -58,8 +203,8 @@ jobs:
       matrix:
         service: [backend, frontend]
     steps:
-      # main as it is now, not the commit being deployed: the script that holds the hook secret
-      # only ever runs from main. That commit is in main's history, which is all the script reads.
+      # main as it is now, not a checkout of another ref: the script that holds the hook secret only
+      # ever runs from main. The deployed commit is in main's history, which is all the script reads.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # The whole history, so the script can diff the live commit against the deployed one.
@@ -74,12 +219,110 @@ jobs:
         run: node scripts/render-deploy.js
         env:
           SERVICE: ${{ matrix.service }}
-          SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+          SHA: ${{ needs.prepare.outputs.sha }}
           HOOK_URL: ${{ matrix.service == 'backend' && secrets.RENDER_BACKEND_DEPLOY_HOOK_URL || secrets.RENDER_FRONTEND_DEPLOY_HOOK_URL }}
           FORCE: ${{ inputs.force || false }}
 
+  smoke:
+    needs: [prepare, deploy]
+    if: ${{ !cancelled() && needs.prepare.outputs.release == 'on' && needs.deploy.result == 'success' }}
+    uses: ./.github/workflows/staging-regression.yml
+    with:
+      base_url: https://peers-frontend-staging.onrender.com
+      api_url: https://peers-backend-staging.onrender.com/api
+
+  release:
+    name: Tag release candidate
+    needs: [prepare, images, deploy, smoke]
+    # Every stage before it passed, or there is no tag.
+    if: >-
+      !cancelled() && needs.prepare.outputs.release == 'on' && needs.images.result == 'success'
+      && needs.deploy.result == 'success' && needs.smoke.result == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    # The only job that can write to the repository: it creates the tag and the release.
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+
+      # Reads the commit each service reports; fails (no tag) if either can't say.
+      - name: Write the release record
+        id: record
+        run: echo "tag=$(node scripts/release-record.js record release)" >> "$GITHUB_OUTPUT"
+        env:
+          SHA: ${{ needs.prepare.outputs.sha }}
+          SMOKE_RESULT: "passed: Staging regression (health, frontend and the @staging Playwright tests)"
+          BACKEND_IMAGE: ${{ needs.images.outputs.backend_image }}
+          FRONTEND_IMAGE: ${{ needs.images.outputs.frontend_image }}
+          PREVIOUS_TAG: ${{ needs.prepare.outputs.previous_tag }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+      # A pre-release: staging only. Production is out of scope (CICD-38).
+      - name: Create the rc tag and release
+        run: >-
+          gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --target "$SHA" --prerelease
+          --title "$TAG" --notes-file release/release-record.md release/release-record.json
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.record.outputs.tag }}
+          SHA: ${{ needs.prepare.outputs.sha }}
+
+      # Milestone evidence. The GitHub release keeps the record for good; this copy is for the run.
+      - name: Upload the release record
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-record
+          path: release/
+          retention-days: 90
+          if-no-files-found: ignore
+
+  rollback:
+    name: Roll back
+    needs: [prepare, deploy, smoke]
+    # By hand (rollback_to), or when deploy or smoke failed and there is an earlier release to go back to.
+    if: >-
+      !cancelled() && needs.prepare.result == 'success' && needs.prepare.outputs.previous_backend != ''
+      && (inputs.rollback_to != ''
+          || (needs.prepare.outputs.release == 'on'
+              && (needs.deploy.result == 'failure' || needs.smoke.result == 'failure')))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment:
+      name: staging
+      url: https://peers-frontend-staging.onrender.com
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [backend, frontend]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+
+      # FORCE, because going back to an older commit is the point here.
+      - name: Redeploy ${{ needs.prepare.outputs.previous_tag }} and wait until live
+        run: node scripts/render-deploy.js
+        env:
+          SERVICE: ${{ matrix.service }}
+          SHA: ${{ matrix.service == 'backend' && needs.prepare.outputs.previous_backend || needs.prepare.outputs.previous_frontend }}
+          HOOK_URL: ${{ matrix.service == 'backend' && secrets.RENDER_BACKEND_DEPLOY_HOOK_URL || secrets.RENDER_FRONTEND_DEPLOY_HOOK_URL }}
+          FORCE: "true"
+
   report:
-    needs: [deploy]
+    needs: [prepare, deploy]
     if: ${{ !cancelled() && needs.deploy.result != 'skipped' }}
     uses: ./.github/workflows/deployment-status.yml
     with:
@@ -87,4 +330,4 @@ jobs:
       result: ${{ needs.deploy.result }}
       url: https://peers-frontend-staging.onrender.com
       health_url: https://peers-backend-staging.onrender.com/api/health
-      commit: ${{ github.event.workflow_run.head_sha || github.sha }}
+      commit: ${{ needs.prepare.outputs.sha }}
