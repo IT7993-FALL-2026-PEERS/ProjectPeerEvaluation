@@ -45,7 +45,6 @@ import GroupIcon from '@mui/icons-material/Group';
 import EmojiObjectsIcon from '@mui/icons-material/EmojiObjects';
 // Remove AssessmentIcon import if present
 import PersonIcon from '@mui/icons-material/Person';
-import PeopleIcon from '@mui/icons-material/People';
 import SearchIcon from '@mui/icons-material/Search';
 import ClearIcon from '@mui/icons-material/Clear';
 import FilterListIcon from '@mui/icons-material/FilterList';
@@ -65,6 +64,9 @@ import CsvUploadDialog from '../components/CsvUploadDialog';
 import DeleteAllStudentsDialog from '../components/DeleteAllStudentsDialog';
 import EvaluationResetDialog from '../components/EvaluationResetDialog';
 import EvaluationStatusDialog from '../components/EvaluationStatusDialog';
+import TeamsDialog from '../components/TeamsDialog';
+import { EditTeamDialog, CreateTeamDialog } from '../components/TeamFormDialogs';
+import TeamStudentsDialog from '../components/TeamStudentsDialog';
 import styles from '../styles/CourseManagement.module.css';
 import '../App.css';
 
@@ -377,13 +379,6 @@ function CourseManagement() {
     return matchesId && matchesName && matchesEmail && matchesTeam;
   }), [students, studentSearch]);
 
-  const filteredTeams = useMemo(() => teams.filter(team => {
-    const matchesName = teamSearch.team_name === '' || 
-      team.team_name.toLowerCase().includes(teamSearch.team_name.toLowerCase());
-    const matchesStatus = teamSearch.team_status === '' || 
-      team.team_status === teamSearch.team_status;
-    return matchesName && matchesStatus;
-  }), [teams, teamSearch]);
 
   // Clear student search
   const clearStudentSearch = () => {
@@ -1077,6 +1072,48 @@ function CourseManagement() {
         onConfirm={handleDeleteAllStudents}
         onMismatch={() => setAlert({ severity: 'error', message: 'Please type "DELETE ALL" to confirm' })}
       />
+      <TeamsDialog
+        open={teamsDialogOpen}
+        course={teamsCourse}
+        teams={teams}
+        loading={teamsLoading}
+        search={teamSearch}
+        showSearch={showTeamSearch}
+        sendingTeamIds={sendingTeamEvaluations}
+        onToggleSearch={() => setShowTeamSearch(!showTeamSearch)}
+        onSearchChange={handleTeamSearchChange}
+        onClearSearch={clearTeamSearch}
+        onCreate={() => setCreateTeamDialogOpen(true)}
+        onManageStudents={handleManageTeamStudents}
+        onSend={handleSendTeamEvaluations}
+        onEdit={handleEditTeam}
+        onDelete={(team) => handleDeleteTeam(team._id || team.id, team.team_name)}
+        onClearAll={handleClearAllTeams}
+        onClose={() => { setTeamsDialogOpen(false); fetchCoursesWithCounts(); }}
+      />
+      <EditTeamDialog
+        open={editTeamDialogOpen}
+        form={editTeamData}
+        onFormChange={setEditTeamData}
+        onClose={() => setEditTeamDialogOpen(false)}
+        onSave={handleSaveTeamEdit}
+      />
+      <CreateTeamDialog
+        open={createTeamDialogOpen}
+        form={newTeamData}
+        onFormChange={setNewTeamData}
+        onClose={() => setCreateTeamDialogOpen(false)}
+        onCreate={handleCreateTeam}
+      />
+      <TeamStudentsDialog
+        open={manageStudentsDialogOpen}
+        team={selectedTeam}
+        teamStudents={teamStudents}
+        availableStudents={availableStudents}
+        onAdd={handleAddStudentToTeam}
+        onRemove={handleRemoveStudentFromTeam}
+        onClose={() => setManageStudentsDialogOpen(false)}
+      />
       <Box display="flex" justifyContent="flex-end" mb={2} gap={2}>
         <Button variant="outlined" className={styles.logoutButton} color="primary" onClick={() => navigate('/settings')}>
           Settings
@@ -1466,353 +1503,6 @@ function CourseManagement() {
         </DialogActions>
       </Dialog>
 
-      {/* Manage Teams Dialog */}
-      <Dialog open={teamsDialogOpen} onClose={() => { setTeamsDialogOpen(false); fetchCoursesWithCounts(); }} maxWidth="md" fullWidth>
-        <DialogTitle>Manage Teams for {teamsCourse?.course_number || teamsCourse?.course_code} {teamsCourse?.course_section || ''} - {teamsCourse?.course_name}</DialogTitle>
-        <DialogContent>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-            <Button
-              variant="outlined"
-              startIcon={<FilterListIcon />}
-              onClick={() => setShowTeamSearch(!showTeamSearch)}
-              size="small"
-            >
-              {showTeamSearch ? 'Hide Search' : 'Show Search'}
-            </Button>
-            <Box sx={{ display: 'flex', gap: 1 }}>
-              <Button 
-                variant="contained" 
-                size="small" 
-                startIcon={<AddIcon />}
-                onClick={() => setCreateTeamDialogOpen(true)}
-              >
-                Create Team
-              </Button>
-            </Box>
-          </Box>
-
-          {/* Team Search Filters */}
-          <Collapse in={showTeamSearch}>
-            <Card sx={{ mb: 2 }}>
-              <CardContent>
-                <Typography variant="h6" gutterBottom>
-                  Search Teams ({filteredTeams.length} of {teams.length})
-                </Typography>
-                <Box sx={{ display: 'flex', gap: 2, mb: 2, flexWrap: 'wrap' }}>
-                  <TextField
-                    size="small"
-                    label="Team Name"
-                    value={teamSearch.team_name}
-                    onChange={(e) => handleTeamSearchChange('team_name', e.target.value)}
-                    placeholder="Search by team name..."
-                    sx={{ minWidth: 200, flex: 1 }}
-                  />
-                  <FormControl size="small" sx={{ minWidth: 150, flex: 1 }}>
-                    <InputLabel>Team Status</InputLabel>
-                    <Select
-                      value={teamSearch.team_status}
-                      label="Team Status"
-                      onChange={(e) => handleTeamSearchChange('team_status', e.target.value)}
-                    >
-                      <MenuItem value="">All</MenuItem>
-                      <MenuItem value="Active">Active</MenuItem>
-                      <MenuItem value="Inactive">Inactive</MenuItem>
-                    </Select>
-                  </FormControl>
-                </Box>
-                <Box sx={{ display: 'flex', gap: 1 }}>
-                  <Button
-                    variant="outlined"
-                    size="small"
-                    startIcon={<ClearIcon />}
-                    onClick={clearTeamSearch}
-                    disabled={!teamSearch.team_name && !teamSearch.team_status}
-                  >
-                    Clear Search
-                  </Button>
-                </Box>
-              </CardContent>
-            </Card>
-          </Collapse>
-
-          {teamsLoading ? (
-            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-              <Typography>Loading teams...</Typography>
-            </Box>
-          ) : (
-            <TableContainer>
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Team Name</TableCell>
-                    <TableCell align="center">Students</TableCell>
-                    <TableCell align="center">Status</TableCell>
-                    <TableCell align="center">Actions</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {filteredTeams.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={4} align="center">
-                        <Typography color="text.secondary">
-                          {teams.length === 0 ? 'No teams found for this course.' : 'No teams match your search criteria.'}
-                        </Typography>
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    filteredTeams
-                      .sort((a, b) => {
-                        // Natural sort that handles both alphabetical and numerical sorting
-                        const nameA = (a.team_name || '').toLowerCase();
-                        const nameB = (b.team_name || '').toLowerCase();
-                        
-                        // Use localeCompare with numeric option for natural sorting
-                        return nameA.localeCompare(nameB, undefined, {
-                          numeric: true,
-                          sensitivity: 'base'
-                        });
-                      })
-                      .map((team) => (
-                      <TableRow key={team._id || team.id}>
-                        <TableCell>
-                          <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
-                            {team.team_name}
-                          </Typography>
-                        </TableCell>
-                        <TableCell align="center">
-                          <Chip 
-                            label={team.student_count || 0} 
-                            size="small" 
-                            color="primary" 
-                            variant="outlined"
-                          />
-                        </TableCell>
-                        <TableCell align="center">
-                          <Chip 
-                            label={team.team_status || 'Active'} 
-                            size="small" 
-                            color={team.team_status === 'Active' ? 'success' : 'default'}
-                          />
-                        </TableCell>
-                        <TableCell align="center">
-                          <IconButton 
-                            size="small" 
-                            color="primary" 
-                            title="Manage Students"
-                            onClick={() => handleManageTeamStudents(team)}
-                          >
-                            <PeopleIcon />
-                          </IconButton>
-                          <IconButton 
-                            size="small" 
-                            color="success" 
-                            title="Send Evaluations to Team"
-                            onClick={() => handleSendTeamEvaluations(team)}
-                            disabled={sendingTeamEvaluations[team._id || team.id]}
-                          >
-                            {sendingTeamEvaluations[team._id || team.id] ? <CircularProgress size={20} /> : <SendIcon />}
-                          </IconButton>
-                          <IconButton 
-                            size="small" 
-                            color="error" 
-                            title="Delete Team"
-                            onClick={() => handleDeleteTeam(team._id || team.id, team.team_name)}
-                          >
-                            <DeleteIcon />
-                          </IconButton>
-                          <IconButton 
-                            size="small" 
-                            color="primary" 
-                            title="Edit Team"
-                            onClick={() => handleEditTeam(team)}
-                          >
-                            <EditIcon />
-                          </IconButton>
-                        </TableCell>
-
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button 
-            onClick={handleClearAllTeams}
-            color="error"
-            variant="outlined"
-            disabled={!teams || teams.length === 0}
-          >
-            Clear All Teams
-          </Button>
-          <Box sx={{ flex: 1 }} />
-          <Button onClick={() => { setTeamsDialogOpen(false); fetchCoursesWithCounts(); }}>Close</Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Edit Team Dialog */}
-      <Dialog open={editTeamDialogOpen} onClose={() => setEditTeamDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Edit Team</DialogTitle>
-        <DialogContent>
-          <TextField
-            fullWidth
-            label="Team Name"
-            value={editTeamData.team_name}
-            onChange={(e) => setEditTeamData({ ...editTeamData, team_name: e.target.value })}
-            margin="normal"
-            required
-          />
-          <FormControl fullWidth margin="normal">
-            <InputLabel>Team Status</InputLabel>
-            <Select
-              value={editTeamData.team_status}
-              onChange={(e) => setEditTeamData({ ...editTeamData, team_status: e.target.value })}
-              label="Team Status"
-            >
-              <MenuItem value="Active">Active</MenuItem>
-              <MenuItem value="Inactive">Inactive</MenuItem>
-            </Select>
-          </FormControl>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setEditTeamDialogOpen(false)}>Cancel</Button>
-          <Button 
-            onClick={handleSaveTeamEdit} 
-            variant="contained"
-            disabled={!editTeamData.team_name.trim()}
-          >
-            Save Changes
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Create Team Dialog */}
-      <Dialog open={createTeamDialogOpen} onClose={() => setCreateTeamDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Create New Team</DialogTitle>
-        <DialogContent>
-          <TextField
-            fullWidth
-            label="Team Name"
-            value={newTeamData.team_name}
-            onChange={(e) => setNewTeamData({ ...newTeamData, team_name: e.target.value })}
-            margin="normal"
-            required
-            autoFocus
-            placeholder="Team 1"
-          />
-          <FormControl fullWidth margin="normal">
-            <InputLabel>Team Status</InputLabel>
-            <Select
-              value={newTeamData.team_status}
-              onChange={(e) => setNewTeamData({ ...newTeamData, team_status: e.target.value })}
-              label="Team Status"
-            >
-              <MenuItem value="Active">Active</MenuItem>
-              <MenuItem value="Inactive">Inactive</MenuItem>
-            </Select>
-          </FormControl>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setCreateTeamDialogOpen(false)}>Cancel</Button>
-          <Button 
-            onClick={handleCreateTeam} 
-            variant="contained"
-            disabled={!newTeamData.team_name.trim()}
-          >
-            Create Team
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Manage Team Students Dialog */}
-      <Dialog open={manageStudentsDialogOpen} onClose={() => setManageStudentsDialogOpen(false)} maxWidth="md" fullWidth>
-        <DialogTitle>
-          Manage Students in {selectedTeam?.team_name}
-        </DialogTitle>
-        <DialogContent>
-          <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 3, mt: 2 }}>
-            {/* Students in Team */}
-            <Card>
-              <CardContent>
-                <Typography variant="h6" gutterBottom>
-                  Students in Team ({teamStudents.length})
-                </Typography>
-                {teamStudents.length === 0 ? (
-                  <Typography color="text.secondary">No students in this team</Typography>
-                ) : (
-                  <Box sx={{ maxHeight: 300, overflow: 'auto' }}>
-                    {teamStudents.map((student) => (
-                      <Box key={student._id} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 1, borderBottom: '1px solid #eee' }}>
-                        <Box>
-                          <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
-                            {student.name}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            {student.student_id} • {student.email}
-                          </Typography>
-                        </Box>
-                        <IconButton 
-                          size="small" 
-                          color="error"
-                          onClick={() => handleRemoveStudentFromTeam(student._id)}
-                          title="Remove from team"
-                        >
-                          <DeleteIcon />
-                        </IconButton>
-                      </Box>
-                    ))}
-                  </Box>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Available Students */}
-            <Card>
-              <CardContent>
-                <Typography variant="h6" gutterBottom>
-                  Available Students ({availableStudents.length})
-                </Typography>
-                {availableStudents.length === 0 ? (
-                  <Typography color="text.secondary">No available students</Typography>
-                ) : (
-                  <Box sx={{ maxHeight: 300, overflow: 'auto' }}>
-                    {availableStudents.map((student) => (
-                      <Box key={student._id} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 1, borderBottom: '1px solid #eee' }}>
-                        <Box>
-                          <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
-                            {student.name}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            {student.student_id} • {student.email}
-                          </Typography>
-                          {student.group_assignment && (
-                            <Typography variant="caption" color="warning.main" sx={{ display: 'block' }}>
-                              Currently in: {student.group_assignment}
-                            </Typography>
-                          )}
-                        </Box>
-                        <IconButton 
-                          size="small" 
-                          color="primary"
-                          onClick={() => handleAddStudentToTeam(student._id)}
-                          title="Add to team"
-                        >
-                          <AddIcon />
-                        </IconButton>
-                      </Box>
-                    ))}
-                  </Box>
-                )}
-              </CardContent>
-            </Card>
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setManageStudentsDialogOpen(false)}>Close</Button>
-        </DialogActions>
-      </Dialog>
                         <IconButton
                           size="small"
                           color="primary"
