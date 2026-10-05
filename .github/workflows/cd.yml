@@ -67,7 +67,13 @@ jobs:
       || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-24.04
     timeout-minutes: 5
+    # actions: read, to find the CI run of the commit and (for the record) its run link.
+    permissions:
+      contents: read
+      actions: read
     outputs:
+      ci_run_id: ${{ steps.ci.outputs.run_id }}
+      ci_run_url: ${{ steps.ci.outputs.run_url }}
       sha: ${{ steps.what.outputs.sha }}
       stale: ${{ steps.what.outputs.stale }}
       release: ${{ steps.what.outputs.release }}
@@ -101,29 +107,61 @@ jobs:
           [ "$CD_RELEASE" = "on" ] && release=on
           { echo "sha=${SHA}"; echo "stale=${stale}"; echo "release=${release}"; } >> "$GITHUB_OUTPUT"
 
-      # The rollback target: the release named in rollback_to, or else the newest rc-* release.
+      # The CI run that tested this commit. After CI it's the run that triggered CD. A manual deploy
+      # needs a CI run on main for the same commit that passed, so nothing untested reaches staging
+      # (Khoa's review of #146). A manual rollback redeploys a release, which passed CI before.
+      - name: Find the CI run that tested this commit
+        id: ci
+        if: ${{ inputs.rollback_to == '' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ steps.what.outputs.sha }}
+          EVENT_RUN_ID: ${{ github.event.workflow_run.id }}
+          EVENT_RUN_URL: ${{ github.event.workflow_run.html_url }}
+        run: |
+          if [ -n "$EVENT_RUN_ID" ]; then
+            { echo "run_id=${EVENT_RUN_ID}"; echo "run_url=${EVENT_RUN_URL}"; } >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          run=$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs?head_sha=${SHA}&event=push&status=success&per_page=1" \
+            --jq '.workflow_runs[0] | select(. != null) | "\(.id) \(.html_url)"')
+          if [ -z "$run" ]; then
+            echo "::error::No successful CI run on main for ${SHA:0:7}. Wait for CI to pass (or re-run it), then run CD again."
+            exit 1
+          fi
+          { echo "run_id=${run%% *}"; echo "run_url=${run#* }"; } >> "$GITHUB_OUTPUT"
+
+      # The rollback target: the release named in rollback_to, or else the newest rc-* release that the
+      # pipeline made. Tags that don't match rc-<date>-<time>-<sha7>, and hand-made releases (no CD run
+      # link, smoke tests not passed), are skipped: scripts/release-record.js `previous` decides.
       - name: Find the previous good release
         id: previous
         env:
           GH_TOKEN: ${{ github.token }}
           ROLLBACK_TO: ${{ inputs.rollback_to }}
         run: |
-          tag="$ROLLBACK_TO"
-          if [ -n "$tag" ] && ! [[ "$tag" =~ ^rc-[0-9]{8}-[0-9]{4}-[0-9a-f]{7}$ ]]; then
-            echo "::error::rollback_to must be an rc-* tag such as rc-20261105-1432-1a2b3c4."
-            exit 1
+          pattern='^rc-[0-9]{8}-[0-9]{4}-[0-9a-f]{7}$'
+          if [ -n "$ROLLBACK_TO" ]; then
+            [[ "$ROLLBACK_TO" =~ $pattern ]] || { echo "::error::rollback_to must be an rc-* tag such as rc-20261105-1432-1a2b3c4."; exit 1; }
+            candidates="$ROLLBACK_TO"
+          else
+            candidates=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 100 --json tagName \
+              --jq '.[].tagName | select(startswith("rc-"))' | head -n 20)
           fi
-          if [ -z "$tag" ]; then
-            tag=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 100 --json tagName \
-              --jq '[.[].tagName | select(startswith("rc-"))][0] // ""')
-          fi
-          file=""
-          if [ -n "$tag" ] && gh release download "$tag" --repo "$GITHUB_REPOSITORY" --pattern release-record.json --dir previous; then
-            file=previous/release-record.json
-          fi
-          node scripts/release-record.js previous "$file" | tee -a "$GITHUB_OUTPUT"
-          if [ -n "$ROLLBACK_TO" ] && ! grep -q '^backend=.' "$GITHUB_OUTPUT"; then
-            echo "::error::No usable release record for ${ROLLBACK_TO}."
+          found="tag=
+          backend=
+          frontend="
+          for tag in $candidates; do
+            [[ "$tag" =~ $pattern ]] || { echo "Skipping ${tag}: not an rc-<date>-<time>-<sha7> tag"; continue; }
+            rm -rf previous
+            gh release download "$tag" --repo "$GITHUB_REPOSITORY" --pattern release-record.json --dir previous 2>/dev/null || { echo "Skipping ${tag}: no release record"; continue; }
+            out=$(node scripts/release-record.js previous previous/release-record.json)
+            if grep -q '^backend=.' <<< "$out"; then found="$out"; break; fi
+            echo "Skipping ${tag}: not a release the pipeline made"
+          done
+          echo "$found" | tee -a "$GITHUB_OUTPUT"
+          if [ -n "$ROLLBACK_TO" ] && ! grep -q '^backend=.' <<< "$found"; then
+            echo "::error::${ROLLBACK_TO} has no release record the pipeline made, so it can't be rolled back to."
             exit 1
           fi
 
@@ -221,6 +259,7 @@ jobs:
           SERVICE: ${{ matrix.service }}
           SHA: ${{ needs.prepare.outputs.sha }}
           HOOK_URL: ${{ matrix.service == 'backend' && secrets.RENDER_BACKEND_DEPLOY_HOOK_URL || secrets.RENDER_FRONTEND_DEPLOY_HOOK_URL }}
+          # Redeploy even when nothing changed, but never an older commit than the live one.
           FORCE: ${{ inputs.force || false }}
 
   smoke:
@@ -240,9 +279,11 @@ jobs:
       && needs.deploy.result == 'success' && needs.smoke.result == 'success'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
-    # The only job that can write to the repository: it creates the tag and the release.
+    # The only job that can write to the repository: it creates the tag and the release. actions: read
+    # downloads the CI run's coverage reports for the record.
     permissions:
       contents: write
+      actions: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -252,15 +293,30 @@ jobs:
         with:
           node-version-file: .nvmrc
 
-      # Reads the commit each service reports; fails (no tag) if either can't say.
+      # The coverage CI measured for this commit. Missing reports are recorded as "not available".
+      - name: Download CI coverage
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CI_RUN_ID: ${{ needs.prepare.outputs.ci_run_id }}
+        run: |
+          gh run download "$CI_RUN_ID" --repo "$GITHUB_REPOSITORY" --name coverage-backend --dir ci/backend || echo "::warning::No backend coverage in CI run ${CI_RUN_ID}"
+          gh run download "$CI_RUN_ID" --repo "$GITHUB_REPOSITORY" --name coverage-frontend --dir ci/frontend || echo "::warning::No frontend coverage in CI run ${CI_RUN_ID}"
+
+      # Fails, with no tag, when staging can't say which commit a service runs or no @staging test ran.
       - name: Write the release record
         id: record
         run: echo "tag=$(node scripts/release-record.js record release)" >> "$GITHUB_OUTPUT"
         env:
           SHA: ${{ needs.prepare.outputs.sha }}
-          SMOKE_RESULT: "passed: Staging regression (health, frontend and the @staging Playwright tests)"
+          SMOKE_RESULT: ${{ needs.smoke.result }}
+          SMOKE_TESTS: ${{ needs.smoke.outputs.tests }}
+          CI_RUN_URL: ${{ needs.prepare.outputs.ci_run_url }}
           BACKEND_IMAGE: ${{ needs.images.outputs.backend_image }}
           FRONTEND_IMAGE: ${{ needs.images.outputs.frontend_image }}
+          BACKEND_DIGEST: ${{ needs.images.outputs.backend_digest }}
+          FRONTEND_DIGEST: ${{ needs.images.outputs.frontend_digest }}
+          BACKEND_COVERAGE: ci/backend/coverage/lcov.info
+          FRONTEND_COVERAGE: ci/frontend/coverage/coverage-summary.json
           PREVIOUS_TAG: ${{ needs.prepare.outputs.previous_tag }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
@@ -312,14 +368,34 @@ jobs:
         with:
           node-version-file: .nvmrc
 
-      # FORCE, because going back to an older commit is the point here.
+      # ROLLBACK, the only mode that may deploy an older commit than the live one.
       - name: Redeploy ${{ needs.prepare.outputs.previous_tag }} and wait until live
         run: node scripts/render-deploy.js
         env:
           SERVICE: ${{ matrix.service }}
           SHA: ${{ matrix.service == 'backend' && needs.prepare.outputs.previous_backend || needs.prepare.outputs.previous_frontend }}
           HOOK_URL: ${{ matrix.service == 'backend' && secrets.RENDER_BACKEND_DEPLOY_HOOK_URL || secrets.RENDER_FRONTEND_DEPLOY_HOOK_URL }}
-          FORCE: "true"
+          ROLLBACK: "true"
+
+  # A rollback is checked like a deploy: health and a deployment status report, then the smoke tests.
+  rollback-report:
+    needs: [prepare, rollback]
+    if: ${{ !cancelled() && needs.rollback.result != 'skipped' }}
+    uses: ./.github/workflows/deployment-status.yml
+    with:
+      environment: staging-rollback
+      result: ${{ needs.rollback.result }}
+      url: https://peers-frontend-staging.onrender.com
+      health_url: https://peers-backend-staging.onrender.com/api/health
+      commit: ${{ needs.prepare.outputs.previous_backend }}
+
+  rollback-smoke:
+    needs: [rollback]
+    if: ${{ !cancelled() && needs.rollback.result == 'success' }}
+    uses: ./.github/workflows/staging-regression.yml
+    with:
+      base_url: https://peers-frontend-staging.onrender.com
+      api_url: https://peers-backend-staging.onrender.com/api
 
   report:
     needs: [prepare, deploy]

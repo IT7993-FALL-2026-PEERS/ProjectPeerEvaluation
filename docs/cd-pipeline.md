@@ -21,8 +21,10 @@ For each service, `scripts/render-deploy.js`:
 
 Then `deployment-status.yml` checks `/api/health` answers OK and writes the deployment status to the run summary.
 
-**Run by hand:** Actions > CD > Run workflow, on `main`. Tick "force" to deploy both services even when nothing they use
-changed (for example after changing an environment variable in Render).
+**Run by hand:** Actions > CD > Run workflow, on `main`. It deploys only a commit whose CI run on `main` passed, and
+refuses otherwise. Tick "force" to deploy both services even when nothing they use changed (for example after changing an
+environment variable in Render). Force never deploys an older commit than the live one: going back is what
+`rollback_to` is for.
 
 ## Release pipeline (`cd.yml`, CICD-28): design for review
 
@@ -34,21 +36,23 @@ stages would have done, and those jobs show as skipped.
 ```
 prepare ──► images ──► deploy (backend, frontend) ──► smoke ──► release (rc-* tag)
                               │                         │
-                              ├──► report               └──► rollback, if deploy or smoke failed
+                              ├──► report               └──► rollback ──► rollback-report, rollback-smoke
 ```
 
 | Job | What it does | Runs when |
 |---|---|---|
-| `prepare` | Works out the commit, the mode, and the previous good release from the newest `rc-*` release's record. If `main` has moved on since CI started, the run stands down, and the run for the newer commit deploys instead. Writes the plan | always |
+| `prepare` | Works out the commit, the mode, the CI run that tested it (a manual run without a passing CI run on `main` stops here), and the previous good release: the newest `rc-*` release **the pipeline made**. Tags that don't match `rc-<date>-<time>-<sha7>`, and hand-made releases, are skipped. If `main` has moved on since CI started, the run stands down, and the run for the newer commit deploys instead. Writes the plan | always |
 | `images` | Calls `image-build.yml` (Aaron): builds both images, starts them, checks health, and pushes `ghcr.io/.../backend\|frontend:<sha>`. Never `latest` | `CD_RELEASE` on |
 | `deploy` | Deploys each service whose files changed, then waits until it reports the commit (backend `/api/health`, frontend `/version.txt`). The two services can be on different commits | always (CICD-12) |
 | `smoke` | Calls `staging-regression.yml`: health, the frontend, and Playwright tests tagged `@staging` (Kylee's smoke tests, read-only, no email) | `CD_RELEASE` on, deploy passed |
-| `release` | Writes the release record (`scripts/release-record.js`), creates the `rc-<yyyymmdd>-<hhmm>-<sha7>` tag and a GitHub pre-release with the record attached | `CD_RELEASE` on, images, deploy and smoke all passed |
-| `rollback` | Force-redeploys both services to the previous release's commits. The run stays failed | `CD_RELEASE` on, deploy or smoke failed, and an earlier release exists |
+| `release` | Writes the release record (`scripts/release-record.js`), creates the `rc-<yyyymmdd>-<hhmm>-<sha7>` tag and a GitHub pre-release with the record attached. Refuses, with no tag, unless at least one `@staging` test ran and passed | `CD_RELEASE` on, images, deploy and smoke all passed |
+| `rollback` | Redeploys both services to the previous release's commits in rollback mode, the only mode allowed to go back to an older commit. The run stays failed | `CD_RELEASE` on, deploy or smoke failed, and an earlier pipeline release exists; or `rollback_to` |
+| `rollback-report`, `rollback-smoke` | A rollback is checked like a deploy: deployment status with the health check, then Staging regression | rollback ran |
 | `report` | `deployment-status.yml`: deployment status in the summary | deploy ran |
 
 **Release record.** It holds the release commit, the commit each component is actually running (read from staging, not
-assumed), both image references, the smoke result, the previous release, the run link, and how to recover. It is the
+assumed), both image references and digests, the smoke result with the number of `@staging` tests that ran, the CI run
+and its coverage, the previous release, the CD run link, and how to recover. It is the
 release notes and the `release-record.json` asset of the GitHub release, which keeps it permanently. A copy is also kept
 as a 90-day run artifact, as is `deployment-status`. The 7-day retention only applies to CI's E2E report. If staging
 can't say which commit a component runs, there is no release.
@@ -56,8 +60,15 @@ can't say which commit a component runs, there is no release.
 **Failure means no tag.** `release` needs every stage before it to have passed. A failed deploy or smoke run fails the
 workflow, and `rollback` puts back the previous release.
 
-**Manual rollback:** Actions > CD > Run workflow on `main`, with `rollback_to` set to an `rc-*` tag. It redeploys that
-release's commits and nothing else. This works whether `CD_RELEASE` is on or off.
+**Manual rollback:** Actions > CD > Run workflow on `main`, with `rollback_to` set to an `rc-*` tag that the pipeline
+made. It redeploys that release's commits, then checks them with the deployment status report and the smoke tests. This
+works whether `CD_RELEASE` is on or off.
+
+**The first release has nothing to roll back to.** Rollback needs an earlier release the pipeline made, so until the
+first `rc-*` exists a failed deploy is not rolled back automatically. Use the Render dashboard rollback or a revert
+instead ([rollback and recovery, R1](operations/rollback-and-recovery.md#r1-staging-is-broken-after-a-deploy)). A
+hand-made release can't stand in as a baseline: the pipeline ignores releases it didn't make. So the first run after
+`CD_RELEASE` goes on is the baseline, and it should be one where staging is known to be good.
 
 **Permissions.** The workflow reads by default. Only `images` gets `packages: write`, and only `release` gets
 `contents: write`. The deploy hooks are `staging` environment secrets, which only `main` can use. Every job runs the
@@ -65,10 +76,14 @@ code from `main`; none checks out another ref.
 
 **Turning it on** (after Khoa has reviewed this design):
 
-1. Tag at least one `@staging` Playwright test (Kylee). Until then, `smoke` runs only the health and frontend checks.
-2. Set the `CD_RELEASE` variable to `on`.
-3. Merge something and check the run: an `rc-*` release whose record matches `/api/health` and `/version.txt`.
-4. Prove the failure path: a deliberately broken deploy should end in a failed run, no new `rc-*` tag, and a rollback.
+1. Tag at least one `@staging` Playwright test (Kylee). Without one, `smoke` runs only the health and frontend checks
+   and `release` refuses to tag. Khoa suggested a CORS check from the frontend's origin as the first.
+2. Delete the hand-made `TEST rc-20261005-2223-955dfcc` pre-release and its tag from the #147 dry run. The pipeline
+   ignores it, but it shouldn't sit among real release candidates.
+3. Set the `CD_RELEASE` variable to `on`.
+4. Merge something and check the run: an `rc-*` release whose record matches `/api/health` and `/version.txt`. That
+   first release is the rollback baseline.
+5. Prove the failure path: a deliberately broken deploy should end in a failed run, no new `rc-*` tag, and a rollback.
 
 **Secrets** (environment `staging`, which only `main` can deploy to):
 
@@ -77,7 +92,8 @@ code from `main`; none checks out another ref.
 | `RENDER_BACKEND_DEPLOY_HOOK_URL` | Render > `peers-backend-staging` > Settings > Deploy Hook |
 | `RENDER_FRONTEND_DEPLOY_HOOK_URL` | Render > `peers-frontend-staging` > Settings > Deploy Hook |
 
-While staging is switched off, a CD run fails at the wait step, which is expected. Turn staging on and run CD by hand.
+Staging stays running until final delivery (6 Dec 2026). If it has been suspended, a CD run fails at the wait step: resume it
+and run CD by hand.
 
 ## Production approval gate (`promote.yml`, CICD-30)
 
@@ -90,7 +106,8 @@ documented placeholder that deploys nothing. The gate and the release are real.
 Releases. Untick it for a real release.
 
 1. `check` refuses anything that isn't an `rc-*` tag with a pre-release from `cd.yml` whose release record names the
-   tag's commit. It also refuses a release that already exists, a dry-run draft included. It then writes a promotion
+   tag's commit, links the CD run that made it, and says the smoke tests passed. A hand-made release candidate can't be
+   promoted. It also refuses a release that already exists, a dry-run draft included. It then writes a promotion
    request to the run summary.
 2. `promote` waits in the `production` environment until it is approved. It then runs the deploy placeholder and
    publishes `release-<yyyymmdd>-<hhmm>-<sha7>` at the same commit. The notes are the release record plus who requested
@@ -135,11 +152,11 @@ A caller must also grant `packages: write` to the job that calls this workflow.
 | Coverage | Frontend and Backend job summaries (`scripts/coverage-gate.js`) |
 | Result and duration of every job, build history of the last 10 runs | `Run report` job in `ci.yml` (`scripts/run-report.js`) |
 | Deployment status | `deployment-status.yml`, called from `cd.yml` after the deploy job (`scripts/deployment-status.js`) |
-| Kept as artifacts | coverage and test results 30 days, `run-report`, `deployment-status-<env>` 30 days |
+| Kept as artifacts | coverage and test results 30 days, `run-report` 30 days, `deployment-status-<env>` and `release-record` 90 days |
 
 ## Staging regression (`staging-regression.yml`)
 
-Manual only (Actions tab > Run workflow) while staging is switched off and the variables below are not set. The weekly schedule (Tuesday 06:00 UTC) is kept as a comment in the workflow and comes back once staging is running. Read-only health and frontend checks, then Playwright tests tagged `@staging`.
+Manual only (Actions tab > Run workflow) while no tests are tagged `@staging` and the variables below are not set. The weekly schedule (Tuesday 06:00 UTC) is kept as a comment in the workflow and comes back once staging is running. Read-only health and frontend checks, then Playwright tests tagged `@staging`.
 Tests with that tag must not send email (Mailtrap allows 50 a month) and must not need the local E2E control server.
 Set the `STAGING_URL` and `STAGING_API_URL` repository variables; a manual run can override both.
 

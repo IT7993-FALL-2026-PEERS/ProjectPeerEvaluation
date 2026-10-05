@@ -72,6 +72,21 @@ test('plan: a late run never rolls back a newer live commit', () => {
   assert.match(result.reason, /newer/);
 });
 
+// Khoa's review of #146: FORCE redeploys, but only ROLLBACK may go back to an older commit.
+test('plan: FORCE never deploys an older commit than the live one', () => {
+  const result = plan({ sha: A, live: B, service: SERVICES.backend, force: true, gitImpl: () => '' });
+  assert.equal(result.deploy, false);
+  assert.match(result.reason, /FORCE never goes back; use rollback_to/);
+});
+
+test('plan: ROLLBACK deploys an older commit, but not one that is already live', () => {
+  const back = plan({ sha: A, live: B, service: SERVICES.backend, rollback: true, gitImpl: () => '' });
+  assert.equal(back.deploy, true);
+  assert.match(back.reason, /rolling back from bbbbbbb/);
+  assert.equal(plan({ sha: A, live: A, service: SERVICES.backend, rollback: true }).deploy, false);
+  assert.equal(plan({ sha: A, live: null, service: SERVICES.backend, rollback: true }).deploy, true);
+});
+
 test('plan: a live commit missing from history deploys', () => {
   const gitImpl = () => { throw new Error('bad object'); };
   assert.equal(plan({ sha: A, live: B, service: SERVICES.backend, gitImpl }).deploy, true);

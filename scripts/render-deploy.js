@@ -1,10 +1,13 @@
 #!/usr/bin/env node
 // Deploys one staging service on Render from cd.yml (backlog CICD-12) and waits until it is live.
 //
-//   SERVICE=backend|frontend SHA=<commit> HOOK_URL=<deploy hook> [FORCE=true] node scripts/render-deploy.js
+//   SERVICE=backend|frontend SHA=<commit> HOOK_URL=<deploy hook> [FORCE=true | ROLLBACK=true] node scripts/render-deploy.js
 //
 //   HOOK_URL  the service's Render deploy hook (a secret: never printed)
-//   FORCE     deploy even when no file the service uses changed
+//   FORCE     deploy even when no file the service uses changed. Never deploys an older commit
+//             than the live one
+//   ROLLBACK  deploy SHA even when it is older than the live commit: going back is the point. Only
+//             cd.yml's rollback job sets it
 //
 // Render's autoDeployTrigger is off in render.yaml, so Render's own buildFilter no longer applies.
 // This script does that job instead, because build minutes are limited (500/month): it asks the
@@ -66,15 +69,17 @@ async function liveCommit(url, fetchImpl = fetch) {
 const git = (...args) => execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
 
 // Decides whether to deploy `sha`, given the live commit. Returns { deploy, reason }.
-function plan({ sha, live, service, force, gitImpl = git }) {
+function plan({ sha, live, service, force, rollback, gitImpl = git }) {
   if (live === sha) return { deploy: false, reason: `${sha.slice(0, 7)} is already live` };
-  if (force) return { deploy: true, reason: 'forced' };
+  if (rollback) return { deploy: true, reason: `rolling back from ${live ? live.slice(0, 7) : 'an unknown commit'}` };
   if (!live) return { deploy: true, reason: 'the live commit is unknown' };
   try {
-    // A newer commit already live means this run is late (runs can finish out of order): don't go back.
+    // A newer commit already live means this run is late (runs can finish out of order): don't go
+    // back. FORCE doesn't override this; going back is ROLLBACK's job.
     gitImpl('merge-base', '--is-ancestor', sha, live);
-    return { deploy: false, reason: `the live commit ${live.slice(0, 7)} is newer than ${sha.slice(0, 7)}` };
+    return { deploy: false, reason: `the live commit ${live.slice(0, 7)} is newer than ${sha.slice(0, 7)}${force ? ' (FORCE never goes back; use rollback_to)' : ''}` };
   } catch { /* sha is not an ancestor of live: carry on */ }
+  if (force) return { deploy: true, reason: 'forced' };
   let files;
   try {
     files = gitImpl('diff', '--name-only', live, sha).split('\n').filter(Boolean);
@@ -110,7 +115,7 @@ async function main(env, deps = {}) {
     return 2;
   }
   const live = await liveCommit(service.versionUrl, deps.fetchImpl);
-  const decision = plan({ sha: env.SHA, live, service, force: env.FORCE === 'true', gitImpl: deps.gitImpl });
+  const decision = plan({ sha: env.SHA, live, service, force: env.FORCE === 'true', rollback: env.ROLLBACK === 'true', gitImpl: deps.gitImpl });
   console.log(`${env.SERVICE}: ${decision.deploy ? 'deploying' : 'skipping'}, ${decision.reason}.`);
   if (!decision.deploy) return 0;
   const result = await deploy({ hookUrl: env.HOOK_URL, sha: env.SHA, versionUrl: service.versionUrl, ...deps });

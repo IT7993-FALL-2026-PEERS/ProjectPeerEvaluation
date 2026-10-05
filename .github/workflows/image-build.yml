@@ -37,6 +37,12 @@ on:
       frontend_image:
         description: Frontend image with its tag.
         value: ${{ jobs.images.outputs.frontend_image }}
+      backend_digest:
+        description: Digest of the pushed backend image (sha256:...), for the release record.
+        value: ${{ jobs.images.outputs.backend_digest }}
+      frontend_digest:
+        description: Digest of the pushed frontend image.
+        value: ${{ jobs.images.outputs.frontend_digest }}
   workflow_dispatch:
     inputs:
       frontend_api_url:
@@ -61,6 +67,8 @@ jobs:
       tag: ${{ steps.names.outputs.tag }}
       backend_image: ${{ steps.names.outputs.backend_image }}
       frontend_image: ${{ steps.names.outputs.frontend_image }}
+      backend_digest: ${{ steps.digests.outputs.backend_digest }}
+      frontend_digest: ${{ steps.digests.outputs.frontend_digest }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -143,9 +151,11 @@ jobs:
 
       # Names, tag and digests for Donald's release record.
       - name: Image summary
+        id: digests
         run: |
           backend_digest=$(docker inspect --format '{{ index .RepoDigests 0 }}' "$BACKEND_IMAGE")
           frontend_digest=$(docker inspect --format '{{ index .RepoDigests 0 }}' "$FRONTEND_IMAGE")
+          { echo "backend_digest=${backend_digest#*@}"; echo "frontend_digest=${frontend_digest#*@}"; } >> "$GITHUB_OUTPUT"
           {
             echo "### Images pushed to ghcr.io"
             echo ""
