@@ -59,6 +59,10 @@ import { isCsvFile } from '../services/csvFile';
 import { getErrorMessage } from '../services/apiError';
 import { buildCreateTeamBody } from '../services/teamRequest';
 import { useAuth } from '../contexts/AuthContext';
+import AddStudentDialog from '../components/AddStudentDialog';
+import EditStudentDialog from '../components/EditStudentDialog';
+import CsvUploadDialog from '../components/CsvUploadDialog';
+import DeleteAllStudentsDialog from '../components/DeleteAllStudentsDialog';
 import styles from '../styles/CourseManagement.module.css';
 import '../App.css';
 
@@ -301,188 +305,6 @@ function CourseManagement() {
     }
   };
 // ...existing code...
-
-  // Add Student Dialog (moved to top-level)
-  const addStudentDialog = (
-    <Dialog open={addStudentOpen} onClose={() => { setAddStudentOpen(false); setStudentFormError(''); }} maxWidth="xs" fullWidth>
-      <DialogTitle>Add Student</DialogTitle>
-      <DialogContent>
-        <TextField
-          fullWidth
-          margin="normal"
-          label="Student ID"
-          value={studentForm.student_id}
-          onChange={e => setStudentForm({ ...studentForm, student_id: e.target.value })}
-          error={!!studentFormError && !studentForm.student_id}
-        />
-        <TextField
-          fullWidth
-          margin="normal"
-          label="Name"
-          value={studentForm.name}
-          onChange={e => setStudentForm({ ...studentForm, name: e.target.value })}
-          error={!!studentFormError && !studentForm.name}
-        />
-        <TextField
-          fullWidth
-          margin="normal"
-          label="Email"
-          value={studentForm.email}
-          onChange={e => setStudentForm({ ...studentForm, email: e.target.value })}
-          error={!!studentFormError && !studentForm.email}
-        />
-        <TextField
-          fullWidth
-          margin="normal"
-          label="Team Assignment (Optional)"
-          value={studentForm.group_assignment}
-          onChange={e => setStudentForm({ ...studentForm, group_assignment: e.target.value })}
-          helperText="Enter team name or identifier for this student"
-        />
-        {studentFormError && (
-          <Typography color="error" variant="body2" sx={{ mt: 1 }}>{studentFormError}</Typography>
-        )}
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={() => { setAddStudentOpen(false); setStudentFormError(''); }}>Cancel</Button>
-        <Button onClick={handleAddStudent} variant="contained">Add</Button>
-      </DialogActions>
-    </Dialog>
-  );
-
-  // Edit Student Dialog (moved to top-level)
-  const editStudentDialog = (
-  <Dialog open={editStudentOpen} onClose={() => { setEditStudentOpen(false); setStudentToEdit(null); setStudentForm({ student_id: '', name: '', email: '', group_assignment: '' }); }} maxWidth="xs" fullWidth>
-      <DialogTitle>Edit Student</DialogTitle>
-      <DialogContent>
-        <TextField
-          fullWidth
-          margin="normal"
-          label="Student ID"
-          value={studentForm.student_id}
-          onChange={e => setStudentForm({ ...studentForm, student_id: e.target.value })}
-        />
-        <TextField
-          fullWidth
-          margin="normal"
-          label="Name"
-          value={studentForm.name}
-          onChange={e => setStudentForm({ ...studentForm, name: e.target.value })}
-        />
-        <TextField
-          fullWidth
-          margin="normal"
-          label="Email"
-          value={studentForm.email}
-          onChange={e => setStudentForm({ ...studentForm, email: e.target.value })}
-        />
-        <TextField
-          fullWidth
-          margin="normal"
-          label="Team Assignment (Optional)"
-          value={studentForm.group_assignment}
-          onChange={e => setStudentForm({ ...studentForm, group_assignment: e.target.value })}
-          helperText="Enter team name or identifier for this student"
-        />
-      </DialogContent>
-      <DialogActions>
-  <Button onClick={() => { setEditStudentOpen(false); setStudentToEdit(null); setStudentForm({ student_id: '', name: '', email: '', group_assignment: '' }); }}>Cancel</Button>
-        <Button onClick={handleUpdateStudent} variant="contained" disabled={!studentForm.student_id || !studentForm.name || !studentForm.email}>Save</Button>
-      </DialogActions>
-    </Dialog>
-  );
-
-  // CSV Upload Dialog
-  const csvUploadDialog = (
-    <Dialog open={csvUploadOpen} onClose={() => { setCsvUploadOpen(false); setCsvUploadError(''); setCsvUploadResults(null); }} maxWidth="sm" fullWidth>
-      <DialogTitle>Upload Student Roster (CSV)</DialogTitle>
-      <DialogContent>
-        <Box sx={{ mb: 2 }}>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              Upload a CSV file with the following columns:
-            </Typography>
-            <Box sx={{ mt: 1, pl: 2 }}>
-              <span style={{ fontWeight: 'bold', color: 'red', fontSize: '1.1em' }}>student_id,name,email,team_name</span>
-            </Box>
-          {/* Note removed as requested */}
-        </Box>
-        
-        <Box sx={{ mb: 2 }}>
-          <input
-            accept=".csv"
-            style={{ display: 'none' }}
-            id="csv-file-input"
-            type="file"
-            onChange={handleCsvFileChange}
-          />
-          <label htmlFor="csv-file-input">
-            <Button variant="outlined" component="span" startIcon={<UploadIcon />}>
-              Choose CSV File
-            </Button>
-          </label>
-          {csvFile && (
-            <Typography variant="body2" sx={{ mt: 1 }}>
-              Selected: {csvFile.name}
-            </Typography>
-          )}
-        </Box>
-
-        {csvUploadError && (
-          <Alert severity="error" sx={{ mb: 2 }}>
-            {csvUploadError}
-          </Alert>
-        )}
-
-        {csvUploadResults && (
-          <Alert severity={csvUploadResults.errors && csvUploadResults.errors.length > 0 ? "warning" : "success"} sx={{ mb: 2 }}>
-            <Typography variant="body2" sx={{ mb: 1 }}>
-              {csvUploadResults.message}
-            </Typography>
-            {csvUploadResults.students && csvUploadResults.students.length > 0 && (
-              <Typography variant="body2">
-                Students added: {csvUploadResults.students.length}
-              </Typography>
-            )}
-            {csvUploadResults.teams_created !== undefined && csvUploadResults.teams_created > 0 && (
-              <Typography variant="body2" color="primary">
-                Teams created: {csvUploadResults.teams_created}
-              </Typography>
-            )}
-            {csvUploadResults.team_names && csvUploadResults.team_names.length > 0 && (
-              <Typography variant="body2" sx={{ fontSize: '0.9rem', color: 'text.secondary' }}>
-                Team names: {csvUploadResults.team_names.join(', ')}
-              </Typography>
-            )}
-            {csvUploadResults.errors && csvUploadResults.errors.length > 0 && (
-              <Box sx={{ mt: 1 }}>
-                <Typography variant="body2" color="error">Errors:</Typography>
-                {csvUploadResults.errors.map((error, index) => (
-                  <Typography key={index} variant="body2" color="error" sx={{ fontSize: '0.8rem' }}>
-                    • {error}
-                  </Typography>
-                ))}
-              </Box>
-            )}
-          </Alert>
-        )}
-
-        {csvUploading && <LinearProgress sx={{ mb: 2 }} />}
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={() => { setCsvUploadOpen(false); setCsvUploadError(''); setCsvUploadResults(null); }}>
-          Close
-        </Button>
-        <Button 
-          onClick={handleCsvUpload} 
-          variant="contained" 
-          disabled={!csvFile || csvUploading}
-          startIcon={<UploadIcon />}
-        >
-          {csvUploading ? 'Uploading...' : 'Upload'}
-        </Button>
-      </DialogActions>
-    </Dialog>
-  );
 
   const [studentsDialogOpen, setStudentsDialogOpen] = useState(false);
   const [studentsLoading, setStudentsLoading] = useState(false);
@@ -1206,62 +1028,6 @@ function CourseManagement() {
     navigate('/');
   };
 
-  // Delete All Students Confirmation Dialog
-  const deleteAllStudentsDialog = (
-    <Dialog 
-      open={deleteAllStudentsOpen} 
-      onClose={() => setDeleteAllStudentsOpen(false)} 
-      maxWidth="sm" 
-      fullWidth
-    >
-      <DialogTitle>Delete All Students</DialogTitle>
-      <DialogContent>
-        <Typography variant="body1" sx={{ mb: 2 }}>
-          Are you sure you want to delete ALL students from this course?
-        </Typography>
-        <Typography variant="body2" color="error" sx={{ mb: 2 }}>
-          This action will:
-        </Typography>
-        <Box component="ul" sx={{ mt: 1, pl: 2, color: 'error.main' }}>
-          <li>Delete all {students.length} students from the course</li>
-          <li>Delete all teams (since they will be empty)</li>
-          <li>This action cannot be undone</li>
-        </Box>
-        <Typography variant="body2" sx={{ mt: 2, fontWeight: 'bold' }}>
-          Type "DELETE ALL" to confirm:
-        </Typography>
-        <TextField
-          fullWidth
-          size="small"
-          sx={{ mt: 1 }}
-          placeholder="Type DELETE ALL to confirm"
-          id="delete-confirmation"
-        />
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={() => setDeleteAllStudentsOpen(false)}>
-          Cancel
-        </Button>
-        <Button 
-          onClick={() => {
-            const confirmationInput = document.getElementById('delete-confirmation');
-            if (confirmationInput.value === 'DELETE ALL') {
-              handleDeleteAllStudents();
-            } else {
-              setAlert({ severity: 'error', message: 'Please type "DELETE ALL" to confirm' });
-            }
-          }}
-          variant="contained" 
-          color="error"
-          disabled={deleteAllStudentsLoading || students.length === 0}
-          startIcon={<DeleteIcon />}
-        >
-          {deleteAllStudentsLoading ? 'Deleting...' : 'Delete All Students'}
-        </Button>
-      </DialogActions>
-    </Dialog>
-  );
-
   return (
     <div className={styles.courseManagementContainer}>
       {/* PEERS System Title at Top */}
@@ -1293,10 +1059,39 @@ function CourseManagement() {
           <Button onClick={handleConfirmEvalReset} color="warning" variant="contained">Continue</Button>
         </DialogActions>
       </Dialog>
-      {addStudentDialog}
-      {editStudentDialog}
-      {csvUploadDialog}
-      {deleteAllStudentsDialog}
+      <AddStudentDialog
+        open={addStudentOpen}
+        form={studentForm}
+        error={studentFormError}
+        onFormChange={setStudentForm}
+        onClose={() => { setAddStudentOpen(false); setStudentFormError(''); }}
+        onSubmit={handleAddStudent}
+      />
+      <EditStudentDialog
+        open={editStudentOpen}
+        form={studentForm}
+        onFormChange={setStudentForm}
+        onClose={() => { setEditStudentOpen(false); setStudentToEdit(null); setStudentForm({ student_id: '', name: '', email: '', group_assignment: '' }); }}
+        onSave={handleUpdateStudent}
+      />
+      <CsvUploadDialog
+        open={csvUploadOpen}
+        file={csvFile}
+        uploading={csvUploading}
+        error={csvUploadError}
+        results={csvUploadResults}
+        onFileChange={handleCsvFileChange}
+        onUpload={handleCsvUpload}
+        onClose={() => { setCsvUploadOpen(false); setCsvUploadError(''); setCsvUploadResults(null); }}
+      />
+      <DeleteAllStudentsDialog
+        open={deleteAllStudentsOpen}
+        studentCount={students.length}
+        loading={deleteAllStudentsLoading}
+        onClose={() => setDeleteAllStudentsOpen(false)}
+        onConfirm={handleDeleteAllStudents}
+        onMismatch={() => setAlert({ severity: 'error', message: 'Please type "DELETE ALL" to confirm' })}
+      />
       <Box display="flex" justifyContent="flex-end" mb={2} gap={2}>
         <Button variant="outlined" className={styles.logoutButton} color="primary" onClick={() => navigate('/settings')}>
           Settings

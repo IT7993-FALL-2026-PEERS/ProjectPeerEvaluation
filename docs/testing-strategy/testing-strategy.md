@@ -141,7 +141,8 @@ fixture as the integration tests, with email captured, never sent) and the front
 static files. A small control server resets the data before each test and returns the captured
 email, so the student tests take the link from the invitation email. Specs: `e2e/instructor.spec.js`
 (E2E-01 to 09, 15 and 16: login, session, roster upload and its error message, one upload dialog,
-teams, invitations, reports, CSV download) and `e2e/student.spec.js` (E2E-10 to 14: opening the link without a login, rating and
+teams, invitations, reports, CSV download), `e2e/students.spec.js` (E2E-17 to 20: add, edit, CSV
+upload and delete-all on the Manage Students dialogs) and `e2e/student.spec.js` (E2E-10 to 14: opening the link without a login, rating and
 submitting, the professor's count, no second submission, a bad link, missing feedback). The run
 refuses to start if another server already holds port 5000 or the build points at a hosted
 backend, so it can never reach a real database or mail account. Without
@@ -235,6 +236,8 @@ opening floors:
 | Frontend floor, raised (3 Oct) | 29% | 26% | 28% |
 | Frontend after the LoginPage tests (4 Oct) | 33.06% | 29.78% | 32.09% |
 | Frontend floor, raised (4 Oct) | 32% | 28% | 31% |
+| Frontend after the student dialogs were split out (4 Oct) | 34.42% | 35.14% | 35.81% |
+| Frontend floor, raised again (4 Oct) | 34% | 34% | 35% |
 
 - **What is measured:** the backend's `controllers`, `middleware`, `models`, `routes`, `utils`
   and `config` folders plus `index.js`; the frontend's `src/frontend` source, excluding tests and
