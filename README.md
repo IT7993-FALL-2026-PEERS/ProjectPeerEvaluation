@@ -41,7 +41,7 @@ stack, a commercial production hosting environment, or migrating databases.
 etc.) are not used for this project even though `DEPLOYMENT_GUIDE.md` documents them as
 historical alternatives. Continuous Integration runs on every pull request (see
 [CI/CD Pipeline](#cicd-pipeline)). A staging environment is live on Render, defined in `render.yaml`:
-once CI passes on `main`, Render deploys the frontend and backend automatically. Staging uses
+once CI passes on `main`, `cd.yml` deploys that exact commit to the frontend and backend. Staging uses
 MongoDB Atlas and a Mailtrap test inbox, so no real student ever receives an email from it. To keep
 costs down, staging is switched off between checks and demos. A CI-driven deploy step with smoke
 tests comes in Milestone 3, and production deployment always stays a manual sponsor approval.
@@ -161,7 +161,7 @@ The numbers move as steps land.
 | Test report | Executed, passed, and failed tests, duration, and coverage | M4 | Live in CI: each test job writes tests run, passed, failed, skipped and duration to its run summary (`scripts/test-summary.js`) next to the coverage table, and keeps the result files as downloadable artifacts |
 | Quality gate | `main-protection` ruleset: a pull request, eight passing required checks and an up-to-date branch before merge. No approval required, so authors merge their own pull requests. No bypass, and direct pushes are rejected | M1 | Live. More checks are added as jobs are added |
 | Build artifacts and Docker images | Build the deployment artifacts and the frontend and backend images for the exact commit that passed CI | M2 | Partly live: the container check builds both images on every pull request, and `image-build.yml` (reusable, or run by hand from the Actions tab) builds them, checks they start healthy and pushes both to GitHub Container Registry tagged with the commit SHA (see [`docs/cd-pipeline.md`](docs/cd-pipeline.md)). It has not yet run on a real commit and no CD workflow calls it yet; planned, week of 2 Nov |
-| Staging deploy | Automatic deploy to Render.com staging | M2 | Partly live: Render deploys `main` after CI passes (`render.yaml`); staging is switched off between checks and demos. CI-driven deploy of the tested commit planned, week of 9 Nov |
+| Staging deploy | Automatic deploy to Render.com staging | M2 | Written, first run pending: after CI passes on `main`, `.github/workflows/cd.yml` deploys the tested commit with each service's Render deploy hook and waits until the service reports it (CICD-12). Render's own auto-deploy is off (`render.yaml`), so failed Dependabot checks no longer block staging. Staging is switched off between checks and demos |
 | Smoke tests | Verify the deployment after each release | M5 | Planned, week of 9 Nov |
 | Deployment health check | Poll `/api/health` after deploy | M1 | Partly live: Render checks `/api/health` before switching traffic to a new deploy, and the endpoint reports the deployed commit. CI polling after deploy planned, week of 16 Nov |
 | Release candidate | Produce a release candidate after staging passes | M1 | Planned, week of 16 Nov |
@@ -500,7 +500,7 @@ scripts/                 # setup.js (npm run setup), setup.sh, verify-env.sh, co
 - **Testing**: Jest + React Testing Library (frontend unit), `node:test` (backend unit and
   integration, against a real MongoDB started by `mongodb-memory-server`), Playwright (end-to-end)
 - **CI/CD**: GitHub Actions (CI is live, eight required checks, with test and run reports in each
-  summary); Render.com staging deploys automatically after CI passes; a reusable image build to
+  summary); `cd.yml` deploys the tested commit to Render.com staging after CI passes; a reusable image build to
   GHCR is written, and a CI-driven delivery pipeline with smoke tests is planned for Milestone 3
 - **Security scanning**: Dependabot, OWASP Dependency-Check and CodeQL (both blocking), secret scanning
 - **Containerization**: Docker / Docker Compose (local dev and CI; deployment stays on Render,

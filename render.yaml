@@ -22,19 +22,11 @@ services:
     buildCommand: npm ci
     startCommand: node index.js
     healthCheckPath: /api/health
-    # Deploy only commits whose GitHub checks passed. Switch to `off` once CI deploys
-    # with the Render CLI and runs smoke tests itself.
-    autoDeployTrigger: checksPass
-    # Build minutes are limited (500/month), so only rebuild when code the running
-    # backend uses changes. Paths are relative to the repo root. Manual deploys and
-    # render.yaml changes always deploy regardless of this filter.
-    buildFilter:
-      paths:
-        - src/backend/**
-      ignoredPaths:
-        - src/backend/tests/**
-        - src/backend/.env.example
-        - "**/*.md"
+    # Render never deploys on its own: .github/workflows/cd.yml deploys main with this
+    # service's deploy hook once CI passes (CICD-12). Build minutes are limited (500/month),
+    # so cd.yml only deploys when a file the backend uses changed; the paths that used to be
+    # this service's buildFilter are in scripts/render-deploy.js.
+    autoDeployTrigger: "off"
     envVars:
       - key: NODE_VERSION
         value: "24" # keep in sync with .nvmrc
@@ -72,22 +64,13 @@ services:
     name: peers-frontend-staging
     runtime: static
     branch: main
-    buildCommand: npm ci && npm run build
+    # version.txt holds the built commit, so cd.yml can tell when a deploy is live (the
+    # backend reports its commit in /api/health instead).
+    buildCommand: npm ci && npm run build && printf '%s\n' "$RENDER_GIT_COMMIT" > build/version.txt
     staticPublishPath: ./build
-    autoDeployTrigger: checksPass
-    # Only rebuild when files that go into the React bundle change, so docs, tests,
-    # CI and backend-only merges don't spend build minutes on this site.
-    buildFilter:
-      paths:
-        - src/index.js
-        - src/frontend/**
-        - public/**
-        - package.json
-        - package-lock.json
-      ignoredPaths:
-        - src/frontend/**/__tests__/**
-        - "**/*.test.js"
-        - "**/*.md"
+    # Deployed by cd.yml only, like the backend. Its old buildFilter paths are in
+    # scripts/render-deploy.js.
+    autoDeployTrigger: "off"
     # React Router handles paths like /evaluate/:token in the browser.
     routes:
       - type: rewrite
