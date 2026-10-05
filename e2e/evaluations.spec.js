@@ -75,7 +75,15 @@ test('E2E-24: changing a team after invitations went out asks first; Cancel chan
   // Continue: the evaluation state is reset, then the student is removed.
   await top(page).getByTitle('Remove from team').first().click();
   await top(page).getByRole('button', { name: 'Continue' }).click();
-  await expect(alertWith(page, 'Cleared 4 tokens')).toBeVisible();
   await expect(alertWith(page, 'Student removed from Alpha')).toBeVisible();
   await expect(top(page).getByText('Students in Team (1)')).toBeVisible();
+
+  // The page has one message slot, so "Cleared 4 tokens" is replaced by the line above within one
+  // round trip; check the reset by what it did: the status goes back to "not sent".
+  await top(page).getByRole('button', { name: 'Close' }).click();
+  await expect(page.getByText('Manage Students in Alpha')).toHaveCount(0);
+  await top(page).getByRole('button', { name: 'Close' }).click();
+  await expect(page.getByText('Manage Teams for CS 4850')).toHaveCount(0);
+  await courseAction(page, 'Evaluation Status').click();
+  await expect(top(page).getByText('Evaluations Have Not Been Sent')).toBeVisible();
 });
