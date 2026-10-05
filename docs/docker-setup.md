@@ -75,6 +75,7 @@ check outputs.
 | Symptom | Cause / fix |
 |---|---|
 | `port is already allocated` / `address already in use` | Another app uses 3000/5000/27017 (often a local `mongod` or `npm run dev`). Stop it or change the port in `.env`. |
+| macOS: `address already in use` on port 5000 | AirPlay Receiver uses port 5000. Turn it off: System Settings > General > AirDrop & Handoff > AirPlay Receiver. Check with `lsof -nP -iTCP:5000 -sTCP:LISTEN`. |
 | `JWT_SECRET is not set` when running compose | No `.env`. Run `npm run setup` (or `node scripts/setup.js --env-only`) or copy `.env.example`. |
 | Backend restarts: `Invalid configuration: JWT_SECRET is too short` | Under `NODE_ENV=production` the secret needs ≥ 32 chars. Re-generate it (see `.env.example`). |
 | Backend `unhealthy`, `/api/health` says `DEGRADED` | Backend is up but not connected to Mongo. Check `docker compose ps mongo` and `DOCKER_MONGODB_URI` (must use `mongo`, not `localhost`). |
@@ -89,12 +90,3 @@ check outputs.
 - No hot reload: this stack runs production builds. For day-to-day coding use `npm run dev`.
 - Uploaded files (`src/backend/uploads/`, used by CSV roster upload) live inside the backend container and are lost when it is recreated.
 - Mongo has no authentication and is bound to loopback only; this is a dev stack, not a deployment.
-
-node -e "
-const fs=require('fs');const p='docs/docker-setup.md';let s=fs.readFileSync(p,'utf8');
-const marker='| \`JWT_SECRET is not set\`';
-const row='| macOS: \`address already in use\` on port 5000 | AirPlay Receiver uses port 5000. Turn it off: System Settings > General > AirDrop & Handoff > AirPlay Receiver. Check with \`lsof -nP -iTCP:5000 -sTCP:LISTEN\`. |\n';
-if(!s.includes(marker)) throw new Error('marker not found');
-fs.writeFileSync(p,s.replace(marker,row+marker));
-"
-grep -n "AirPlay" docs/docker-setup.md
