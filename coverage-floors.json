@@ -1,4 +1,4 @@
 {
   "backend": { "lines": 63, "branches": 77, "functions": 67 },
-  "frontend": { "lines": 32, "branches": 28, "functions": 31 }
+  "frontend": { "lines": 34, "branches": 34, "functions": 35 }
 }
