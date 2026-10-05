@@ -5,9 +5,10 @@ import {
 import UploadIcon from '@mui/icons-material/Upload';
 
 // "Upload Student Roster", opened from the course row, moved out of CourseManagement.js (CICD-57,
-// step 5). `onClose` is the backdrop and Escape; `onCancel` is the Cancel button, which the page
-// also uses to forget the chosen file. `progress` is 0 until an upload is running.
-function CourseRosterUploadDialog({ open, file, progress, onFileChange, onClose, onCancel, onUpload }) {
+// step 5). `onClose` is every way of closing it without uploading (Cancel, Escape, a click outside),
+// and the page must forget the chosen file then, or the next course would be offered it.
+// `progress` is 0 until an upload is running.
+function CourseRosterUploadDialog({ open, file, progress, onFileChange, onClose, onUpload }) {
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
       <DialogTitle>Upload Student Roster</DialogTitle>
@@ -43,7 +44,7 @@ function CourseRosterUploadDialog({ open, file, progress, onFileChange, onClose,
         </Box>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onCancel}>
+        <Button onClick={onClose}>
           Cancel
         </Button>
         <Button

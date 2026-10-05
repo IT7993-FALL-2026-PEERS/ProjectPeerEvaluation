@@ -1,5 +1,5 @@
 const { test, expect } = require('@playwright/test');
-const { resetData, loginAsAda, courseAction, alertWith } = require('./support/app');
+const { resetData, loginAsAda, courseAction, alertWith, ROSTER_CSV } = require('./support/app');
 
 // The Manage Students list with its search and delete, and the course dialogs: create, edit and
 // delete a course. (Adding, editing, uploading and deleting all students are in students.spec.js;
@@ -130,4 +130,21 @@ test('E2E-36: Delete Course asks first; Cancel keeps the course, Delete removes 
 
   await expect(alertWith(page, 'Course deleted successfully')).toBeVisible();
   await expect(page.getByText('No courses found. Create your first course to get started.')).toBeVisible();
+});
+
+// Closing the roster dialog with Escape or a click outside used to keep the chosen file, so opening
+// it again on another course offered to upload the first course's file into the second.
+test('E2E-37: a roster file chosen for one course is forgotten when the dialog closes, whatever way it closes', async ({ page }) => {
+  await createCourse(page, { name: 'Databases', number: 'IT 3100', section: '02', semester: 'Fall 2026' });
+
+  await page.getByRole('row', { name: /CS 4850/ }).getByTitle('Upload Roster').click();
+  await top(page).locator('input[type=file]').setInputFiles(ROSTER_CSV);
+  await expect(top(page).getByText('Selected: roster.csv')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('[role=dialog]')).toHaveCount(0);
+
+  await page.getByRole('row', { name: /IT 3100/ }).getByTitle('Upload Roster').click();
+  await expect(top(page).getByRole('heading', { name: 'Upload Student Roster' })).toBeVisible();
+  await expect(top(page).getByText(/Selected:/)).toHaveCount(0);
+  await expect(top(page).getByRole('button', { name: 'Upload', exact: true })).toBeDisabled();
 });
