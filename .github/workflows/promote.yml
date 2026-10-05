@@ -6,8 +6,8 @@ name: Promote release candidate
 # Run it from the release candidate's tag: Actions > Promote release candidate > Run workflow >
 # "Use workflow from" > Tags > rc-... . The `production` environment (Settings > Environments) is what
 # makes this a gate:
-#   - required reviewers: Dr. Vyas (geetikavyas) and Khoa (KhoaHo-kho6). GitHub needs one approval
-#     from either of them; it cannot require both.
+#   - required reviewers: Dr. Vyas (geetikavyas) or Khoa (KhoaHo-kho6). One approval from either is
+#     enough (agreed in #147; GitHub environments can't require more than one).
 #   - prevent self-review: the person who started the run cannot approve it.
 #   - deployment tags: rc-* only, so a run from main or any other ref is refused.
 #

@@ -100,7 +100,7 @@ Releases. Untick it for a real release.
 
 | Setting | Value |
 |---|---|
-| Required reviewers | Dr. Vyas (`geetikavyas`) and Khoa (`KhoaHo-kho6`). GitHub needs **one** approval from either; it can't require both |
+| Required reviewers | Dr. Vyas (`geetikavyas`) or Khoa (`KhoaHo-kho6`): one approval from either is enough (agreed in #147) |
 | Prevent self-review | On: whoever starts the run can't approve it |
 | Deployment branches and tags | Tags matching `rc-*` only, so a run from `main` or any other ref fails at `promote` |
 | Secrets | None. Nothing is deployed |
