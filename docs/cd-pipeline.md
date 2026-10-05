@@ -79,6 +79,38 @@ code from `main`; none checks out another ref.
 
 While staging is switched off, a CD run fails at the wait step, which is expected. Turn staging on and run CD by hand.
 
+## Production approval gate (`promote.yml`, CICD-30)
+
+A separate, manual workflow that turns an `rc-*` release candidate from `cd.yml` into a GitHub Release once the sponsor
+or the team leader approves it. Production hosting is out of scope (CICD-38), so the production deploy step is a
+documented placeholder that deploys nothing. The gate and the release are real.
+
+**Run it:** Actions > Promote release candidate > Run workflow > **Use workflow from > Tags > `rc-...`**. Leave
+**dry_run** ticked to publish the release as a draft, which only maintainers can see and which can be deleted under
+Releases. Untick it for a real release.
+
+1. `check` refuses anything that isn't an `rc-*` tag with a pre-release from `cd.yml` whose release record names the
+   tag's commit. It also refuses a release that already exists, a dry-run draft included. It then writes a promotion
+   request to the run summary.
+2. `promote` waits in the `production` environment until it is approved. It then runs the deploy placeholder and
+   publishes `release-<yyyymmdd>-<hhmm>-<sha7>` at the same commit. The notes are the release record plus who requested
+   and who approved the promotion.
+
+**The `production` environment** (Settings > Environments) is the gate:
+
+| Setting | Value |
+|---|---|
+| Required reviewers | Dr. Vyas (`geetikavyas`) or Khoa (`KhoaHo-kho6`): one approval from either is enough (agreed in #147) |
+| Prevent self-review | On: whoever starts the run can't approve it |
+| Deployment branches and tags | Tags matching `rc-*` only, so a run from `main` or any other ref fails at `promote` |
+| Secrets | None. Nothing is deployed |
+
+To approve: open the waiting run and choose Review deployments > `production` > Approve and deploy. Rejecting it, or
+leaving it for 30 days, ends the run without a release.
+
+If a production environment is ever approved, its deploy replaces the placeholder step and runs before the release is
+published, so a failed deploy publishes nothing.
+
 ## Image build and push (`image-build.yml`)
 
 Reusable (`workflow_call`) and runnable on its own (`workflow_dispatch`). It builds the backend and frontend images
@@ -114,7 +146,8 @@ Set the `STAGING_URL` and `STAGING_API_URL` repository variables; a manual run c
 ## Environments and secrets (CICD-38)
 
 Production hosting is out of scope, so staging is the only deploy target. The `staging` environment holds the deploy
-hooks for `cd.yml`. `main - peers-backend-staging` and `main - peers-frontend-staging` are created by Render when it
+hooks for `cd.yml`. The `production` environment is only the approval gate for `promote.yml`: it has reviewers and no
+secrets, and nothing deploys to it. `main - peers-backend-staging` and `main - peers-frontend-staging` are created by Render when it
 deploys `main`.
 
 On 5 October 2026 we removed the leftovers from the unmerged `with-test-coverage` branch (audit A-05, A-06):
