@@ -69,8 +69,8 @@ back by itself, but **the run stays failed** on purpose: someone still has to fi
 
 `curl` times out or Render shows a "service suspended" page.
 
-1. It's probably suspended: staging is switched off between checks and demos. Ask Khoa to **Resume** both
-   services in Render ([Render handover](render-handover.md)).
+1. It may have been suspended. Staging is meant to stay on until final delivery, so someone did it on purpose
+   or by mistake. Ask Khoa to **Resume** both services in Render ([Render handover](render-handover.md)).
 2. After resuming, the services run the commit they had. To bring them up to `main`, run **CD** by hand with
    **force**.
 3. If it's not suspended, check Render > service > **Events** for a failed deploy (R2), and Render's status page.

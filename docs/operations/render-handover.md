@@ -30,8 +30,9 @@ fills them in.
   `staging` environment secrets `RENDER_BACKEND_DEPLOY_HOOK_URL` and `RENDER_FRONTEND_DEPLOY_HOOK_URL` in GitHub.
   Anyone with a hook URL can deploy, so regenerate a hook if it leaks
   ([R7](rollback-and-recovery.md#r7-a-secret-leaked)).
-- **Suspend and resume.** Suspending both services stops the cost between demos. CD fails while they're
-  suspended, which is expected ([R3](rollback-and-recovery.md#r3-staging-doesnt-answer)).
+- **Suspend and resume.** Staging stays running until final delivery (6 Dec 2026), because CD deploys to it on
+  every merge. Suspending both services is for the shut-down date (Option 2 below) or a team decision to change
+  this. CD fails while they're suspended ([R3](rollback-and-recovery.md#r3-staging-doesnt-answer)).
 
 ## The decision: hand over or shut down
 
