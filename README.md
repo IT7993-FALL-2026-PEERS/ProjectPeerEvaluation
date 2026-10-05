@@ -43,8 +43,9 @@ historical alternatives. Continuous Integration runs on every pull request (see
 [CI/CD Pipeline](#cicd-pipeline)). A staging environment is live on Render, defined in `render.yaml`:
 once CI passes on `main`, `cd.yml` deploys that exact commit to the frontend and backend. Staging uses
 MongoDB Atlas and a Mailtrap test inbox, so no real student ever receives an email from it; the backend
-refuses to send through anything but the Mailtrap sandbox on staging (CICD-44). To keep
-costs down, staging is switched off between checks and demos. The rest of the delivery pipeline (images,
+refuses to send through anything but the Mailtrap sandbox on staging (CICD-44). Staging stays
+running until final delivery, because CD deploys to it on every merge, and is then shut down or handed over
+([Render handover](docs/operations/render-handover.md)). The rest of the delivery pipeline (images,
 smoke tests, release candidates, rollback) is built and switched off until it has been reviewed, and production
 deployment always stays a manual sponsor approval.
 
@@ -173,7 +174,7 @@ The numbers move as steps land.
 | Deployment health check | Poll `/api/health` after deploy | M1 | Live: Render checks `/api/health` before switching traffic, CD waits until each service reports the deployed commit (`/api/health`, `/version.txt`), and the deployment status job checks health after every deploy |
 | Release candidate | Produce a release candidate after staging passes | M1 | Written, switched off until the design review (CICD-28): with `CD_RELEASE` on, CD tags `rc-*` with a release record only when images, deploy and smoke tests passed, and rolls back to the previous release when they fail. Planned on, week of 16 Nov |
 | Build and deployment reports | Build history and deployment status | M2 | Live: the `Run report` job adds every job's result and duration and the last ten runs to each CI run summary, and every CD run ends with a deployment status section and a `deployment-status` artifact (kept 90 days) |
-| Scheduled staging regression | Weekly smoke and end-to-end run against staging, without sending email | M5 | Workflow written (`staging-regression.yml`), manual runs only for now: staging is switched off between checks, and no tests are tagged `@staging` yet |
+| Scheduled staging regression | Weekly smoke and end-to-end run against staging, without sending email | M5 | Workflow written (`staging-regression.yml`), manual runs only for now: no tests are tagged `@staging` yet |
 | Production deploy | Manual sponsor approval. Not automated | Sponsor | By design. The approval gate is written: `promote.yml` waits for Dr. Vyas or Khoa to approve in the `production` environment (no self-review, `rc-*` tags only), then publishes a GitHub Release. The deploy itself is a placeholder, because production hosting is out of scope (CICD-30, [`docs/cd-pipeline.md`](docs/cd-pipeline.md)) |
 
 ### Detailed workflow reference (WF01–WF12)

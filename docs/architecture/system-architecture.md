@@ -249,8 +249,8 @@ flowchart LR
   the paid Starter plan, so it doesn't sleep and can reach SMTP. `/api/health` must report
   the database connected before Render switches traffic, and it reports the deployed
   commit. Render's auto-deploy is off: `cd.yml` deploys the commit CI tested, and skips a service
-  when no file it uses changed (`scripts/render-deploy.js`). Staging is switched off
-  between checks and demos to save cost.
+  when no file it uses changed (`scripts/render-deploy.js`). Staging stays running
+  until final delivery, because CD deploys to it on every merge.
 - **Production:** not hosted by this project. The approved design ends in a manual
   sponsor approval gate (Milestone 3).
 - **Containers:** `Dockerfile.frontend` (React build served by nginx), `src/backend/Dockerfile`

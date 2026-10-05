@@ -14,8 +14,9 @@ and 4 below need it **on**. The switch, and why it is still off, is in
 
 ## Before you start
 
-- Staging has to be **running**. It is suspended between checks and demos to save money, and Khoa resumes it in
-  Render ([Render handover](render-handover.md)). While it's suspended, a deploy fails at "waiting until live".
+- Staging has to be **running**. It stays on until final delivery (6 Dec 2026). If someone suspended it, Khoa
+  resumes it in Render ([Render handover](render-handover.md)); while it's suspended, a deploy fails at
+  "waiting until live".
 - Your change is merged into `main` through a pull request with all eight required checks green
   ([CI/CD operations](ci-cd-operations.md#required-checks)).
 
