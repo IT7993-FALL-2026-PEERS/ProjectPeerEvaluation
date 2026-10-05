@@ -6,6 +6,7 @@ const { getHealth } = require('./config/health');
 const { applyServerTimeouts } = require('./config/serverTimeouts');
 const { requestLogger } = require('./middleware/requestLogger');
 const { applyRateLimits, trustProxyHops } = require('./config/rateLimit');
+const { corsOptions } = require('./config/corsConfig');
 
 const app = express();
 
@@ -15,17 +16,8 @@ const app = express();
 app.set('trust proxy', trustProxyHops());
 
 // Middleware
-app.use(cors({
-  origin: [
-    'http://localhost:3000', 
-    'http://127.0.0.1:3000',
-    'https://peer-evaluation-frontend.onrender.com',
-    /\.onrender\.com$/  // Allow any Render.com subdomain
-  ],
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-  credentials: true
-}));
+// CORS: only the frontend at FRONTEND_URL, plus localhost outside production. See config/corsConfig.js.
+app.use(cors(corsOptions()));
 app.use(express.json());
 
 // Request logger middleware (redacts student evaluation tokens)
