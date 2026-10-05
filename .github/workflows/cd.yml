@@ -184,7 +184,9 @@ jobs:
       frontend_api_url: https://peers-backend-staging.onrender.com/api
 
   deploy:
-    name: Deploy ${{ matrix.service }} to staging
+    # No matrix value in the name: GitHub adds "(backend)" itself, and a skipped job would
+    # otherwise show the expression unexpanded.
+    name: Deploy to staging
     needs: [prepare, images]
     # images is skipped while CD_RELEASE is off, which must not stop the deploy.
     if: >-
@@ -283,7 +285,7 @@ jobs:
           if-no-files-found: ignore
 
   rollback:
-    name: Roll back ${{ matrix.service }}
+    name: Roll back
     needs: [prepare, deploy, smoke]
     # By hand (rollback_to), or when deploy or smoke failed and there is an earlier release to go back to.
     if: >-
