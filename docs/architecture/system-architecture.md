@@ -218,7 +218,7 @@ the new bcrypt hash and clears the token so the link works once.
 | MFA | Model field and login branch exist | Verification returns 501, so MFA can't be used (D-17) |
 | Transport | HTTPS on Render; SMTP over STARTTLS with certificate checking | — |
 | Staging email | With `DEPLOY_ENV=staging` (or a `*-staging` Render service) the mailer sends only through the Mailtrap sandbox and refuses any other transport (`utils/emailGuard.js`) | — (CICD-44) |
-| CORS | `localhost:3000` and any `*.onrender.com` origin, credentials allowed | Broader than needed (D-13) |
+| CORS | Only the origin of `FRONTEND_URL`, plus `localhost:3000` outside production, credentials allowed (`config/corsConfig.js`) | — (D-13 resolved, CICD-37) |
 | Exported data | CSV fields quoted and formula-prefixed | — |
 | Dependencies | Dependabot weekly; OWASP Dependency-Check and CodeQL on every PR, both required (OWASP fails on CVSS 7 or higher unless accepted) | Frontend: findings in `react-scripts` build tooling are accepted risks with expiry dates (`docs/security/security-policy.md`) |
 
