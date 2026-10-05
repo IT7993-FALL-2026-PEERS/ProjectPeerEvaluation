@@ -92,7 +92,8 @@ code from `main`; none checks out another ref.
 | `RENDER_BACKEND_DEPLOY_HOOK_URL` | Render > `peers-backend-staging` > Settings > Deploy Hook |
 | `RENDER_FRONTEND_DEPLOY_HOOK_URL` | Render > `peers-frontend-staging` > Settings > Deploy Hook |
 
-While staging is switched off, a CD run fails at the wait step, which is expected. Turn staging on and run CD by hand.
+Staging stays running until final delivery (6 Dec 2026). If it has been suspended, a CD run fails at the wait step: resume it
+and run CD by hand.
 
 ## Production approval gate (`promote.yml`, CICD-30)
 
@@ -155,7 +156,7 @@ A caller must also grant `packages: write` to the job that calls this workflow.
 
 ## Staging regression (`staging-regression.yml`)
 
-Manual only (Actions tab > Run workflow) while staging is switched off and the variables below are not set. The weekly schedule (Tuesday 06:00 UTC) is kept as a comment in the workflow and comes back once staging is running. Read-only health and frontend checks, then Playwright tests tagged `@staging`.
+Manual only (Actions tab > Run workflow) while no tests are tagged `@staging` and the variables below are not set. The weekly schedule (Tuesday 06:00 UTC) is kept as a comment in the workflow and comes back once staging is running. Read-only health and frontend checks, then Playwright tests tagged `@staging`.
 Tests with that tag must not send email (Mailtrap allows 50 a month) and must not need the local E2E control server.
 Set the `STAGING_URL` and `STAGING_API_URL` repository variables; a manual run can override both.
 
