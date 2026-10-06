@@ -145,7 +145,7 @@ teams, invitations, reports, CSV download), `e2e/students.spec.js` (E2E-17 to 20
 upload and delete-all on the Manage Students dialogs) and `e2e/evaluations.spec.js` (E2E-21 to 24: the
 evaluation status dialog, reminders, resetting, and the "Evaluations Already Sent" confirmation), `e2e/teams.spec.js` (E2E-25 to 30: moving
 students in and out of a team, team search, editing a team, sending to one team, Clear All Teams,
-and one dialog, not one per course), `e2e/courses.spec.js` (E2E-31 to 36: the Manage Students list with its search and single delete, and creating, editing and deleting a course) and `e2e/student.spec.js` (E2E-10 to 14: opening the link without a login, rating and
+and one dialog, not one per course), `e2e/courses.spec.js` (E2E-31 to 38: the Manage Students list with its search and single delete, creating, editing and deleting a course, and what the roster upload dialog keeps when it closes) and `e2e/student.spec.js` (E2E-10 to 14: opening the link without a login, rating and
 submitting, the professor's count, no second submission, a bad link, missing feedback). The run
 refuses to start if another server already holds port 5000 or the build points at a hosted
 backend, so it can never reach a real database or mail account. Without

@@ -2,7 +2,7 @@
 
 **Gantt task:** Technical Assessment — *"Review software architecture & technology stack"* (M1)
 **Milestone:** 1 — Assessment & Planning
-**Status:** Complete for review. Describes `main` at commit `11cfd3d` (26 Sep 2026)
+**Status:** Complete for review. Describes `main` at commit `11cfd3d` (26 Sep 2026); later changes are marked where they apply (last updated 5 Oct 2026)
 **Related:** [api-documentation.md](api-documentation.md) ·
 [database-schema.md](database-schema.md) ·
 [../research-report/tech-stack-analysis.md](../research-report/tech-stack-analysis.md) ·
@@ -79,8 +79,9 @@ Supporting code:
 - `services/emailResult.js` — turns the send/remind response into a success, warning or
   error message naming anyone who was missed.
 
-`CourseManagement.js` is 2,687 lines and holds most of the professor workflow in one
-component, which makes it the hardest part of the frontend to test.
+`CourseManagement.js` was 2,687 lines when this was written and held most of the professor workflow in
+one component, which made it the hardest part of the frontend to test. It is being split into tested
+components (CICD-57) and was 1,478 lines on 5 Oct 2026.
 
 ---
 
@@ -250,7 +251,7 @@ flowchart LR
   the database connected before Render switches traffic, and it reports the deployed
   commit. Render's auto-deploy is off: `cd.yml` deploys the commit CI tested, and skips a service
   when no file it uses changed (`scripts/render-deploy.js`). Staging stays running
-  until final delivery, because CD deploys to it on every merge.
+  until final delivery, because CD deploys to it after every merge that passes CI.
 - **Production:** not hosted by this project. The approved design ends in a manual
   sponsor approval gate (Milestone 3).
 - **Containers:** `Dockerfile.frontend` (React build served by nginx), `src/backend/Dockerfile`
@@ -274,8 +275,8 @@ New findings from this review. Items already in the defects log keep their D-num
 | A-2 | **Fixed (CICD-17, CICD-18).** Student evaluation tokens were weak and permanent, and submissions weren't checked against the teammate list (API-1, API-2) | Grade integrity depends on these links | `crypto.randomBytes` tokens with an expiry; accept only the evaluator's own teammates, each once |
 | A-3 | **Partly fixed (CICD-19).** A malformed file is now refused before anything is deleted; a valid roster upload still deletes all evaluations for the course, a question for the sponsor (API-3) | Silent data loss mid-cycle | Keep evaluations on upload, or ask for confirmation |
 | A-4 | Team membership is stored twice (D-10) and reports rely on `Student.team_id` | The two can drift | Treat `Student.team_id` as the source of truth |
-| A-5 | Most of the professor UI is one 2,687-line component | Hard to test and change safely | Split by feature when tests need it; not a rewrite |
-| A-6 | Leftover placeholder files: `config/db.js`, `config/corsConfig.js`, `utils/tokenUtils.js` (one-line comments), the unused `Report` model, and the frontend `Dashboard.js` and `TeamAssignment.js` pages | Confusing; `migrations/migrateCourses.js` requires the empty `config/db.js` and can't run | Delete, and fix or retire the migration |
+| A-5 | **Partly fixed (CICD-57).** Most of the professor UI was one 2,687-line component; its dialogs are now separate tested components and the page is 1,478 lines (5 Oct) | Hard to test and change safely | Split by feature when tests need it; not a rewrite |
+| A-6 | Leftover placeholder files: `config/db.js`, `utils/tokenUtils.js` (one-line comments; `config/corsConfig.js` was one too, and now holds the CORS policy, CICD-37, so keep it), the unused `Report` model, and the frontend `Dashboard.js` and `TeamAssignment.js` pages | Confusing; `migrations/migrateCourses.js` requires the empty `config/db.js` and can't run | Delete, and fix or retire the migration |
 | A-7 | **Fixed (CICD-34).** There was no rate limiting anywhere (API-5) | Password guessing and email flooding | Add `express-rate-limit` to auth and evaluation routes |
 | A-8 | Stubs return 501: token refresh, MFA (D-17), team auto-assign, the three `/api/ai/*` endpoints | Features the UI or data model suggest don't exist | Confirm with the sponsor which are in scope |
 
