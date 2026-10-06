@@ -12,6 +12,7 @@ the walkthrough below. Each step links to the page that explains it.
 | [CI/CD operations](ci-cd-operations.md) | Something in GitHub Actions is red, slow or needs changing; routine upkeep |
 | [Release procedure](release-procedure.md) | Getting a change onto staging and turning it into a release |
 | [Rollback and recovery](rollback-and-recovery.md) | Staging is broken, a deploy went wrong, a secret leaked, CI is blocked |
+| [Runbook walkthrough](runbook-walkthrough.md) | Repeating the walkthrough below step by step, with commands, expected output and the record of past runs |
 | [Render handover](render-handover.md) | Who owns which account, and what happens to them when the project ends |
 | [CD pipeline design](../cd-pipeline.md) | How `cd.yml` and `promote.yml` work inside |
 | [Security policy](../security/security-policy.md) | A security check blocks a merge; accepting a risk |
@@ -59,7 +60,8 @@ Khoa, see [Render handover](render-handover.md)).
 - [ ] Without any `rc-*` release: revert your change from step 3 in a pull request and let CD deploy the revert
       ([R1, option C](rollback-and-recovery.md#r1-staging-is-broken-after-a-deploy)).
 
-When every box is ticked, write in CICD-31 who did it, on which date, and what was unclear.
+When every box is ticked, write in CICD-31 who did it, on which date, and what was unclear. The
+[runbook walkthrough](runbook-walkthrough.md) has each step's commands and expected output, and a run log to add to.
 
 ## Where things live
 
