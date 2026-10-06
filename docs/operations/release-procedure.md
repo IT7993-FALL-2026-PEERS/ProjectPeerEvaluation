@@ -43,6 +43,9 @@ curl -s https://peers-backend-staging.onrender.com/api/health     # "status":"OK
 curl -s https://peers-frontend-staging.onrender.com/version.txt   # <sha>
 ```
 
+Trust these two commits, not the page source: the production build minifies `index.html` and drops HTML comments, so
+a change made only to a comment won't show up in the page even when it is live.
+
 The two commits can differ: a service keeps its commit until a change touches files it uses. To deploy both
 services anyway, for example after changing an environment variable in Render, run **Actions > CD > Run workflow**
 on `main` with **force** ticked. A manual run only deploys a commit whose CI run on `main` passed, and force never

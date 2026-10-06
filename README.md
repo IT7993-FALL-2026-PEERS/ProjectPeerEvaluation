@@ -400,10 +400,24 @@ npm ci
 npm run lint
 npm test -- --watchAll=false --coverage && node scripts/coverage-gate.js frontend
 npm run build
+npx playwright install chromium                 # once: the browser for the end-to-end tests
 E2E_START_SERVER=1 npm run test:e2e
 (cd src/backend && npm run lint && npm run test:coverage && node ../../scripts/coverage-gate.js backend)
 (cd src/backend && npm run test:integration)
 ```
+
+The first end-to-end run on a new machine also needs Chromium's system libraries. If it fails with
+`error while loading shared libraries: libnspr4.so` (or `libnss3`, `libasound`), install them once with
+`sudo npx playwright install-deps chromium`. Without sudo, run the tests in Playwright's own image, which has the
+browser and its libraries (use the image tag that matches the `@playwright/test` version in `package-lock.json`):
+
+```bash
+docker run --rm --network host --user "$(id -u):$(id -g)" -e HOME=/tmp/home -e CI=true -e E2E_START_SERVER=1 \
+  -v "$PWD:/work" -w /work mcr.microsoft.com/playwright:v1.63.0-noble npm run test:e2e
+```
+
+`npm ci` may warn that install scripts (for example `core-js`) were not run and need approving. That is npm 11
+being cautious; the app, tests and build don't need them.
 
 Commit `package.json` and `package-lock.json` together. `npm ci` fails if they are out of sync.
 
