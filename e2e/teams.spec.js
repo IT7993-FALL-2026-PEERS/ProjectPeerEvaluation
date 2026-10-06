@@ -108,7 +108,11 @@ test('E2E-29: Clear All Teams asks first, then empties the list and the course\'
   await expect(top(page).getByText('No teams found for this course.')).toBeVisible();
   await expect(top(page).getByRole('button', { name: 'Clear All Teams' })).toBeDisabled();
 
-  // The course row's team count follows (Teams is the sixth column).
+  // The course row behind the dialog already shows no teams (Teams is the sixth column). A plain
+  // locator: while the dialog is open, role queries skip the table behind it.
+  await expect(page.locator('tr', { hasText: 'CS 4850' }).locator('td').nth(5)).toHaveText('0');
+
+  // And it still does once the dialog is closed.
   await top(page).getByRole('button', { name: 'Close' }).click();
   await expect(page.getByRole('row', { name: /CS 4850/ }).getByRole('cell').nth(5)).toHaveText('0');
 });

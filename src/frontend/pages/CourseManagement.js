@@ -1,7 +1,7 @@
 // ...existing code...
 
 // ...existing code...
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 
 // Test comment for GitHub upload - Preston
 
@@ -737,6 +737,9 @@ function CourseManagement() {
   });
   const [uploadFile, setUploadFile] = useState(null);
   const [uploadProgress, setUploadProgress] = useState(0);
+  // Which opening of the upload dialog an upload belongs to. Closing the dialog starts a new one, so an
+  // upload still in flight (the server still gets it) cannot touch the next dialog's file or progress.
+  const uploadSession = useRef(0);
   const [alert, setAlert] = useState(null);
 
   // Search filter state
@@ -834,6 +837,13 @@ function CourseManagement() {
     }
   };
 
+  const closeUploadDialog = () => {
+    uploadSession.current += 1;
+    setUploadDialogOpen(false);
+    setUploadFile(null);
+    setUploadProgress(0);
+  };
+
   const handleUploadRoster = async () => {
     if (!uploadFile || !selectedCourse || !(selectedCourse.id || selectedCourse._id)) {
       setAlert({ severity: 'error', message: 'No course selected.' });
@@ -841,6 +851,8 @@ function CourseManagement() {
     }
 
     const courseId = selectedCourse.id || selectedCourse._id;
+    const session = uploadSession.current;
+    const stillOpen = () => session === uploadSession.current;
     const formData = new FormData();
     formData.append('file', uploadFile);
 
@@ -855,7 +867,7 @@ function CourseManagement() {
             const progress = Math.round(
               (progressEvent.loaded * 100) / progressEvent.total
             );
-            setUploadProgress(progress);
+            if (stillOpen()) setUploadProgress(progress);
           }
         }
       );
@@ -863,13 +875,11 @@ function CourseManagement() {
         severity: 'success', 
         message: `${response.data.students.length} students added successfully` 
       });
-      setUploadDialogOpen(false);
-      setUploadFile(null);
-      setUploadProgress(0);
+      if (stillOpen()) closeUploadDialog();
   fetchCoursesWithCounts();
     } catch (error) {
       setAlert({ severity: 'error', message: getErrorMessage(error, 'Failed to upload roster') });
-      setUploadProgress(0);
+      if (stillOpen()) setUploadProgress(0);
     }
   };
 
@@ -1134,11 +1144,7 @@ function CourseManagement() {
         file={uploadFile}
         progress={uploadProgress}
         onFileChange={setUploadFile}
-        onClose={() => {
-          setUploadDialogOpen(false);
-          setUploadFile(null);
-          setUploadProgress(0);
-        }}
+        onClose={closeUploadDialog}
         onUpload={handleUploadRoster}
       />
       <TeamStudentsDialog
