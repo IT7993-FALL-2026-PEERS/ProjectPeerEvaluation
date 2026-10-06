@@ -9,42 +9,13 @@ import {
   Paper,
   Typography,
   Button,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  TextField,
-  IconButton,
-  Chip,
   Alert,
-  Box,
-  LinearProgress,
-  CircularProgress,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  Card,
-  CardContent,
-  Collapse
+  Box
 } from '@mui/material';
 
 import AddIcon from '@mui/icons-material/Add';
-import EditIcon from '@mui/icons-material/Edit';
-import DeleteIcon from '@mui/icons-material/Delete';
-import UploadIcon from '@mui/icons-material/Upload';
-import SendIcon from '@mui/icons-material/Send';
-import GroupIcon from '@mui/icons-material/Group';
 import EmojiObjectsIcon from '@mui/icons-material/EmojiObjects';
 // Remove AssessmentIcon import if present
-import PersonIcon from '@mui/icons-material/Person';
-import SearchIcon from '@mui/icons-material/Search';
-import ClearIcon from '@mui/icons-material/Clear';
-import FilterListIcon from '@mui/icons-material/FilterList';
-import BarChartIcon from '@mui/icons-material/BarChart';
-import DescriptionIcon from '@mui/icons-material/Description';
 import { useNavigate } from 'react-router-dom';
 import api, { getCourseById } from '../services/api';
 import { getApiBaseUrl } from '../services/apiUrl';
@@ -52,6 +23,7 @@ import { describeEmailResult } from '../services/emailResult';
 import { isCsvFile } from '../services/csvFile';
 import { getErrorMessage } from '../services/apiError';
 import { buildCreateTeamBody } from '../services/teamRequest';
+import { nextSortConfig } from '../services/courseSort';
 import { useAuth } from '../contexts/AuthContext';
 import AddStudentDialog from '../components/AddStudentDialog';
 import EditStudentDialog from '../components/EditStudentDialog';
@@ -66,6 +38,8 @@ import StudentsDialog from '../components/StudentsDialog';
 import { CreateCourseDialog, EditCourseDialog } from '../components/CourseFormDialogs';
 import DeleteCourseDialog from '../components/DeleteCourseDialog';
 import CourseRosterUploadDialog from '../components/CourseRosterUploadDialog';
+import CourseSearchFilters from '../components/CourseSearchFilters';
+import CourseTable from '../components/CourseTable';
 import styles from '../styles/CourseManagement.module.css';
 import '../App.css';
 
@@ -1196,274 +1170,35 @@ function CourseManagement() {
         </Button>
       </Paper>
       
-      {/* Search Filters */}
-      <Card sx={{ mb: 2 }}>
-        <CardContent>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-            <Typography variant="h6" component="h2">
-              Search Courses
-            </Typography>
-            <Button
-              variant="outlined"
-              startIcon={<FilterListIcon />}
-              onClick={() => setShowSearchFilters(!showSearchFilters)}
-            >
-              {showSearchFilters ? 'Hide Filters' : 'Show Filters'}
-            </Button>
-          </Box>
-          
-          <Collapse in={showSearchFilters}>
-            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 2, mb: 2 }}>
-              <TextField
-                fullWidth
-                label="Course Name"
-                value={searchFilters.course_name}
-                onChange={(e) => setSearchFilters({ ...searchFilters, course_name: e.target.value })}
-                placeholder="Software Engineering"
-              />
-              <TextField
-                fullWidth
-                label="Course Number"
-                value={searchFilters.course_number}
-                onChange={(e) => setSearchFilters({ ...searchFilters, course_number: e.target.value })}
-                placeholder="CS 4850"
-              />
-              <TextField
-                fullWidth
-                label="Course Section"
-                value={searchFilters.course_section}
-                onChange={(e) => setSearchFilters({ ...searchFilters, course_section: e.target.value })}
-                placeholder="01"
-              />
-              <TextField
-                fullWidth
-                label="Semester"
-                value={searchFilters.semester}
-                onChange={(e) => setSearchFilters({ ...searchFilters, semester: e.target.value })}
-                placeholder="Fall 2025"
-              />
-              <FormControl fullWidth>
-                <InputLabel>Course Status</InputLabel>
-                <Select
-                  value={searchFilters.course_status}
-                  label="Course Status"
-                  onChange={(e) => setSearchFilters({ ...searchFilters, course_status: e.target.value })}
-                >
-                  <MenuItem value="Active">Active</MenuItem>
-                  <MenuItem value="Inactive">Inactive</MenuItem>
-                  <MenuItem value="">All</MenuItem>
-                </Select>
-              </FormControl>
-            </Box>
-            
-            <Box sx={{ display: 'flex', gap: 1 }}>
-              <Button
-                variant="contained"
-                startIcon={<SearchIcon />}
-                onClick={handleSearch}
-              >
-                Search
-              </Button>
-              <Button
-                variant="outlined"
-                startIcon={<ClearIcon />}
-                onClick={handleClearSearch}
-              >
-                Clear
-              </Button>
-            </Box>
-          </Collapse>
-        </CardContent>
-      </Card>
+      <CourseSearchFilters
+        filters={searchFilters}
+        show={showSearchFilters}
+        onToggle={() => setShowSearchFilters(!showSearchFilters)}
+        onChange={setSearchFilters}
+        onSearch={handleSearch}
+        onClear={handleClearSearch}
+      />
 
       {alert && (
         <Alert severity={alert.severity} className={styles.alert} onClose={() => setAlert(null)}>
           {alert.message}
         </Alert>
       )}
-      <div className={styles.tableContainer} style={{ width: '100%' }}>
-        <TableContainer component={Paper} style={{ width: '100%' }}>
-          <Table style={{ width: '100%' }}>
-            <TableHead>
-              <TableRow>
-                <TableCell
-                  onClick={() => setSortConfig(prev => ({ key: 'course_name', direction: prev.key === 'course_name' && prev.direction === 'asc' ? 'desc' : 'asc' }))}
-                  style={{ cursor: 'pointer', fontWeight: 'bold', whiteSpace: 'nowrap' }}
-                >
-                  Course Name {sortConfig.key === 'course_name' ? (sortConfig.direction === 'asc' ? '▲' : '▼') : ''}
-                </TableCell>
-                <TableCell
-                  onClick={() => setSortConfig(prev => ({ key: 'course_number', direction: prev.key === 'course_number' && prev.direction === 'asc' ? 'desc' : 'asc' }))}
-                  style={{ cursor: 'pointer', fontWeight: 'bold', whiteSpace: 'nowrap' }}
-                >
-                  Course Number {sortConfig.key === 'course_number' ? (sortConfig.direction === 'asc' ? '▲' : '▼') : ''}
-                </TableCell>
-                <TableCell style={{ whiteSpace: 'nowrap' }}>Course Section</TableCell>
-                <TableCell
-                  onClick={() => setSortConfig(prev => ({ key: 'semester', direction: prev.key === 'semester' && prev.direction === 'asc' ? 'desc' : 'asc' }))}
-                  style={{ cursor: 'pointer', fontWeight: 'bold', whiteSpace: 'nowrap' }}
-                >
-                  Semester {sortConfig.key === 'semester' ? (sortConfig.direction === 'asc' ? '▲' : '▼') : ''}
-                </TableCell>
-                <TableCell align="center">Students</TableCell>
-                <TableCell align="center">Teams</TableCell>
-                <TableCell align="center">Status</TableCell>
-                <TableCell align="center">Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {loading ? (
-                <TableRow>
-                  <TableCell colSpan={8} align="center">
-                    <LinearProgress />
-                  </TableCell>
-                </TableRow>
-              ) : courses.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={8} align="center">
-                    No courses found. Create your first course to get started.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                // Sort courses before mapping
-                [...courses].sort((a, b) => {
-                  const { key, direction } = sortConfig;
-                  let aValue = a[key];
-                  let bValue = b[key];
-                  // Handle alternate keys for course_number
-                  if (key === 'course_number') {
-                    aValue = a.course_number || a.course_code || '';
-                    bValue = b.course_number || b.course_code || '';
-                  }
-                  // Handle numbers for student_count/team_count
-                  if (key === 'student_count' || key === 'team_count') {
-                    aValue = a[key] || 0;
-                    bValue = b[key] || 0;
-                  }
-                  // Fallback to string compare
-                  if (typeof aValue === 'string' && typeof bValue === 'string') {
-                    aValue = aValue.toLowerCase();
-                    bValue = bValue.toLowerCase();
-                  }
-                  if (aValue < bValue) return direction === 'asc' ? -1 : 1;
-                  if (aValue > bValue) return direction === 'asc' ? 1 : -1;
-
-                  // If sorting by semester, use course_name as secondary (alphabetical)
-                  if (key === 'semester') {
-                    const aName = (a.course_name || '').toLowerCase();
-                    const bName = (b.course_name || '').toLowerCase();
-                    if (aName < bName) return -1;
-                    if (aName > bName) return 1;
-                  }
-                  // Always use course_section as final tiebreaker (numeric, ascending)
-                  const aSection = parseInt(a.course_section, 10) || 0;
-                  const bSection = parseInt(b.course_section, 10) || 0;
-                  if (aSection < bSection) return -1;
-                  if (aSection > bSection) return 1;
-                  return 0;
-                }).map((course) => (
-                  <TableRow key={course.id || course._id}>
-                    <TableCell>{course.course_name}</TableCell>
-                    <TableCell>{course.course_number || course.course_code || 'N/A'}</TableCell>
-                    <TableCell>{course.course_section || 'N/A'}</TableCell>
-                    <TableCell style={{ whiteSpace: 'nowrap' }}>{course.semester}</TableCell>
-                    <TableCell align="center">
-                      <Chip label={course.student_count || 0} size="small" />
-                    </TableCell>
-                    <TableCell align="center">
-                      <Chip label={Number.isInteger(course.team_count) && course.team_count > 0 ? course.team_count : 0} size="small" />
-                    </TableCell>
-                    <TableCell align="center">
-                      <Chip 
-                        label={course.course_status || 'Active'} 
-                        color={course.course_status === 'Active' ? 'success' : 'default'}
-                        size="small" 
-                      />
-                    </TableCell>
-                    <TableCell align="center">
-                      <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center' }}>
-                        {/* ...other action buttons... */}
-                        <IconButton
-                          size="small"
-                          color="primary"
-                          onClick={() => {
-                            setSelectedCourse(course);
-                            setUploadDialogOpen(true);
-                          }}
-                          title="Upload Roster"
-                        >
-                          <UploadIcon />
-                        </IconButton>
-                        <IconButton
-                          size="small"
-                          color="primary"
-                          onClick={() => handleViewStudents(course)}
-                          title="Manage Students"
-                        >
-                          <PersonIcon />
-                        </IconButton>
-
-                        <IconButton
-                          size="small"
-                          color="primary"
-                          onClick={() => handleViewTeams(course)}
-                          title="Manage Teams"
-                        >
-                          <GroupIcon />
-                        </IconButton>
-                        <IconButton
-                          size="small"
-                          color="success"
-                          onClick={() => handleSendInvitations(course._id || course.id)}
-                          title="Send Evaluations"
-                          disabled={sendingEvaluations[course._id || course.id]}
-                        >
-                          {sendingEvaluations[course._id || course.id] ? <CircularProgress size={20} /> : <SendIcon />}
-                        </IconButton>
-                        <IconButton
-                          size="small"
-                          color="secondary"
-                          onClick={() => handleViewEvaluationStatus(course)}
-                          title="Evaluation Status"
-                        >
-                          <BarChartIcon />
-                        </IconButton>
-                        <IconButton
-                          size="small"
-                          color="primary"
-                          onClick={() => navigate(`/reports?course=${course._id || course.id}`)}
-                          title="View Reports"
-                        >
-                          <DescriptionIcon />
-                        </IconButton>
-                        <IconButton
-                          size="small"
-                          color="error"
-                          onClick={() => {
-                            setCourseToDelete(course);
-                            setDeleteDialogOpen(true);
-                          }}
-                          title="Delete Course"
-                        >
-                          <DeleteIcon />
-                        </IconButton>
-                        <IconButton
-                          size="small"
-                          color="primary"
-                          onClick={() => handleEditClick(course)}
-                          title="Edit Course"
-                        >
-                          <EditIcon />
-                        </IconButton>
-                      </Box>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </div>
+      <CourseTable
+        courses={courses}
+        loading={loading}
+        sortConfig={sortConfig}
+        sendingIds={sendingEvaluations}
+        onSort={(key) => setSortConfig(prev => nextSortConfig(prev, key))}
+        onUploadRoster={(course) => { setSelectedCourse(course); setUploadDialogOpen(true); }}
+        onManageStudents={handleViewStudents}
+        onManageTeams={handleViewTeams}
+        onSendEvaluations={(course) => handleSendInvitations(course._id || course.id)}
+        onEvaluationStatus={handleViewEvaluationStatus}
+        onViewReports={(course) => navigate(`/reports?course=${course._id || course.id}`)}
+        onDelete={(course) => { setCourseToDelete(course); setDeleteDialogOpen(true); }}
+        onEdit={handleEditClick}
+      />
 
       <EvaluationStatusDialog
         open={evaluationStatusOpen}
