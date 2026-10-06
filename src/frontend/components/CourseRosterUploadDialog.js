@@ -30,6 +30,8 @@ function CourseRosterUploadDialog({ open, file, progress, onFileChange, onClose,
               type="file"
               hidden
               accept=".csv"
+              // Cleared on click, so choosing the same file again (after the dialog was closed) still fires a change.
+              onClick={(e) => { e.target.value = ''; }}
               onChange={(e) => onFileChange(e.target.files[0])}
             />
           </Button>

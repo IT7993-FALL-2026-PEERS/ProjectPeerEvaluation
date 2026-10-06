@@ -1,5 +1,5 @@
 const { test, expect } = require('@playwright/test');
-const { resetData, loginAsAda, courseAction, alertWith, ROSTER_CSV } = require('./support/app');
+const { resetData, loginAsAda, courseAction, alertWith, ROSTER_CSV, HEADER_ONLY_CSV } = require('./support/app');
 
 // The Manage Students list with its search and delete, and the course dialogs: create, edit and
 // delete a course. (Adding, editing, uploading and deleting all students are in students.spec.js;
@@ -134,17 +134,57 @@ test('E2E-36: Delete Course asks first; Cancel keeps the course, Delete removes 
 
 // Closing the roster dialog with Escape or a click outside used to keep the chosen file, so opening
 // it again on another course offered to upload the first course's file into the second.
-test('E2E-37: a roster file chosen for one course is forgotten when the dialog closes, whatever way it closes', async ({ page }) => {
+test('E2E-37: a roster file chosen for one course is forgotten when the dialog closes, whichever way it closes', async ({ page }) => {
   await createCourse(page, { name: 'Databases', number: 'IT 3100', section: '02', semester: 'Fall 2026' });
+  const ways = {
+    'Escape': () => page.keyboard.press('Escape'),
+    'Cancel': () => top(page).getByRole('button', { name: 'Cancel' }).click(),
+    'a click outside': () => page.locator('.MuiDialog-container').last().click({ position: { x: 5, y: 5 } }),
+  };
+
+  for (const [way, close] of Object.entries(ways)) {
+    await page.getByRole('row', { name: /CS 4850/ }).getByTitle('Upload Roster').click();
+    await top(page).locator('input[type=file]').setInputFiles(ROSTER_CSV);
+    await expect(top(page).getByText('Selected: roster.csv'), `chosen before closing with ${way}`).toBeVisible();
+    await close();
+    await expect(page.locator('[role=dialog]')).toHaveCount(0);
+
+    await page.getByRole('row', { name: /IT 3100/ }).getByTitle('Upload Roster').click();
+    await expect(top(page).getByRole('heading', { name: 'Upload Student Roster' })).toBeVisible();
+    await expect(top(page).getByText(/Selected:/), `after closing with ${way}`).toHaveCount(0);
+    await expect(top(page).getByRole('button', { name: 'Upload', exact: true })).toBeDisabled();
+    await page.keyboard.press('Escape');
+    await expect(page.locator('[role=dialog]')).toHaveCount(0);
+  }
+});
+
+// Closing the dialog does not cancel an upload that is already on its way, and the server still gets
+// it. Its progress and its success used to land on whichever dialog was open by then: the next
+// course's, which then closed itself and forgot its file.
+test('E2E-38: an upload that finishes after its dialog was closed leaves the next dialog alone', async ({ page }) => {
+  await createCourse(page, { name: 'Databases', number: 'IT 3100', section: '02', semester: 'Fall 2026' });
+  await page.route('**/api/courses/*/roster', async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    await route.continue();
+  });
 
   await page.getByRole('row', { name: /CS 4850/ }).getByTitle('Upload Roster').click();
   await top(page).locator('input[type=file]').setInputFiles(ROSTER_CSV);
-  await expect(top(page).getByText('Selected: roster.csv')).toBeVisible();
-  await page.keyboard.press('Escape');
+  await top(page).getByRole('button', { name: 'Upload', exact: true }).click();
+  // Cancel, not Escape: the Upload button that had focus is now disabled, so the keyboard no longer
+  // reaches the dialog until the upload ends.
+  await top(page).getByRole('button', { name: 'Cancel' }).click();
   await expect(page.locator('[role=dialog]')).toHaveCount(0);
 
   await page.getByRole('row', { name: /IT 3100/ }).getByTitle('Upload Roster').click();
   await expect(top(page).getByRole('heading', { name: 'Upload Student Roster' })).toBeVisible();
-  await expect(top(page).getByText(/Selected:/)).toHaveCount(0);
-  await expect(top(page).getByRole('button', { name: 'Upload', exact: true })).toBeDisabled();
+  await top(page).locator('input[type=file]').setInputFiles(HEADER_ONLY_CSV);
+  await expect(top(page).getByText('Selected: header-only.csv')).toBeVisible();
+
+  // The first upload still finishes and says so ...
+  await expect(alertWith(page, /students added successfully/)).toBeVisible({ timeout: 10000 });
+  // ... but the second course's dialog keeps its own file and shows no progress from the first.
+  await expect(top(page).getByText('Selected: header-only.csv')).toBeVisible();
+  await expect(top(page).getByRole('progressbar')).toHaveCount(0);
+  await expect(page.locator('[role=dialog]')).toHaveCount(1);
 });

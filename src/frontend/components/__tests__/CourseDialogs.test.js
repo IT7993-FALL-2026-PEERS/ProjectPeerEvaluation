@@ -326,6 +326,17 @@ describe('CourseRosterUploadDialog', () => {
     expect(screen.getByText('Selected: roster.csv')).toBeInTheDocument();
   });
 
+  test('choosing the same file again still counts, because the input is cleared when it is clicked', async () => {
+    const onFileChange = jest.fn();
+    render(<CourseRosterUploadDialog {...props({ onFileChange })} />);
+    const input = screen.getByLabelText('Select CSV File');
+
+    await user.upload(input, csv);
+    expect(onFileChange).toHaveBeenCalledTimes(1);
+    await user.upload(input, csv);
+    expect(onFileChange).toHaveBeenCalledTimes(2);
+  });
+
   test('Upload is off until a file is chosen, and while an upload is running', () => {
     const { rerender } = render(<CourseRosterUploadDialog {...props()} />);
     expect(screen.getByRole('button', { name: 'Upload' })).toBeDisabled();
