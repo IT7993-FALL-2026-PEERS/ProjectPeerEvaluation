@@ -108,7 +108,10 @@ The frontend can't call the API, and the browser console shows "blocked by CORS 
 
 The backend only accepts the origin of `FRONTEND_URL` (CICD-37). On staging, `render.yaml` sets it to
 `https://peers-frontend-staging.onrender.com`. If the frontend's address changed (a renamed service, a custom
-domain), change `FRONTEND_URL` to match, then redeploy the backend (CD with force, or Render > Manual Deploy).
+domain), change `FRONTEND_URL` to match in `render.yaml`, through a pull request. It's defined there, so a change made
+only in the dashboard is overwritten at the next Blueprint sync. Render applies the new value when the Blueprint
+syncs. If the backend doesn't redeploy by itself, use Render > the backend > Manual Deploy. CD's force won't help
+here, because the backend already runs the latest commit.
 Locally: open the app at `http://localhost:3000`, or set `FRONTEND_URL` to the address you use
 ([Docker setup](../docker-setup.md)).
 

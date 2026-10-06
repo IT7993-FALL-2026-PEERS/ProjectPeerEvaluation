@@ -46,10 +46,14 @@ curl -s https://peers-frontend-staging.onrender.com/version.txt   # <sha>
 Trust these two commits, not the page source: the production build minifies `index.html` and drops HTML comments, so
 a change made only to a comment won't show up in the page even when it is live.
 
-The two commits can differ: a service keeps its commit until a change touches files it uses. To deploy both
-services anyway, for example after changing an environment variable in Render, run **Actions > CD > Run workflow**
-on `main` with **force** ticked. A manual run only deploys a commit whose CI run on `main` passed, and force never
-deploys an older commit than the live one (going back is [rollback](rollback-and-recovery.md#r1-staging-is-broken-after-a-deploy)'s job).
+The two commits can differ: a service keeps its commit until a change touches files it uses. To bring a service up
+to `main` anyway, for example after a rollback in the Render dashboard, run **Actions > CD > Run workflow** on `main`
+with **force** ticked. A manual run only deploys a commit whose CI run on `main` passed. Force skips a service that
+already runs that commit, and never deploys an older one (going back is
+[rollback](rollback-and-recovery.md#r1-staging-is-broken-after-a-deploy)'s job).
+
+**After changing an environment variable in Render**, choose **Save and deploy** there. Render redeploys the commit
+that is live, with the new value. CD's force can't do this, because that commit is already live.
 
 If the deploy fails, go to [Rollback and recovery, R2](rollback-and-recovery.md#r2-a-cd-run-failed).
 
@@ -64,8 +68,10 @@ With the release stages on, the same CD run also:
    services' commits as staging reported them, the images and their digests, the smoke result and test count, the
    CI run and its coverage, the previous release, and how to recover.
 
-A failed step means **no tag**, a failed run, and an automatic rollback to the previous release
-([R2](rollback-and-recovery.md#r2-a-cd-run-failed)). The very first release candidate has nothing to roll back to,
+A failed step means **no tag** and a failed run. Only a failed **deploy** or **smoke** job also rolls back to the
+previous release automatically ([R2](rollback-and-recovery.md#r2-a-cd-run-failed)). If `images` fails, nothing was
+deployed. If `Tag release candidate` fails (for example, no `@staging` test ran), staging **stays on the new version**,
+untagged. The very first release candidate has nothing to roll back to,
 so make it from a commit where staging is known to be good. Release candidates are under the repository's **Releases**,
 marked *Pre-release*.
 

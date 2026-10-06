@@ -143,3 +143,44 @@ test('main skips a service whose files did not change', async (t) => {
   assert.match(log.mock.calls[0].arguments[0], /backend: skipping/);
   log.mock.restore();
 });
+
+// Khoa's follow-up on #146: a bad hook URL or an unexpected error must not print the hook URL.
+const { spawnSync } = require('node:child_process');
+const path = require('node:path');
+const { failureMessage } = require('../../../scripts/render-deploy');
+const SECRET_HOOK = 'https://api.render.com/deploy/srv-secret?key=TOPSECRET';
+
+test('main refuses a hook URL that is not a valid https URL, without printing it', async (t) => {
+  const err = t.mock.method(console, 'error', () => {});
+  for (const hook of ['not a url TOPSECRET', 'http://api.render.com/deploy/srv-x?key=TOPSECRET']) {
+    assert.equal(await main({ SERVICE: 'backend', SHA: A, HOOK_URL: hook }), 2);
+  }
+  for (const call of err.mock.calls) {
+    assert.match(call.arguments[0], /HOOK_URL is not a valid https URL/);
+    assert.doesNotMatch(call.arguments[0], /TOPSECRET/);
+  }
+});
+
+test('deploy reports an unreachable hook without the error details', async () => {
+  const fetchImpl = async () => { throw new TypeError(`fetch failed for ${SECRET_HOOK}`); };
+  const result = await deploy({ hookUrl: SECRET_HOOK, sha: A, versionUrl: 'https://x', fetchImpl, sleep: async () => {} });
+  assert.equal(result.live, false);
+  assert.equal(result.detail, "could not reach Render's deploy hook (TypeError)");
+});
+
+test('an unexpected error prints only its type', () => {
+  const message = failureMessage(new TypeError(`Invalid URL: ${SECRET_HOOK}`));
+  assert.match(message, /unexpected TypeError/);
+  assert.doesNotMatch(message, /TOPSECRET|srv-secret/);
+  assert.match(failureMessage(undefined), /unexpected error/);
+});
+
+test('the command line exits 2 with a fixed message for a malformed hook URL', () => {
+  const script = path.join(__dirname, '..', '..', '..', 'scripts', 'render-deploy.js');
+  const run = spawnSync(process.execPath, [script], {
+    env: { ...process.env, SERVICE: 'backend', SHA: A, HOOK_URL: 'https://[TOPSECRET' }, encoding: 'utf8',
+  });
+  assert.equal(run.status, 2);
+  assert.match(run.stderr, /HOOK_URL is not a valid https URL/);
+  assert.doesNotMatch(run.stderr + run.stdout, /TOPSECRET/);
+});

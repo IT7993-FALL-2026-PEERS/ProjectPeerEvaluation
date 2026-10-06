@@ -163,3 +163,19 @@ test('main rejects an unknown command', async (t) => {
   t.mock.method(console, 'error', () => {});
   assert.equal(await main(['publish'], {}), 2);
 });
+
+// Khoa's follow-up on #146: a short message instead of a raw stack trace.
+const { spawnSync } = require('node:child_process');
+const { failureMessage } = require('../../../scripts/release-record');
+
+test('an unexpected error becomes one short line', () => {
+  assert.equal(failureMessage(new Error('EACCES: permission denied')), 'Release record: failed (EACCES: permission denied). No release.');
+});
+
+test('the command line exits 2 with its usage line, not a stack trace', () => {
+  const script = path.join(__dirname, '..', '..', '..', 'scripts', 'release-record.js');
+  const run = spawnSync(process.execPath, [script, 'publish'], { encoding: 'utf8' });
+  assert.equal(run.status, 2);
+  assert.match(run.stderr, /^Usage: node scripts\/release-record\.js/);
+  assert.doesNotMatch(run.stderr, /at .*\.js:\d+/);
+});
