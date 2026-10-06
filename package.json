@@ -91,5 +91,8 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "prettier": "^3.9.9"
   },
-  "proxy": "http://localhost:5000"
+  "proxy": "http://localhost:5000",
+  "overrides": {
+    "shell-quote": "^1.11.0"
+  }
 }
