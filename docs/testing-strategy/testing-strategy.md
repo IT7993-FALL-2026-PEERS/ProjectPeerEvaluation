@@ -251,6 +251,8 @@ opening floors:
 | Frontend floor, raised a sixth time (6 Oct) | 45% | 62% | 60% |
 | Frontend after the course list's data was moved into a hook (6 Oct) | 48.88% | 63.22% | 64.26% |
 | Frontend floor, raised a seventh time (6 Oct) | 48% | 63% | 64% |
+| Frontend after the students' data was moved into a hook (6 Oct) | 61.27% | 69.57% | 71.01% |
+| Frontend floor, raised an eighth time (6 Oct) | 61% | 69% | 71% |
 
 - **What is measured:** the backend's `controllers`, `middleware`, `models`, `routes`, `utils`
   and `config` folders plus `index.js`; the frontend's `src/frontend` source, excluding tests and
