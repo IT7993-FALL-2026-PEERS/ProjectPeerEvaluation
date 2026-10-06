@@ -188,3 +188,69 @@ test('E2E-38: an upload that finishes after its dialog was closed leaves the nex
   await expect(top(page).getByRole('progressbar')).toHaveCount(0);
   await expect(page.locator('[role=dialog]')).toHaveCount(1);
 });
+
+// The course list's own controls: the search filters and the sortable column headers. These stand
+// behind moving them into their own components (CICD-57, step 6).
+const courseNames = (page) => page.locator('tbody tr td:first-child');
+
+test('E2E-39: course search narrows the list by name and status, and Clear puts the defaults back', async ({ page }) => {
+  await createCourse(page, { name: 'Databases', number: 'IT 3100', section: '02', semester: 'Fall 2026' });
+  await createCourse(page, { name: 'Algorithms', number: 'CS 3000', section: '01', semester: 'Spring 2027' });
+  await page.getByRole('row', { name: /CS 3000/ }).getByTitle('Edit Course').click();
+  await top(page).getByRole('combobox').click();
+  await page.getByRole('option', { name: 'Inactive' }).click();
+  await top(page).getByRole('button', { name: 'Save' }).click();
+  await expect(alertWith(page, 'Course updated successfully')).toBeVisible();
+  // The list shows Active courses by default, so the inactive one is gone.
+  await expect(courseNames(page)).toHaveText(['Capstone', 'Databases']);
+
+  await page.getByRole('button', { name: 'Show Filters' }).click();
+  await expect(page.getByRole('button', { name: 'Hide Filters' })).toBeVisible();
+  await page.getByLabel('Course Name').fill('data');
+  await page.getByRole('button', { name: 'Search', exact: true }).click();
+  await expect(courseNames(page)).toHaveText(['Databases']);
+
+  await page.getByRole('button', { name: 'Clear', exact: true }).click();
+  await expect(page.getByLabel('Course Name')).toHaveValue('');
+  await expect(courseNames(page)).toHaveText(['Capstone', 'Databases']);
+
+  await page.getByRole('combobox').click();
+  await page.getByRole('option', { name: 'Inactive' }).click();
+  await page.getByRole('button', { name: 'Search', exact: true }).click();
+  await expect(courseNames(page)).toHaveText(['Algorithms']);
+
+  await page.getByLabel('Course Name').fill('zzz');
+  await page.getByRole('button', { name: 'Search', exact: true }).click();
+  await expect(page.getByText('No courses found. Create your first course to get started.')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Hide Filters' }).click();
+  await expect(page.getByRole('button', { name: 'Show Filters' })).toBeVisible();
+});
+
+test('E2E-40: clicking a column header sorts the courses, and clicking it again reverses them', async ({ page }) => {
+  await createCourse(page, { name: 'Databases', number: 'IT 3100', section: '02', semester: 'Fall 2026' });
+  await createCourse(page, { name: 'Algorithms', number: 'CS 3000', section: '01', semester: 'Spring 2027' });
+  const header = (label) => page.getByRole('columnheader', { name: new RegExp(`^${label}`) });
+
+  // By name, ascending, to begin with.
+  await expect(courseNames(page)).toHaveText(['Algorithms', 'Capstone', 'Databases']);
+  await expect(header('Course Name')).toContainText('▲');
+
+  await header('Course Name').click();
+  await expect(courseNames(page)).toHaveText(['Databases', 'Capstone', 'Algorithms']);
+  await expect(header('Course Name')).toContainText('▼');
+
+  await header('Course Number').click();
+  await expect(courseNames(page)).toHaveText(['Algorithms', 'Capstone', 'Databases']);
+  await expect(header('Course Number')).toContainText('▲');
+  await expect(header('Course Name')).not.toContainText('▲');
+  await expect(header('Course Name')).not.toContainText('▼');
+  await header('Course Number').click();
+  await expect(courseNames(page)).toHaveText(['Databases', 'Capstone', 'Algorithms']);
+
+  // Same semester: the name breaks the tie, in the same order whichever way the semesters go.
+  await header('Semester').click();
+  await expect(courseNames(page)).toHaveText(['Capstone', 'Databases', 'Algorithms']);
+  await header('Semester').click();
+  await expect(courseNames(page)).toHaveText(['Algorithms', 'Capstone', 'Databases']);
+});
