@@ -44,7 +44,7 @@ historical alternatives. Continuous Integration runs on every pull request (see
 once CI passes on `main`, `cd.yml` deploys that exact commit to the frontend and backend. Staging uses
 MongoDB Atlas and a Mailtrap test inbox, so no real student ever receives an email from it; the backend
 refuses to send through anything but the Mailtrap sandbox on staging (CICD-44). Staging stays
-running until final delivery, because CD deploys to it on every merge, and is then shut down or handed over
+running until final delivery, because CD deploys to it after every merge that passes CI, and is then shut down or handed over
 ([Render handover](docs/operations/render-handover.md)). The rest of the delivery pipeline (images,
 smoke tests, release candidates, rollback) is built and switched off until it has been reviewed, and production
 deployment always stays a manual sponsor approval.
@@ -159,17 +159,17 @@ The numbers move as steps land.
 |---|---|---|---|
 | Install dependencies and build | `npm ci` and the production build | M1 / M4 | Live (`.github/workflows/ci.yml`) |
 | Workflow lint | `actionlint` checks the workflow files themselves | M1 / M4 | Live |
-| Unit tests | Jest and React Testing Library for the frontend (230 tests); Node's built-in test runner (`node:test`) for the backend (364 tests) | M4 / M5 | Live for both in CI on every pull request. Coverage is measured on every pull request and gated by floors just below today's baseline (`coverage-floors.json`; backend about 66% of lines, frontend about 42%), and the floors only go up. The team's target is 70%; the backend is close, the frontend is not (`CourseManagement.js` is being split into tested components: its dialogs are covered, its data handling is not yet) |
+| Unit tests | Jest and React Testing Library for the frontend (232 tests); Node's built-in test runner (`node:test`) for the backend (370 tests) | M4 / M5 | Live for both in CI on every pull request. Coverage is measured on every pull request and gated by floors just below today's baseline (`coverage-floors.json`; backend about 66% of lines, frontend about 42%), and the floors only go up. The team's target is 70%; the backend is close, the frontend is not (`CourseManagement.js` is being split into tested components: its dialogs are covered, its data handling is not yet) |
 | Integration tests | Backend, database, authentication, and email, against a real MongoDB that the tests start themselves and an isolated email transport (never real student inboxes) | M4 / M5 | Live: 131 tests, required job `Integration (real MongoDB)` |
 | Functional regression tests | At least one automated test per critical business workflow | M5 | Live: all twelve critical workflows (CW-01 to CW-12) are covered, see [`docs/requirements/critical-workflows.md`](docs/requirements/critical-workflows.md) |
-| End-to-end tests | Playwright drives the real app in a browser: student and instructor workflows, on a throwaway database with email captured, never sent | M4 / M5 | Live: 37 tests, required job `E2E smoke (Playwright)` |
+| End-to-end tests | Playwright drives the real app in a browser: student and instructor workflows, on a throwaway database with email captured, never sent | M4 / M5 | Live: 39 tests, required job `E2E smoke (Playwright)` |
 | Static analysis | ESLint: frontend (`npm run lint`) and backend (`cd src/backend && npm run lint`) | M1 / M4 | Live |
 | Container build check | `docker compose up --build --wait` builds the frontend and backend images and starts them with MongoDB, then checks the stack is healthy | M2 | Live, required job `Containers (build + compose smoke)` |
 | Dependency validation and security scan | Dependabot, OWASP Dependency Check, CodeQL code scanning, secret scanning | M3 | Live and blocking: OWASP Dependency-Check runs on every pull request, on `main`, and weekly (`.github/workflows/security.yml`) and fails on any finding with CVSS 7 or higher that is not an accepted risk (`.github/dependency-check-suppressions.xml`, each entry with an expiry date); CodeQL (GitHub default setup) scans the code on every pull request. Both are required checks. Dependabot opens weekly update pull requests (`.github/dependabot.yml`); its alerts, all in `react-scripts` build tooling, are triaged and dismissed as accepted risk. Secret scanning and push protection are on. The policy, the triage and the 10 accepted findings are in [`docs/security/security-policy.md`](docs/security/security-policy.md) |
 | Test report | Executed, passed, and failed tests, duration, and coverage | M4 | Live in CI: each test job writes tests run, passed, failed, skipped and duration to its run summary (`scripts/test-summary.js`) next to the coverage table, and keeps the result files as downloadable artifacts |
 | Quality gate | `main-protection` ruleset: a pull request, eight passing required checks and an up-to-date branch before merge. No approval required, so authors merge their own pull requests. No bypass, and direct pushes are rejected | M1 | Live. More checks are added as jobs are added |
 | Build artifacts and Docker images | Build the deployment artifacts and the frontend and backend images for the exact commit that passed CI | M2 | Partly live: the container check builds both images on every pull request, and `image-build.yml` (reusable, or run by hand from the Actions tab) builds them, checks they start healthy and pushes both to GitHub Container Registry tagged with the commit SHA (see [`docs/cd-pipeline.md`](docs/cd-pipeline.md)). `cd.yml` calls it once its release stages are switched on (`CD_RELEASE`); it has not yet run on a real commit |
-| Staging deploy | Automatic deploy to Render.com staging | M2 | Live since 5 Oct: after CI passes on `main`, `.github/workflows/cd.yml` deploys the tested commit with each service's Render deploy hook, skips a service when nothing it uses changed, and waits until the service reports the commit (CICD-12). Render's own auto-deploy is off (`render.yaml`). Staging is switched off between checks and demos ([release procedure](docs/operations/release-procedure.md)) |
+| Staging deploy | Automatic deploy to Render.com staging | M2 | Live since 5 Oct: after CI passes on `main`, `.github/workflows/cd.yml` deploys the tested commit with each service's Render deploy hook, skips a service when nothing it uses changed, and waits until the service reports the commit (CICD-12). Render's own auto-deploy is off (`render.yaml`). Staging stays running until final delivery ([release procedure](docs/operations/release-procedure.md)) |
 | Smoke tests | Verify the deployment after each release | M5 | Written, switched off: `cd.yml` runs Staging regression after the deploy once `CD_RELEASE` is on. No tests are tagged `@staging` yet (Kylee); planned, week of 9 Nov |
 | Deployment health check | Poll `/api/health` after deploy | M1 | Live: Render checks `/api/health` before switching traffic, CD waits until each service reports the deployed commit (`/api/health`, `/version.txt`), and the deployment status job checks health after every deploy |
 | Release candidate | Produce a release candidate after staging passes | M1 | Written, switched off until the design review (CICD-28): with `CD_RELEASE` on, CD tags `rc-*` with a release record only when images, deploy and smoke tests passed, and rolls back to the previous release when they fail. Planned on, week of 16 Nov |
@@ -401,8 +401,8 @@ npm run lint
 npm test -- --watchAll=false --coverage && node scripts/coverage-gate.js frontend
 npm run build
 E2E_START_SERVER=1 npm run test:e2e
-cd src/backend && npm run lint && npm run test:coverage && node ../../scripts/coverage-gate.js backend
-cd src/backend && npm run test:integration
+(cd src/backend && npm run lint && npm run test:coverage && node ../../scripts/coverage-gate.js backend)
+(cd src/backend && npm run test:integration)
 ```
 
 Commit `package.json` and `package-lock.json` together. `npm ci` fails if they are out of sync.
