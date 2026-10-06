@@ -22,9 +22,11 @@ For each service, `scripts/render-deploy.js`:
 Then `deployment-status.yml` checks `/api/health` answers OK and writes the deployment status to the run summary.
 
 **Run by hand:** Actions > CD > Run workflow, on `main`. It deploys only a commit whose CI run on `main` passed, and
-refuses otherwise. Tick "force" to deploy both services even when nothing they use changed (for example after changing an
-environment variable in Render). Force never deploys an older commit than the live one: going back is what
-`rollback_to` is for.
+refuses otherwise. Tick "force" to deploy a service even when nothing it uses changed, for example to bring a service
+back up to `main` after a rollback in the Render dashboard, or after resuming a suspended service. Force skips a service
+that already runs the commit, and never deploys an older commit than the live one: going back is what `rollback_to` is
+for. After changing an environment variable in Render, use Render's **Save and deploy**, which redeploys the live
+commit with the new value. Force can't do that, because the commit is already live.
 
 ## Release pipeline (`cd.yml`, CICD-28): design for review
 

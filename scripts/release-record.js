@@ -178,8 +178,17 @@ async function main(argv, env, deps) {
   return 2;
 }
 
-module.exports = { RC_TAG_RE, tagName, smokeOutcome, readCoverage, buildRecord, formatMarkdown, madeByPipeline, previousGood, record, main };
+// The command line's catch-all: a short message instead of a raw stack trace. The record holds no secrets, so
+// the error's own message is safe to show.
+function failureMessage(error) {
+  return `Release record: failed (${error?.message || error}). No release.`;
+}
+
+module.exports = { RC_TAG_RE, tagName, smokeOutcome, readCoverage, buildRecord, formatMarkdown, madeByPipeline, previousGood, failureMessage, record, main };
 
 if (require.main === module) {
-  main(process.argv.slice(2), process.env).then((code) => { process.exitCode = code; });
+  main(process.argv.slice(2), process.env).then(
+    (code) => { process.exitCode = code; },
+    (error) => { console.error(failureMessage(error)); process.exitCode = 1; },
+  );
 }

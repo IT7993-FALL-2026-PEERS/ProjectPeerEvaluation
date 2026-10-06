@@ -95,8 +95,13 @@ function plan({ sha, live, service, force, rollback, gitImpl = git }) {
 async function deploy({ hookUrl, sha, versionUrl, fetchImpl = fetch, timeoutMs = 20 * 60000, intervalMs = 20000, sleep = (ms) => new Promise((r) => setTimeout(r, ms)), now = Date.now }) {
   const url = new URL(hookUrl);
   url.searchParams.set('ref', sha);
-  const response = await fetchImpl(url, { method: 'POST', signal: AbortSignal.timeout(30000) });
-  // Never echo the hook URL or response body: the URL is the secret.
+  // Never echo the hook URL, the response body or a network error's details: the URL is the secret.
+  let response;
+  try {
+    response = await fetchImpl(url, { method: 'POST', signal: AbortSignal.timeout(30000) });
+  } catch (error) {
+    return { live: false, detail: `could not reach Render's deploy hook (${error?.name || 'error'})` };
+  }
   if (!response.ok) return { live: false, detail: `Render refused the deploy hook (HTTP ${response.status})` };
   const deadline = now() + timeoutMs;
   let last = null;
@@ -108,10 +113,28 @@ async function deploy({ hookUrl, sha, versionUrl, fetchImpl = fetch, timeoutMs =
   return { live: false, detail: `${sha.slice(0, 7)} was not live after ${Math.round(timeoutMs / 60000)} minutes (live: ${last ? last.slice(0, 7) : 'unknown'})` };
 }
 
+function isHttpsUrl(value) {
+  try {
+    return new URL(value).protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+// The command line's last line of defence: an unexpected error can carry the hook URL (a bad URL's error
+// holds its input), so only its type is printed.
+function failureMessage(error) {
+  return `Render deploy: failed with an unexpected ${error?.name || 'error'}. Details are left out because they can contain the deploy hook URL.`;
+}
+
 async function main(env, deps = {}) {
   const service = SERVICES[env.SERVICE];
   if (!service || !SHA_RE.test(env.SHA || '') || !env.HOOK_URL) {
     console.error('Render deploy: set SERVICE (backend or frontend), SHA (full commit) and HOOK_URL.');
+    return 2;
+  }
+  if (!isHttpsUrl(env.HOOK_URL)) {
+    console.error('Render deploy: HOOK_URL is not a valid https URL. Check the deploy hook secret in the staging environment.');
     return 2;
   }
   const live = await liveCommit(service.versionUrl, deps.fetchImpl);
@@ -123,8 +146,11 @@ async function main(env, deps = {}) {
   return result.live ? 0 : 1;
 }
 
-module.exports = { SERVICES, globToRegExp, matchesService, liveCommit, plan, deploy, main };
+module.exports = { SERVICES, globToRegExp, matchesService, liveCommit, plan, deploy, failureMessage, main };
 
 if (require.main === module) {
-  main(process.env).then((code) => { process.exitCode = code; });
+  main(process.env).then(
+    (code) => { process.exitCode = code; },
+    (error) => { console.error(failureMessage(error)); process.exitCode = 1; },
+  );
 }
