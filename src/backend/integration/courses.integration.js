@@ -95,3 +95,15 @@ test('TC-05-36: the course search matches part of a name, case-insensitively, an
   const wildcard = await app.request('GET', '/api/courses?course_name=.*', { token: ada });
   assert.equal(wildcard.body.length, 0, '".*" is searched for literally');
 });
+
+test('TC-05-37: a blank course_status lists every course; no status lists only the Active ones', async () => {
+  await app.request('POST', '/api/courses', { token: ada, body: NEW_COURSE });
+  const networks = await Course.findOne({ course_number: 'IT 4200' });
+  await app.request('DELETE', `/api/courses/${networks._id}`, { token: ada });
+  const numbers = async (query) => (await app.request('GET', `/api/courses${query}`, { token: ada })).body.map((c) => c.course_number).sort();
+
+  assert.deepEqual(await numbers(''), ['CS 4850']);
+  assert.deepEqual(await numbers('?course_status=Active'), ['CS 4850']);
+  assert.deepEqual(await numbers('?course_status=Inactive'), ['IT 4200']);
+  assert.deepEqual(await numbers('?course_status='), ['CS 4850', 'IT 4200']);
+});
