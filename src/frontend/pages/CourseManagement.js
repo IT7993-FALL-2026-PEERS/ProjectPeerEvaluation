@@ -20,10 +20,10 @@ import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { getApiBaseUrl } from '../services/apiUrl';
 import { describeEmailResult } from '../services/emailResult';
-import { isCsvFile } from '../services/csvFile';
 import { getErrorMessage } from '../services/apiError';
 import { buildCreateTeamBody } from '../services/teamRequest';
 import useCourses from '../hooks/useCourses';
+import useStudents from '../hooks/useStudents';
 import { useAuth } from '../contexts/AuthContext';
 import AddStudentDialog from '../components/AddStudentDialog';
 import EditStudentDialog from '../components/EditStudentDialog';
@@ -65,27 +65,6 @@ function CourseManagement() {
       setSendingTeamEvaluations((prev) => ({ ...prev, [teamId]: false }));
     }
   };
-  // State for add/edit student dialogs
-  const [addStudentOpen, setAddStudentOpen] = useState(false);
-  const [editStudentOpen, setEditStudentOpen] = useState(false);
-  const [studentToEdit, setStudentToEdit] = useState(null);
-  const [studentForm, setStudentForm] = useState({ student_id: '', name: '', email: '', group_assignment: '' });
-  const [studentFormError, setStudentFormError] = useState('');
-
-
-  // Sorting handler
-
-  // State for CSV upload
-  const [csvUploadOpen, setCsvUploadOpen] = useState(false);
-  const [csvFile, setCsvFile] = useState(null);
-  const [csvUploading, setCsvUploading] = useState(false);
-  const [csvUploadError, setCsvUploadError] = useState('');
-  const [csvUploadResults, setCsvUploadResults] = useState(null);
-
-  // State for delete all students
-  const [deleteAllStudentsOpen, setDeleteAllStudentsOpen] = useState(false);
-  const [deleteAllStudentsLoading, setDeleteAllStudentsLoading] = useState(false);
-
   // State for evaluation management
   const [evaluationStatusOpen, setEvaluationStatusOpen] = useState(false);
   const [evaluationStatusLoading, setEvaluationStatusLoading] = useState(false);
@@ -103,183 +82,8 @@ function CourseManagement() {
   const [pendingEvalResetCourseId, setPendingEvalResetCourseId] = useState(null);
   const [pendingTeamAction, setPendingTeamAction] = useState(null); // { type: 'add'|'remove', studentId }
 
-  // Handler stubs for add, edit, delete
-  const handleAddStudent = async () => {
-    setStudentFormError('');
-    if (!studentsCourse) return;
-    if (!studentForm.student_id || !studentForm.name || !studentForm.email) {
-      setStudentFormError('Student ID, name, and email are required.');
-      return;
-    }
-    try {
-      await api.post(`/courses/${studentsCourse._id || studentsCourse.id}/students`, studentForm);
-      setAlert({ severity: 'success', message: 'Student added successfully' });
-      setAddStudentOpen(false); // Only close the Add Student dialog
-      setStudentForm({ student_id: '', name: '', email: '', group_assignment: '' });
-      // Refresh students list
-      const response = await api.get(`/courses/${studentsCourse._id || studentsCourse.id}/students`);
-  setStudents(response.data);
-  // Reset search filters so all students are shown
-  setStudentSearch({ student_id: '', name: '', email: '', team: '' });
-      // Ensure Manage Students dialog stays open and refreshed
-      setStudentsDialogOpen(true);
-    } catch (error) {
-      if (error.response && error.response.data && error.response.data.error && error.response.data.error.message) {
-        setStudentFormError(error.response.data.error.message);
-      } else {
-        setStudentFormError('Failed to add student.');
-      }
-    }
-  };
-
-  const handleEditStudent = (student) => {
-    setStudentToEdit(student);
-    setStudentForm({ 
-      student_id: student.student_id, 
-      name: student.name, 
-      email: student.email,
-      group_assignment: student.group_assignment || ''
-    });
-    setEditStudentOpen(true);
-  };
-
-  const handleUpdateStudent = async () => {
-    if (!studentsCourse || !studentToEdit) return;
-    try {
-      await api.put(`/courses/${studentsCourse._id || studentsCourse.id}/students/${studentToEdit._id || studentToEdit.id}`, studentForm);
-      setAlert({ severity: 'success', message: 'Student updated successfully' });
-      setEditStudentOpen(false);
-      setStudentToEdit(null);
-      setStudentForm({ student_id: '', name: '', email: '', group_assignment: '' });
-      // Refresh students list
-      const response = await api.get(`/courses/${studentsCourse._id || studentsCourse.id}/students`);
-      setStudents(response.data);
-    } catch (error) {
-      setAlert({ severity: 'error', message: 'Failed to update student' });
-    }
-  };
-
-  const handleDeleteStudent = async (student) => {
-    if (!studentsCourse || !student) {
-      console.error('Delete failed: missing studentsCourse or student', { studentsCourse, student });
-      return;
-    }
-    const studentId = student._id || student.id;
-    if (!studentId) {
-      setAlert({ severity: 'error', message: 'Student ID is missing. Cannot delete.' });
-      console.error('Delete failed: student object missing _id and id', student);
-      return;
-    }
-    // Confirmation dialog
-    const studentName = student.name || `Student ${student.student_id}`;
-    const teamInfo = student.group_assignment ? `\nTeam: ${student.group_assignment}` : `\nNot assigned to any team`;
-    const confirmMessage = `Are you sure you want to delete "${studentName}" (ID: ${student.student_id})?${teamInfo}\n\nThis action cannot be undone and will:\n• Remove the student from the course\n• Unlink them from their team (if any)\n• Delete their evaluation data`;
-    if (!window.confirm(confirmMessage)) {
-      return;
-    }
-    try {
-      await api.delete(`/courses/${studentsCourse._id || studentsCourse.id}/students/${studentId}`);
-      setAlert({ severity: 'success', message: `Student "${studentName}" deleted successfully` });
-      // Refresh students list
-      const response = await api.get(`/courses/${studentsCourse._id || studentsCourse.id}/students`);
-      setStudents(response.data);
-    } catch (error) {
-      setAlert({ severity: 'error', message: `Failed to delete student "${studentName}"` });
-      console.error('Delete student error:', error);
-    }
-  };
-
-  // CSV Upload handlers
-  const handleCsvUpload = async () => {
-    if (!csvFile || !studentsCourse) return;
-    
-    setCsvUploading(true);
-    setCsvUploadError('');
-    setCsvUploadResults(null);
-    
-    const formData = new FormData();
-    formData.append('file', csvFile);
-    
-    try {
-      const response = await api.post(`/courses/${studentsCourse._id || studentsCourse.id}/roster`, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-      
-      setCsvUploadResults(response.data);
-      setAlert({ severity: 'success', message: response.data.message });
-      
-      // Refresh students list
-      const studentsResponse = await api.get(`/courses/${studentsCourse._id || studentsCourse.id}/students`);
-      setStudents(studentsResponse.data);
-      
-      // Reset form
-      setCsvFile(null);
-      
-    } catch (error) {
-      const errorMessage = getErrorMessage(error, 'Failed to upload CSV file');
-      setCsvUploadError(errorMessage);
-      setAlert({ severity: 'error', message: errorMessage });
-    } finally {
-      setCsvUploading(false);
-    }
-  };
-
-  const handleCsvFileChange = (event) => {
-    const file = event.target.files[0];
-    if (isCsvFile(file)) {
-      setCsvFile(file);
-      setCsvUploadError('');
-    } else {
-      setCsvUploadError('Please choose a file whose name ends in .csv');
-      setCsvFile(null);
-    }
-  };
-
-  // Delete All Students handler
-  const handleDeleteAllStudents = async () => {
-    if (!studentsCourse) return;
-    
-    setDeleteAllStudentsLoading(true);
-    
-    try {
-      const response = await api.delete(`/courses/${studentsCourse._id || studentsCourse.id}/students`);
-      
-      setAlert({ 
-        severity: 'success', 
-        message: `${response.data.message} (${response.data.deleted_students} students, ${response.data.deleted_teams} teams deleted)` 
-      });
-      
-      // Clear students and teams data immediately
-      setStudents([]);
-      setTeams([]);
-      
-      // Clear search filters
-      setStudentSearch({ student_id: '', name: '', email: '', team: '' });
-      setTeamSearch({ team_name: '', team_status: '' });
-      setShowStudentSearch(false);
-      setShowTeamSearch(false);
-      
-      // Close the delete confirmation dialog
-      setDeleteAllStudentsOpen(false);
-      
-      // Refresh the main courses list to update counts
-      await fetchCoursesWithCounts();
-      
-    } catch (error) {
-      const errorMessage = getErrorMessage(error, 'Failed to delete all students');
-      setAlert({ severity: 'error', message: errorMessage });
-    } finally {
-      setDeleteAllStudentsLoading(false);
-    }
-  };
 // ...existing code...
 
-  const [studentsDialogOpen, setStudentsDialogOpen] = useState(false);
-  const [studentsLoading, setStudentsLoading] = useState(false);
-  const [students, setStudents] = useState([]);
-  const [studentsCourse, setStudentsCourse] = useState(null);
 
   // Teams dialog state
   const [teamsDialogOpen, setTeamsDialogOpen] = useState(false);
@@ -302,15 +106,6 @@ function CourseManagement() {
   const [teamStudents, setTeamStudents] = useState([]);
   const [availableStudents, setAvailableStudents] = useState([]);
 
-  // Student search state
-  const [studentSearch, setStudentSearch] = useState({
-    student_id: '',
-    name: '',
-    email: '',
-    team: ''
-  });
-  const [showStudentSearch, setShowStudentSearch] = useState(false);
-
   // Team search state
   const [teamSearch, setTeamSearch] = useState({
     team_name: '',
@@ -318,38 +113,9 @@ function CourseManagement() {
   });
   const [showTeamSearch, setShowTeamSearch] = useState(false);
 
-  const handleViewStudents = async (course) => {
-    setStudentsDialogOpen(true);
-    setStudentsCourse(course);
-    setStudentsLoading(true);
-    // Reset search when opening dialog
-    setStudentSearch({ student_id: '', name: '', email: '', team: '' });
-    setShowStudentSearch(false); // Default to hidden
-    try {
-      const response = await api.get(`/courses/${course._id || course.id}/students`);
-      setStudents(response.data);
-    } catch (error) {
-      setStudents([]);
-    } finally {
-      setStudentsLoading(false);
-    }
-  };
-
   // The lists shown in the dialogs are worked out from the full list and the search fields, so they
   // can never be out of date: change `students`, `teams` or a search field and they follow. (They used
   // to be separate state set by hand, which showed the old list after a refresh.)
-
-
-  // Clear student search
-  const clearStudentSearch = () => {
-    setStudentSearch({ student_id: '', name: '', email: '', team: '' });
-    setShowStudentSearch(false); // Hide search after clearing
-  };
-
-  // Handle search input changes (the list is filtered as the user types)
-  const handleStudentSearchChange = (field, value) => {
-    setStudentSearch(previous => ({ ...previous, [field]: value }));
-  };
 
   // Clear team search
   const clearTeamSearch = () => {
@@ -716,6 +482,19 @@ function CourseManagement() {
     courses, loading, searchFilters, setSearchFilters, showSearchFilters, toggleSearchFilters,
     sortConfig, sortBy, fetchCoursesWithCounts, handleSearch, handleClearSearch,
   } = useCourses({ onError: setAlert });
+  const {
+    students, setStudents, openStudents,
+    studentsDialog, addStudentDialog, editStudentDialog, csvUploadDialog, deleteAllStudentsDialog,
+  } = useStudents({
+    setAlert,
+    refreshCourses: fetchCoursesWithCounts,
+    // Delete all students also removes the course's teams, so the team dialogs forget them too.
+    onAllStudentsDeleted: () => {
+      setTeams([]);
+      setTeamSearch({ team_name: '', team_status: '' });
+      setShowTeamSearch(false);
+    },
+  });
 
   const handleCreateCourse = async () => {
     try {
@@ -941,39 +720,10 @@ function CourseManagement() {
         onCancel={handleCancelEvalReset}
         onConfirm={handleConfirmEvalReset}
       />
-      <AddStudentDialog
-        open={addStudentOpen}
-        form={studentForm}
-        error={studentFormError}
-        onFormChange={setStudentForm}
-        onClose={() => { setAddStudentOpen(false); setStudentFormError(''); }}
-        onSubmit={handleAddStudent}
-      />
-      <EditStudentDialog
-        open={editStudentOpen}
-        form={studentForm}
-        onFormChange={setStudentForm}
-        onClose={() => { setEditStudentOpen(false); setStudentToEdit(null); setStudentForm({ student_id: '', name: '', email: '', group_assignment: '' }); }}
-        onSave={handleUpdateStudent}
-      />
-      <CsvUploadDialog
-        open={csvUploadOpen}
-        file={csvFile}
-        uploading={csvUploading}
-        error={csvUploadError}
-        results={csvUploadResults}
-        onFileChange={handleCsvFileChange}
-        onUpload={handleCsvUpload}
-        onClose={() => { setCsvUploadOpen(false); setCsvUploadError(''); setCsvUploadResults(null); }}
-      />
-      <DeleteAllStudentsDialog
-        open={deleteAllStudentsOpen}
-        studentCount={students.length}
-        loading={deleteAllStudentsLoading}
-        onClose={() => setDeleteAllStudentsOpen(false)}
-        onConfirm={handleDeleteAllStudents}
-        onMismatch={() => setAlert({ severity: 'error', message: 'Please type "DELETE ALL" to confirm' })}
-      />
+      <AddStudentDialog {...addStudentDialog} />
+      <EditStudentDialog {...editStudentDialog} />
+      <CsvUploadDialog {...csvUploadDialog} />
+      <DeleteAllStudentsDialog {...deleteAllStudentsDialog} />
       <TeamsDialog
         open={teamsDialogOpen}
         course={teamsCourse}
@@ -1007,23 +757,7 @@ function CourseManagement() {
         onClose={() => setCreateTeamDialogOpen(false)}
         onCreate={handleCreateTeam}
       />
-      <StudentsDialog
-        open={studentsDialogOpen}
-        course={studentsCourse}
-        students={students}
-        loading={studentsLoading}
-        search={studentSearch}
-        showSearch={showStudentSearch}
-        onToggleSearch={() => setShowStudentSearch(!showStudentSearch)}
-        onSearchChange={handleStudentSearchChange}
-        onClearSearch={clearStudentSearch}
-        onUploadCsv={() => setCsvUploadOpen(true)}
-        onAddStudent={() => setAddStudentOpen(true)}
-        onEdit={handleEditStudent}
-        onDelete={handleDeleteStudent}
-        onDeleteAll={() => setDeleteAllStudentsOpen(true)}
-        onClose={() => { setStudentsDialogOpen(false); fetchCoursesWithCounts(); }}
-      />
+      <StudentsDialog {...studentsDialog} />
       <CreateCourseDialog
         open={createDialogOpen}
         form={newCourse}
@@ -1121,7 +855,7 @@ function CourseManagement() {
         sendingIds={sendingEvaluations}
         onSort={sortBy}
         onUploadRoster={(course) => { setSelectedCourse(course); setUploadDialogOpen(true); }}
-        onManageStudents={handleViewStudents}
+        onManageStudents={openStudents}
         onManageTeams={handleViewTeams}
         onSendEvaluations={(course) => handleSendInvitations(course._id || course.id)}
         onEvaluationStatus={handleViewEvaluationStatus}
