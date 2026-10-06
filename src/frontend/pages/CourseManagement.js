@@ -24,6 +24,7 @@ import { isCsvFile } from '../services/csvFile';
 import { getErrorMessage } from '../services/apiError';
 import { buildCreateTeamBody } from '../services/teamRequest';
 import { nextSortConfig } from '../services/courseSort';
+import { buildCourseQuery } from '../services/courseQuery';
 import { useAuth } from '../contexts/AuthContext';
 import AddStudentDialog from '../components/AddStudentDialog';
 import EditStudentDialog from '../components/EditStudentDialog';
@@ -733,15 +734,7 @@ function CourseManagement() {
       // Use provided filters or current search filters
       const activeFilters = filters || searchFilters;
       
-      // Build query parameters
-      const queryParams = new URLSearchParams();
-      Object.entries(activeFilters).forEach(([key, value]) => {
-        if (value && value.trim()) {
-          queryParams.append(key, value.trim());
-        }
-      });
-      
-      const response = await api.get(`/courses?${queryParams.toString()}`);
+      const response = await api.get(`/courses?${buildCourseQuery(activeFilters)}`);
       let coursesList = response.data;
       
       // Fetch the latest course object for each course in parallel

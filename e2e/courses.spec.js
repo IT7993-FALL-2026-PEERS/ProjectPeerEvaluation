@@ -214,6 +214,12 @@ test('E2E-39: course search narrows the list by name and status, and Clear puts 
   await expect(page.getByLabel('Course Name')).toHaveValue('');
   await expect(courseNames(page)).toHaveText(['Capstone', 'Databases']);
 
+  // All lists the inactive course too (CICD-60).
+  await page.getByRole('combobox').click();
+  await page.getByRole('option', { name: 'All' }).click();
+  await page.getByRole('button', { name: 'Search', exact: true }).click();
+  await expect(courseNames(page)).toHaveText(['Algorithms', 'Capstone', 'Databases']);
+
   await page.getByRole('combobox').click();
   await page.getByRole('option', { name: 'Inactive' }).click();
   await page.getByRole('button', { name: 'Search', exact: true }).click();
