@@ -1,7 +1,7 @@
 // ...existing code...
 
 // ...existing code...
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 
 // Test comment for GitHub upload - Preston
 
@@ -17,14 +17,13 @@ import AddIcon from '@mui/icons-material/Add';
 import EmojiObjectsIcon from '@mui/icons-material/EmojiObjects';
 // Remove AssessmentIcon import if present
 import { useNavigate } from 'react-router-dom';
-import api, { getCourseById } from '../services/api';
+import api from '../services/api';
 import { getApiBaseUrl } from '../services/apiUrl';
 import { describeEmailResult } from '../services/emailResult';
 import { isCsvFile } from '../services/csvFile';
 import { getErrorMessage } from '../services/apiError';
 import { buildCreateTeamBody } from '../services/teamRequest';
-import { nextSortConfig } from '../services/courseSort';
-import { buildCourseQuery } from '../services/courseQuery';
+import useCourses from '../hooks/useCourses';
 import { useAuth } from '../contexts/AuthContext';
 import AddStudentDialog from '../components/AddStudentDialog';
 import EditStudentDialog from '../components/EditStudentDialog';
@@ -73,8 +72,6 @@ function CourseManagement() {
   const [studentForm, setStudentForm] = useState({ student_id: '', name: '', email: '', group_assignment: '' });
   const [studentFormError, setStudentFormError] = useState('');
 
-  // State for sorting courses table
-  const [sortConfig, setSortConfig] = useState({ key: 'course_name', direction: 'asc' });
 
   // Sorting handler
 
@@ -684,8 +681,6 @@ function CourseManagement() {
   };
   const navigate = useNavigate();
   const { logout } = useAuth();
-  const [courses, setCourses] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -717,68 +712,10 @@ function CourseManagement() {
   const uploadSession = useRef(0);
   const [alert, setAlert] = useState(null);
 
-  // Search filter state
-  const [searchFilters, setSearchFilters] = useState({
-    course_name: '',
-    course_number: '',
-    course_section: '',
-    semester: '',
-    course_status: 'Active' // Back to default Active filter
-  });
-  const [showSearchFilters, setShowSearchFilters] = useState(false);
-
-  // Fetch all courses, then update each with the latest student_count
-  const fetchCoursesWithCounts = useCallback(async (filters = null) => {
-    setLoading(true);
-    try {
-      // Use provided filters or current search filters
-      const activeFilters = filters || searchFilters;
-      
-      const response = await api.get(`/courses?${buildCourseQuery(activeFilters)}`);
-      let coursesList = response.data;
-      
-      // Fetch the latest course object for each course in parallel
-      const updatedCourses = await Promise.all(
-        coursesList.map(async (course) => {
-          try {
-            const fresh = await getCourseById(course._id || course.id);
-            // Use all fields from the fresh course object
-            return { ...fresh };
-          } catch (e) {
-            // fallback to original if error
-            return course;
-          }
-        })
-      );
-      
-      setCourses(updatedCourses);
-    } catch (error) {
-      setAlert({ severity: 'error', message: 'Failed to fetch courses' });
-    } finally {
-      setLoading(false);
-    }
-  }, [searchFilters]);
-
-  useEffect(() => {
-    fetchCoursesWithCounts();
-  }, [fetchCoursesWithCounts]); // Re-fetch when fetchCoursesWithCounts changes
-
-  // Search handlers
-  const handleSearch = () => {
-    fetchCoursesWithCounts(searchFilters);
-  };
-
-  const handleClearSearch = () => {
-    const clearedFilters = {
-      course_name: '',
-      course_number: '',
-      course_section: '',
-      semester: '',
-      course_status: 'Active'
-    };
-    setSearchFilters(clearedFilters);
-    fetchCoursesWithCounts(clearedFilters);
-  };
+  const {
+    courses, loading, searchFilters, setSearchFilters, showSearchFilters, toggleSearchFilters,
+    sortConfig, sortBy, fetchCoursesWithCounts, handleSearch, handleClearSearch,
+  } = useCourses({ onError: setAlert });
 
   const handleCreateCourse = async () => {
     try {
@@ -1166,7 +1103,7 @@ function CourseManagement() {
       <CourseSearchFilters
         filters={searchFilters}
         show={showSearchFilters}
-        onToggle={() => setShowSearchFilters(!showSearchFilters)}
+        onToggle={toggleSearchFilters}
         onChange={setSearchFilters}
         onSearch={handleSearch}
         onClear={handleClearSearch}
@@ -1182,7 +1119,7 @@ function CourseManagement() {
         loading={loading}
         sortConfig={sortConfig}
         sendingIds={sendingEvaluations}
-        onSort={(key) => setSortConfig(prev => nextSortConfig(prev, key))}
+        onSort={sortBy}
         onUploadRoster={(course) => { setSelectedCourse(course); setUploadDialogOpen(true); }}
         onManageStudents={handleViewStudents}
         onManageTeams={handleViewTeams}
