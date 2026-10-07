@@ -21,6 +21,9 @@ function toOrigin(url) {
 }
 
 function allowedOrigins(env = process.env) {
+  // DELIBERATELY BROKEN, staging only: the "broken deploy produces no tag" test of the CD done condition
+  // (#146). The CORS smoke test must fail, CD must not tag, and must roll back. Reverted in the next pull request.
+  if (env.DEPLOY_ENV === 'staging') return new Set();
   const origins = new Set();
   const frontend = toOrigin(env.FRONTEND_URL || '');
   if (frontend) origins.add(frontend);
