@@ -68,6 +68,19 @@ test('TC-16-21: a complete submission is saved against the right people and mark
   assert.equal((await Student.findById(IDS.ben)).evaluation_completed, false);
 });
 
+test('TC-15-20: every saved evaluation carries the time it was submitted', async () => {
+  const before = Date.now();
+  const token = await tokenFromEmail('ann@example.edu');
+  const res = await app.request('POST', `/api/evaluate/${token}`, { body: { evaluations: [rating(IDS.ben)] } });
+  assert.equal(res.status, 201);
+
+  const [saved] = await Evaluation.find({ course_id: IDS.courseAda });
+  assert.ok(saved.submitted_at instanceof Date);
+  // Set by the server when the evaluation is saved, not by the student.
+  assert.ok(saved.submitted_at.getTime() >= before - 1000, 'not earlier than the request');
+  assert.ok(saved.submitted_at.getTime() <= Date.now() + 1000, 'not later than now');
+});
+
 test('TC-16-22: the professor sees the submission in the course status', async () => {
   const token = await tokenFromEmail('ann@example.edu');
   await app.request('POST', `/api/evaluate/${token}`, { body: { evaluations: [rating(IDS.ben)] } });

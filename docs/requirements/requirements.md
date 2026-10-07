@@ -57,16 +57,17 @@ existing tests and its planned coverage are recorded in the Requirements Traceab
 
 | Status | Count |
 |---|---|
-| Validated | 12 |
+| Validated | 11 |
 | Defective | 5 |
 | Needs verification | 3 |
-| Partial | 1 |
+| Partial | 2 |
 | Unsupported | 2 |
 | **Total** | **23** |
 
 *Counts revised 27 Sep after a second pass over the backend controllers. Four statuses
-changed: FR-14 to Defective, FR-15 and FR-16 to Validated, FR-19 to Partial. Each revised
-entry says what changed and why.*
+changed: FR-14 to Defective, FR-15 and FR-16 to Validated, FR-19 to Partial. Revised again
+on 7 Oct, when the tests were linked to the matrix: FR-07 to Partial (the email-format check
+does not exist). Each revised entry says what changed and why.*
 
 ---
 
@@ -180,7 +181,12 @@ roster is created.
 `csv-parser` dependencies; format documented in `docs/csv-upload-format.md`.
 
 ### FR-07 — Roster validation and duplicate handling
-*Inherited: FR2.3* · **Status: Validated**
+*Inherited: FR2.3* · **Status: Partial** · **Backlog: CICD-47**
+
+*Revised 7 Oct — previously Validated. The duplicate check and the required-field check are
+implemented and tested (TC-06-22, TC-06-24, TC-06-32, TC-06-33, TC-07-01). The second criterion
+below, an invalid email address reported as an error, is not: no code checks the format of the
+email, so a row with a bad address is accepted. CICD-47 adds the check and its test.*
 
 **Required functionality.** Uploaded roster data is validated, and students already on the
 course are not added twice.

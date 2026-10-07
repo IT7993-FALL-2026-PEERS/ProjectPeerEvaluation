@@ -288,6 +288,10 @@ is the measure of whether requirements are actually proven.
 Every test links back to a requirement through `docs/requirements/rtm.md`. When a test is
 written, its ID goes in that requirement's row.
 
+`scripts/check-rtm.js` keeps this honest: `npm test` in `src/backend` runs it, and it fails when the matrix
+cites a test ID or file that does not exist, or when a requirement that is not Unsupported or Planned
+cites no test (see the matrix's *Keeping the IDs honest* section).
+
 **Test case ID convention: `TC-<FR number>-<sequence>`** — so the second test covering FR-06
 is `TC-06-02`, and the ID appears in the test's name. A failing test then points straight at
 the requirement it broke, without anyone having to go and look it up. [Decision 3, confirmed in §7]
