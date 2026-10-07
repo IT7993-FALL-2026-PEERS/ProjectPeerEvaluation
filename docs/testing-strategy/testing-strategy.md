@@ -255,6 +255,8 @@ opening floors:
 | Frontend floor, raised an eighth time (6 Oct) | 61% | 69% | 71% |
 | Frontend after the teams' data was moved into a hook (6 Oct) | 79.64% | 79.08% | 83.55% |
 | Frontend floor, raised a ninth time (6 Oct) | 79% | 79% | 83% |
+| Frontend after the evaluations were moved into a hook (7 Oct) | 86.59% | 82.96% | 88.06% |
+| Frontend floor, raised a tenth time (7 Oct) | 86% | 82% | 88% |
 
 - **What is measured:** the backend's `controllers`, `middleware`, `models`, `routes`, `utils`
   and `config` folders plus `index.js`; the frontend's `src/frontend` source, excluding tests and
