@@ -75,4 +75,7 @@ app.use(errorHandler);
 
 // Start Server
 const PORT = process.env.PORT || 5000;
-applyServerTimeouts(app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`)));
+// The deployed commit in the startup line, so Render's log shows which version started (Render sets
+// RENDER_GIT_COMMIT; it's also in /api/health).
+const commit = process.env.RENDER_GIT_COMMIT ? ` (commit ${process.env.RENDER_GIT_COMMIT.slice(0, 7)})` : '';
+applyServerTimeouts(app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}${commit}`)));
