@@ -90,7 +90,7 @@ test('login: wrong password returns 401', async (t) => {
   assert.equal(save.mock.callCount(), 0);
 });
 
-test('login: returns a signed access token containing the professor id', async (t) => {
+test('TC-04-11: login: returns a signed access token containing the professor id, valid for one hour (D-18)', async (t) => {
   const professor = new Professor({ ...fields, password: await bcrypt.hash(fields.password, 4) });
   t.mock.method(Professor, 'findOne', async () => professor);
   const save = stubSave(t);

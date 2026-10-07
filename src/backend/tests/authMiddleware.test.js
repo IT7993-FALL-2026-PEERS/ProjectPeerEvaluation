@@ -39,7 +39,7 @@ test('authenticateToken: wrong signing secret returns 401', () => {
   unauthorized('Bearer ' + jwt.sign({ id: 'professor' }, 'wrong-secret'));
 });
 
-test('authenticateToken: expired token returns 401', () => {
+test('TC-04-10: authenticateToken: an expired token returns 401', () => {
   unauthorized('Bearer ' + jwt.sign({ id: 'professor', exp: 1 }, SECRET));
 });
 
