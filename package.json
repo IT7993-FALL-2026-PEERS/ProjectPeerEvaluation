@@ -45,7 +45,7 @@
     "collectCoverageFrom": [
       "src/frontend/**/*.{js,jsx}",
       "!src/frontend/**/__tests__/**",
-      "!src/frontend/index.js"
+      "!src/frontend/index.jsx"
     ],
     "coverageReporters": [
       "json-summary",

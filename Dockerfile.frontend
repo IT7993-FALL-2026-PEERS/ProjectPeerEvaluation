@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 # Frontend image: Create React App build served by nginx.
-# Build context is the REPO ROOT (CRA's src/index.js and public/ live there):
+# Build context is the REPO ROOT (CRA's src/index.jsx and public/ live there):
 #   docker build -t peers-frontend:local -f Dockerfile.frontend .
 # Keep the Node major in sync with .nvmrc, package.json "engines" and render.yaml.
 
@@ -23,7 +23,7 @@ COPY package.json package-lock.json ./
 RUN npm ci --ignore-scripts
 
 COPY public ./public
-COPY src/index.js ./src/index.js
+COPY src/index.jsx ./src/index.jsx
 COPY src/frontend ./src/frontend
 RUN npm run build
 
