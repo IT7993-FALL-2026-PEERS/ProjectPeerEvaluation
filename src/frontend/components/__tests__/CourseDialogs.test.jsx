@@ -87,7 +87,7 @@ describe('StudentsDialog', () => {
   });
 
   test('the search button reads Show Search or Hide Search and toggles it', async () => {
-    const onToggleSearch = jest.fn();
+    const onToggleSearch = vi.fn();
     const { rerender } = render(<StudentsDialog {...studentsProps({ onToggleSearch })} />);
     await user.click(screen.getByRole('button', { name: 'Show Search' }));
     expect(onToggleSearch).toHaveBeenCalledTimes(1);
@@ -105,7 +105,7 @@ describe('StudentsDialog', () => {
   });
 
   test('typing in each search field reports the field and its value', () => {
-    const onSearchChange = jest.fn();
+    const onSearchChange = vi.fn();
     render(<StudentsDialog {...studentsProps({ showSearch: true, onSearchChange })} />);
 
     for (const [label, field] of [['Student ID', 'student_id'], ['Name', 'name'], ['Email', 'email'], ['Team', 'team']]) {
@@ -115,7 +115,7 @@ describe('StudentsDialog', () => {
   });
 
   test('Clear Search is off until a search is typed, then clears it', async () => {
-    const onClearSearch = jest.fn();
+    const onClearSearch = vi.fn();
     const { rerender } = render(<StudentsDialog {...studentsProps({ showSearch: true, onClearSearch })} />);
     expect(screen.getByRole('button', { name: 'Clear Search' })).toBeDisabled();
 
@@ -128,8 +128,8 @@ describe('StudentsDialog', () => {
   });
 
   test('the row buttons report the student they belong to', async () => {
-    const onEdit = jest.fn();
-    const onDelete = jest.fn();
+    const onEdit = vi.fn();
+    const onDelete = vi.fn();
     render(<StudentsDialog {...studentsProps({ onEdit, onDelete })} />);
     const row = screen.getByRole('row', { name: /Ben Baker/ });
 
@@ -140,7 +140,7 @@ describe('StudentsDialog', () => {
   });
 
   test('Upload CSV, Add Student, Delete All Students and Close call the page\'s handlers', async () => {
-    const handlers = { onUploadCsv: jest.fn(), onAddStudent: jest.fn(), onDeleteAll: jest.fn(), onClose: jest.fn() };
+    const handlers = { onUploadCsv: vi.fn(), onAddStudent: vi.fn(), onDeleteAll: vi.fn(), onClose: vi.fn() };
     render(<StudentsDialog {...studentsProps(handlers)} />);
 
     await user.click(screen.getByRole('button', { name: 'Upload CSV' }));
@@ -184,7 +184,7 @@ describe('CreateCourseDialog', () => {
     ['Course Section', 'course_section'],
     ['Semester', 'semester'],
   ])('typing in %s reports the whole form with that field changed', (label, field) => {
-    const onFormChange = jest.fn();
+    const onFormChange = vi.fn();
     render(<CreateCourseDialog {...props({ form: FULL_COURSE, onFormChange })} />);
     fireEvent.change(screen.getByLabelText(label), { target: { value: 'new' } });
     expect(onFormChange).toHaveBeenCalledWith({ ...FULL_COURSE, [field]: 'new' });
@@ -196,8 +196,8 @@ describe('CreateCourseDialog', () => {
   });
 
   test('Cancel and Create call the page\'s handlers', async () => {
-    const onClose = jest.fn();
-    const onCreate = jest.fn();
+    const onClose = vi.fn();
+    const onCreate = vi.fn();
     render(<CreateCourseDialog {...props({ form: FULL_COURSE, onClose, onCreate })} />);
     expect(screen.getByRole('button', { name: 'Create' })).toBeEnabled();
 
@@ -242,14 +242,14 @@ describe('EditCourseDialog', () => {
     ['Course Section', 'course_section'],
     ['Semester', 'semester'],
   ])('typing in %s reports the whole form with that field changed', (label, field) => {
-    const onFormChange = jest.fn();
+    const onFormChange = vi.fn();
     render(<EditCourseDialog {...props({ onFormChange })} />);
     fireEvent.change(screen.getByLabelText(label), { target: { value: 'new' } });
     expect(onFormChange).toHaveBeenCalledWith({ ...EDIT, [field]: 'new' });
   });
 
   test('choosing a status reports the whole form with the new status', async () => {
-    const onFormChange = jest.fn();
+    const onFormChange = vi.fn();
     render(<EditCourseDialog {...props({ onFormChange })} />);
     await user.click(screen.getByRole('combobox'));
     await user.click(screen.getByRole('option', { name: 'Inactive' }));
@@ -262,8 +262,8 @@ describe('EditCourseDialog', () => {
   });
 
   test('Cancel and Save call the page\'s handlers', async () => {
-    const onClose = jest.fn();
-    const onSave = jest.fn();
+    const onClose = vi.fn();
+    const onSave = vi.fn();
     render(<EditCourseDialog {...props({ onClose, onSave })} />);
 
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
@@ -281,8 +281,8 @@ describe('DeleteCourseDialog', () => {
   });
 
   test('asks whether to delete the course, and Cancel and Delete call the page\'s handlers', async () => {
-    const onClose = jest.fn();
-    const onConfirm = jest.fn();
+    const onClose = vi.fn();
+    const onConfirm = vi.fn();
     render(<DeleteCourseDialog open onClose={onClose} onConfirm={onConfirm} />);
     expect(screen.getByRole('heading', { name: 'Delete Course' })).toBeInTheDocument();
     expect(screen.getByText('Are you sure you want to delete this course?')).toBeInTheDocument();
@@ -315,7 +315,7 @@ describe('CourseRosterUploadDialog', () => {
   });
 
   test('choosing a file reports it, and its name is shown once the page passes it back', async () => {
-    const onFileChange = jest.fn();
+    const onFileChange = vi.fn();
     const { rerender } = render(<CourseRosterUploadDialog {...props({ onFileChange })} />);
     expect(screen.queryByText(/Selected:/)).not.toBeInTheDocument();
 
@@ -327,7 +327,7 @@ describe('CourseRosterUploadDialog', () => {
   });
 
   test('choosing the same file again still counts, because the input is cleared when it is clicked', async () => {
-    const onFileChange = jest.fn();
+    const onFileChange = vi.fn();
     render(<CourseRosterUploadDialog {...props({ onFileChange })} />);
     const input = screen.getByLabelText('Select CSV File');
 
@@ -357,8 +357,8 @@ describe('CourseRosterUploadDialog', () => {
   });
 
   test('Cancel and Upload call the page\'s handlers', async () => {
-    const onClose = jest.fn();
-    const onUpload = jest.fn();
+    const onClose = vi.fn();
+    const onUpload = vi.fn();
     render(<CourseRosterUploadDialog {...props({ file: csv, onClose, onUpload })} />);
 
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
@@ -369,7 +369,7 @@ describe('CourseRosterUploadDialog', () => {
   });
 
   test('Escape closes it the same way as Cancel, so the page forgets the file', async () => {
-    const onClose = jest.fn();
+    const onClose = vi.fn();
     render(<CourseRosterUploadDialog {...props({ file: csv, onClose })} />);
     await user.keyboard('{Escape}');
     expect(onClose).toHaveBeenCalledTimes(1);

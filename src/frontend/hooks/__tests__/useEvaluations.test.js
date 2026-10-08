@@ -3,9 +3,9 @@ import api from '../../services/api';
 import { getApiBaseUrl } from '../../services/apiUrl';
 import useEvaluations from '../useEvaluations';
 
-jest.mock('../../services/api', () => ({
+vi.mock('../../services/api', () => ({
   __esModule: true,
-  default: { get: jest.fn(), post: jest.fn(), delete: jest.fn(), defaults: { baseURL: 'http://api.test' } },
+  default: { get: vi.fn(), post: vi.fn(), delete: vi.fn(), defaults: { baseURL: 'http://api.test' } },
 }));
 
 // The evaluations of a course: sending the invitations, sending reminders, the Evaluation Status
@@ -20,20 +20,20 @@ let setAlert;
 let statusBody;
 
 beforeEach(() => {
-  jest.restoreAllMocks();
-  jest.spyOn(console, 'error').mockImplementation(() => {});
-  jest.spyOn(console, 'log').mockImplementation(() => {});
+  vi.restoreAllMocks();
+  vi.spyOn(console, 'error').mockImplementation(() => {});
+  vi.spyOn(console, 'log').mockImplementation(() => {});
   Object.values(api).forEach((fn) => { if (typeof fn.mockReset === 'function') fn.mockReset(); });
   statusBody = SENT;
   api.get.mockImplementation(async () => ({ data: statusBody }));
   api.post.mockResolvedValue({ data: {} });
   api.delete.mockResolvedValue({ data: {} });
-  global.fetch = jest.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ message: 'API is running' }) });
-  setAlert = jest.fn();
+  global.fetch = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ message: 'API is running' }) });
+  setAlert = vi.fn();
 });
 
 afterEach(() => {
-  jest.useRealTimers();
+  vi.useRealTimers();
   delete global.fetch;
 });
 
@@ -48,7 +48,7 @@ async function opened(course = COURSE) {
 
 // Lets the page's one-second "refresh the status" timer run.
 async function afterOneSecond() {
-  await act(async () => { jest.advanceTimersByTime(1000); });
+  await act(async () => { vi.advanceTimersByTime(1000); });
 }
 
 describe('useEvaluations: the status dialog', () => {
@@ -149,7 +149,7 @@ describe('useEvaluations: sending the invitations', () => {
   });
 
   test('closes the status dialog and shows the new status a second later', async () => {
-    jest.useFakeTimers();
+    vi.useFakeTimers();
     const view = await opened();
     api.get.mockClear();
     statusBody = { evaluations_sent: true, total_students: 4, completed: 0 };
@@ -262,7 +262,7 @@ describe('useEvaluations: sending reminders', () => {
 
 describe('useEvaluations: resetting the evaluation state', () => {
   test('resets the course, says how much was cleared, and shows the new status a second later', async () => {
-    jest.useFakeTimers();
+    vi.useFakeTimers();
     const view = render();
     api.delete.mockResolvedValue({ data: { message: 'Evaluation state reset', tokens_cleared: 4, evaluations_deleted: 2 } });
     statusBody = NOT_SENT;

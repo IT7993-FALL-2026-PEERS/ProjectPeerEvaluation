@@ -2,9 +2,9 @@ import { renderHook, act } from '@testing-library/react';
 import api from '../../services/api';
 import useCourseDialogs from '../useCourseDialogs';
 
-jest.mock('../../services/api', () => ({
+vi.mock('../../services/api', () => ({
   __esModule: true,
-  default: { post: jest.fn(), put: jest.fn(), delete: jest.fn() },
+  default: { post: vi.fn(), put: vi.fn(), delete: vi.fn() },
 }));
 
 // The four course dialogs: create, edit, delete and the roster upload from a course row (CICD-57,
@@ -18,15 +18,15 @@ let setAlert;
 let refreshCourses;
 
 beforeEach(() => {
-  jest.restoreAllMocks();
-  jest.spyOn(console, 'error').mockImplementation(() => {});
-  jest.spyOn(console, 'log').mockImplementation(() => {});
+  vi.restoreAllMocks();
+  vi.spyOn(console, 'error').mockImplementation(() => {});
+  vi.spyOn(console, 'log').mockImplementation(() => {});
   Object.values(api).forEach((fn) => fn.mockReset());
   api.post.mockResolvedValue({ data: { students: [] } });
   api.put.mockResolvedValue({ data: {} });
   api.delete.mockResolvedValue({ data: {} });
-  setAlert = jest.fn();
-  refreshCourses = jest.fn();
+  setAlert = vi.fn();
+  refreshCourses = vi.fn();
 });
 
 const render = () => renderHook(() => useCourseDialogs({ setAlert, refreshCourses }));

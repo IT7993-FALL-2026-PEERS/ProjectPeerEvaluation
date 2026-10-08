@@ -6,7 +6,7 @@ import axios from 'axios';
 import LoginPage from '../LoginPage';
 import { AuthProvider } from '../../contexts/AuthContext';
 
-jest.mock('axios');
+vi.mock('axios');
 
 function renderLoginPage() {
   render(
@@ -19,7 +19,7 @@ function renderLoginPage() {
 }
 
 describe('LoginPage show/hide password', () => {
-  afterEach(() => jest.clearAllMocks());
+  afterEach(() => vi.clearAllMocks());
 
   test('the password is hidden until "Show password" is clicked, then can be hidden again', async () => {
     renderLoginPage();
@@ -46,7 +46,7 @@ describe('LoginPage show/hide password', () => {
 });
 
 describe('LoginPage errors', () => {
-  afterEach(() => jest.clearAllMocks());
+  afterEach(() => vi.clearAllMocks());
 
   // The backend's error handler nests the message: { error: { code, message } }.
   test('shows the message the backend sent', async () => {
@@ -103,7 +103,7 @@ const fillLogin = async (email = 'prof@example.com', password = 'secret-123') =>
 
 describe('LoginPage sign in', () => {
   afterEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     localStorage.clear();
   });
 
@@ -143,10 +143,10 @@ describe('LoginPage sign in', () => {
 
 describe('LoginPage registration', () => {
   beforeEach(() => {
-    window.alert = jest.fn();
+    window.alert = vi.fn();
   });
   afterEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     localStorage.clear();
   });
 
@@ -200,7 +200,7 @@ describe('LoginPage registration', () => {
 });
 
 describe('LoginPage password reset', () => {
-  afterEach(() => jest.clearAllMocks());
+  afterEach(() => vi.clearAllMocks());
 
   async function openDialog() {
     renderApp();
@@ -215,7 +215,7 @@ describe('LoginPage password reset', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Send Reset Link' }));
 
     const message = await screen.findByText('If your email is registered, you will receive password reset instructions.');
-    expect(message).toHaveStyle({ color: 'green' });
+    expect(message).toHaveStyle({ color: 'rgb(0, 128, 0)' });
     expect(axios.post).toHaveBeenCalledWith('http://localhost:5000/api/auth/reset-password', { email: 'prof@example.com' });
   });
 
@@ -225,7 +225,7 @@ describe('LoginPage password reset', () => {
     await userEvent.type(field, 'prof@example.com');
     await userEvent.click(screen.getByRole('button', { name: 'Send Reset Link' }));
 
-    expect(await screen.findByText('Failed to send reset instructions.')).toHaveStyle({ color: 'red' });
+    expect(await screen.findByText('Failed to send reset instructions.')).toHaveStyle({ color: 'rgb(255, 0, 0)' });
   });
 
   test('refuses an empty email without sending anything', async () => {

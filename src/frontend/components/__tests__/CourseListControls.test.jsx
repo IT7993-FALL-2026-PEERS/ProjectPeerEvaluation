@@ -29,7 +29,7 @@ describe('CourseSearchFilters', () => {
   });
 
   test('the toggle button reports a press', async () => {
-    const onToggle = jest.fn();
+    const onToggle = vi.fn();
     render(<CourseSearchFilters {...filterProps({ onToggle })} />);
 
     await user.click(screen.getByRole('button', { name: 'Hide Filters' }));
@@ -58,7 +58,7 @@ describe('CourseSearchFilters', () => {
   });
 
   test('typing in a field reports every filter with that one changed', () => {
-    const onChange = jest.fn();
+    const onChange = vi.fn();
     const filters = { ...FILTERS, course_number: 'CS' };
     render(<CourseSearchFilters {...filterProps({ filters, onChange })} />);
 
@@ -76,7 +76,7 @@ describe('CourseSearchFilters', () => {
   });
 
   test('the status can be Active, Inactive or All (an empty value), and each choice is reported', async () => {
-    const onChange = jest.fn();
+    const onChange = vi.fn();
     render(<CourseSearchFilters {...filterProps({ onChange })} />);
 
     await user.click(screen.getByRole('combobox'));
@@ -91,8 +91,8 @@ describe('CourseSearchFilters', () => {
   });
 
   test('Search and Clear report a press', async () => {
-    const onSearch = jest.fn();
-    const onClear = jest.fn();
+    const onSearch = vi.fn();
+    const onClear = vi.fn();
     render(<CourseSearchFilters {...filterProps({ onSearch, onClear })} />);
 
     await user.click(screen.getByRole('button', { name: 'Search' }));
@@ -206,7 +206,7 @@ describe('CourseTable', () => {
   });
 
   test('clicking Course Name, Course Number or Semester reports that column; the others do not sort', async () => {
-    const onSort = jest.fn();
+    const onSort = vi.fn();
     render(<CourseTable {...tableProps({ onSort })} />);
 
     await user.click(screen.getByRole('columnheader', { name: /^Course Name/ }));
@@ -241,7 +241,7 @@ describe('CourseTable', () => {
     ['Delete Course', 'onDelete'],
     ['Edit Course', 'onEdit'],
   ])('%s reports the course of the row it is in', async (title, handler) => {
-    const handlers = { onUploadRoster: jest.fn(), onManageStudents: jest.fn(), onManageTeams: jest.fn(), onSendEvaluations: jest.fn(), onEvaluationStatus: jest.fn(), onViewReports: jest.fn(), onDelete: jest.fn(), onEdit: jest.fn() };
+    const handlers = { onUploadRoster: vi.fn(), onManageStudents: vi.fn(), onManageTeams: vi.fn(), onSendEvaluations: vi.fn(), onEvaluationStatus: vi.fn(), onViewReports: vi.fn(), onDelete: vi.fn(), onEdit: vi.fn() };
     render(<CourseTable {...tableProps(handlers)} />);
 
     await user.click(within(screen.getByRole('row', { name: /Databases/ })).getByTitle(title));

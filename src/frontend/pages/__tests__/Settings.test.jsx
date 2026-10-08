@@ -5,9 +5,9 @@ import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import api from '../../services/api';
 import Settings from '../Settings';
 
-jest.mock('../../services/api', () => ({
+vi.mock('../../services/api', () => ({
   __esModule: true,
-  default: { get: jest.fn(), post: jest.fn() },
+  default: { get: vi.fn(), post: vi.fn() },
 }));
 
 // The professor's list of words that flag a peer evaluation as concerning (AI flag settings).
@@ -36,7 +36,7 @@ describe('Settings: flagged words', () => {
   beforeEach(() => {
     api.get.mockResolvedValue({ data: { words: ['harass', 'unfair'] } });
   });
-  afterEach(() => jest.resetAllMocks());
+  afterEach(() => vi.resetAllMocks());
 
   test('lists the professor\'s words from the server', async () => {
     renderSettings();

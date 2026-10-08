@@ -5,9 +5,9 @@ import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import api from '../../services/api';
 import Reports from '../Reports';
 
-jest.mock('../../services/api', () => ({
+vi.mock('../../services/api', () => ({
   __esModule: true,
-  default: { get: jest.fn(), post: jest.fn() },
+  default: { get: vi.fn(), post: vi.fn() },
 }));
 
 // The professor's report page (CW-08, CW-09): pick a course, generate the grades, read the comments,
@@ -74,14 +74,14 @@ async function chooseCourse(label) {
 
 describe('Reports', () => {
   beforeEach(() => {
-    jest.spyOn(console, 'log').mockImplementation(() => {});
-    jest.spyOn(console, 'error').mockImplementation(() => {});
-    jest.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
     serve();
   });
   afterEach(() => {
-    jest.restoreAllMocks();
-    jest.resetAllMocks();
+    vi.restoreAllMocks();
+    vi.resetAllMocks();
   });
 
   test('offers only active courses, and Generate Report waits for a choice', async () => {
@@ -196,8 +196,8 @@ describe('Reports', () => {
 
   describe('Download CSV', () => {
     beforeEach(() => {
-      window.URL.createObjectURL = jest.fn(() => 'blob:report');
-      window.URL.revokeObjectURL = jest.fn();
+      window.URL.createObjectURL = vi.fn(() => 'blob:report');
+      window.URL.revokeObjectURL = vi.fn();
     });
 
     async function generated() {
