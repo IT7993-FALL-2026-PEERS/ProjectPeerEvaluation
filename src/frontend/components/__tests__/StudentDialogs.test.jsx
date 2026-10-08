@@ -36,7 +36,7 @@ describe('AddStudentDialog', () => {
   });
 
   test('passes the whole updated form to the page on every change', async () => {
-    const onFormChange = jest.fn();
+    const onFormChange = vi.fn();
     render(<AddStudentDialog open form={{ ...EMPTY, name: 'Zed' }} error="" onFormChange={onFormChange} onClose={() => {}} onSubmit={() => {}} />);
 
     await user.type(screen.getByLabelText('Email'), 'z');
@@ -60,8 +60,8 @@ describe('AddStudentDialog', () => {
   });
 
   test('Add and Cancel call the page\'s handlers', async () => {
-    const onSubmit = jest.fn();
-    const onClose = jest.fn();
+    const onSubmit = vi.fn();
+    const onClose = vi.fn();
     render(<AddStudentDialog open form={EMPTY} error="" onFormChange={() => {}} onClose={onClose} onSubmit={onSubmit} />);
 
     await user.click(screen.getByRole('button', { name: 'Add' }));
@@ -105,8 +105,8 @@ describe('EditStudentDialog', () => {
   });
 
   test('Save and Cancel call the page\'s handlers', async () => {
-    const onSave = jest.fn();
-    const onClose = jest.fn();
+    const onSave = vi.fn();
+    const onClose = vi.fn();
     render(<EditStudentDialog open form={STUDENT} onFormChange={() => {}} onClose={onClose} onSave={onSave} />);
 
     await user.click(screen.getByRole('button', { name: 'Save' }));

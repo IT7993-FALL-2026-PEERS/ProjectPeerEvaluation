@@ -2,10 +2,10 @@ import { renderHook, act, waitFor } from '@testing-library/react';
 import api, { getCourseById } from '../../services/api';
 import useCourses, { DEFAULT_COURSE_FILTERS } from '../useCourses';
 
-jest.mock('../../services/api', () => ({
+vi.mock('../../services/api', () => ({
   __esModule: true,
-  default: { get: jest.fn() },
-  getCourseById: jest.fn(),
+  default: { get: vi.fn() },
+  getCourseById: vi.fn(),
 }));
 
 // The course list's data: the courses the professor sees, the search filters that narrow them, and
@@ -24,7 +24,7 @@ beforeEach(() => {
 });
 
 // Renders the hook and waits for its first load to finish.
-async function loaded(onError = jest.fn()) {
+async function loaded(onError = vi.fn()) {
   const view = renderHook((props) => useCourses(props), { initialProps: { onError } });
   await waitFor(() => expect(view.result.current.loading).toBe(false));
   return view;
@@ -34,7 +34,7 @@ const lastQuery = () => api.get.mock.calls[api.get.mock.calls.length - 1][0];
 
 describe('useCourses: loading', () => {
   test('starts loading, then lists the courses with their latest counts', async () => {
-    const view = renderHook(() => useCourses({ onError: jest.fn() }));
+    const view = renderHook(() => useCourses({ onError: vi.fn() }));
     expect(view.result.current.loading).toBe(true);
     expect(view.result.current.courses).toEqual([]);
 
@@ -49,7 +49,7 @@ describe('useCourses: loading', () => {
   test('is loading from its very first render, so the page never flashes "No courses found"', async () => {
     const seen = [];
     const view = renderHook(() => {
-      const courses = useCourses({ onError: jest.fn() });
+      const courses = useCourses({ onError: vi.fn() });
       seen.push(courses.loading);
       return courses;
     });
@@ -81,7 +81,7 @@ describe('useCourses: loading', () => {
 
   test('reports a failed list, shows no courses and stops loading', async () => {
     api.get.mockRejectedValue(new Error('down'));
-    const onError = jest.fn();
+    const onError = vi.fn();
 
     const view = await loaded(onError);
 
@@ -91,7 +91,7 @@ describe('useCourses: loading', () => {
   });
 
   test('keeps the courses it had when a later load fails', async () => {
-    const onError = jest.fn();
+    const onError = vi.fn();
     const view = await loaded(onError);
     api.get.mockRejectedValue(new Error('down'));
 
@@ -117,18 +117,18 @@ describe('useCourses: loading', () => {
   });
 
   test('does not load again because the page gave it a new error callback', async () => {
-    const view = await loaded(jest.fn());
+    const view = await loaded(vi.fn());
     const calls = api.get.mock.calls.length;
 
-    view.rerender({ onError: jest.fn() });
-    view.rerender({ onError: jest.fn() });
+    view.rerender({ onError: vi.fn() });
+    view.rerender({ onError: vi.fn() });
 
     expect(api.get).toHaveBeenCalledTimes(calls);
   });
 
   test('reports to the newest error callback', async () => {
-    const first = jest.fn();
-    const second = jest.fn();
+    const first = vi.fn();
+    const second = vi.fn();
     const view = await loaded(first);
     view.rerender({ onError: second });
     api.get.mockRejectedValue(new Error('down'));

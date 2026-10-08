@@ -100,7 +100,7 @@ describe('TeamsDialog', () => {
   });
 
   test('the search button reads Show Search or Hide Search and toggles it', async () => {
-    const onToggleSearch = jest.fn();
+    const onToggleSearch = vi.fn();
     const { rerender } = render(<TeamsDialog {...teamsProps({ onToggleSearch })} />);
     await user.click(screen.getByRole('button', { name: 'Show Search' }));
     expect(onToggleSearch).toHaveBeenCalledTimes(1);
@@ -118,7 +118,7 @@ describe('TeamsDialog', () => {
   });
 
   test('typing a name or choosing a status reports the field and its value', async () => {
-    const onSearchChange = jest.fn();
+    const onSearchChange = vi.fn();
     render(<TeamsDialog {...teamsProps({ showSearch: true, onSearchChange })} />);
 
     fireEvent.change(screen.getByLabelText('Team Name'), { target: { value: 'al' } });
@@ -130,7 +130,7 @@ describe('TeamsDialog', () => {
   });
 
   test('Clear Search is off until a search is typed, then clears it', async () => {
-    const onClearSearch = jest.fn();
+    const onClearSearch = vi.fn();
     const { rerender } = render(<TeamsDialog {...teamsProps({ showSearch: true, onClearSearch })} />);
     expect(screen.getByRole('button', { name: 'Clear Search' })).toBeDisabled();
 
@@ -140,7 +140,7 @@ describe('TeamsDialog', () => {
   });
 
   test('the row buttons report the team they belong to', async () => {
-    const handlers = { onManageStudents: jest.fn(), onSend: jest.fn(), onEdit: jest.fn(), onDelete: jest.fn() };
+    const handlers = { onManageStudents: vi.fn(), onSend: vi.fn(), onEdit: vi.fn(), onDelete: vi.fn() };
     render(<TeamsDialog {...teamsProps(handlers)} />);
     const row = screen.getByRole('row', { name: /Team 2/ });
 
@@ -163,7 +163,7 @@ describe('TeamsDialog', () => {
   });
 
   test('Create Team, Clear All Teams and Close call the page\'s handlers', async () => {
-    const handlers = { onCreate: jest.fn(), onClearAll: jest.fn(), onClose: jest.fn() };
+    const handlers = { onCreate: vi.fn(), onClearAll: vi.fn(), onClose: vi.fn() };
     render(<TeamsDialog {...teamsProps(handlers)} />);
 
     await user.click(screen.getByRole('button', { name: 'Create Team' }));
@@ -198,14 +198,14 @@ describe('EditTeamDialog', () => {
   });
 
   test('typing a name reports the whole form with the new name', () => {
-    const onFormChange = jest.fn();
+    const onFormChange = vi.fn();
     render(<EditTeamDialog {...formProps({ onFormChange, onSave: () => {} })} />);
     fireEvent.change(screen.getByLabelText(/Team Name/), { target: { value: 'Alpha Squad' } });
     expect(onFormChange).toHaveBeenCalledWith({ team_name: 'Alpha Squad', team_status: 'Active' });
   });
 
   test('choosing a status reports the whole form with the new status', async () => {
-    const onFormChange = jest.fn();
+    const onFormChange = vi.fn();
     render(<EditTeamDialog {...formProps({ onFormChange, onSave: () => {} })} />);
     await user.click(screen.getByRole('combobox'));
     await user.click(screen.getByRole('option', { name: 'Inactive' }));
@@ -221,8 +221,8 @@ describe('EditTeamDialog', () => {
   });
 
   test('Cancel and Save Changes call the page\'s handlers', async () => {
-    const onClose = jest.fn();
-    const onSave = jest.fn();
+    const onClose = vi.fn();
+    const onSave = vi.fn();
     render(<EditTeamDialog {...formProps({ onClose, onSave })} />);
 
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
@@ -251,7 +251,7 @@ describe('CreateTeamDialog', () => {
   });
 
   test('typing a name or choosing a status reports the whole form', async () => {
-    const onFormChange = jest.fn();
+    const onFormChange = vi.fn();
     render(<CreateTeamDialog {...createProps({ onFormChange })} />);
 
     fireEvent.change(screen.getByLabelText(/Team Name/), { target: { value: 'Gamma' } });
@@ -274,8 +274,8 @@ describe('CreateTeamDialog', () => {
   });
 
   test('Cancel and Create Team call the page\'s handlers', async () => {
-    const onClose = jest.fn();
-    const onCreate = jest.fn();
+    const onClose = vi.fn();
+    const onCreate = vi.fn();
     render(<CreateTeamDialog {...createProps({ form: { team_name: 'Gamma', team_status: 'Active' }, onClose, onCreate })} />);
 
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
@@ -332,8 +332,8 @@ describe('TeamStudentsDialog', () => {
   });
 
   test('Remove from team reports the student, and so does Add to team', async () => {
-    const onAdd = jest.fn();
-    const onRemove = jest.fn();
+    const onAdd = vi.fn();
+    const onRemove = vi.fn();
     render(<TeamStudentsDialog {...studentsProps({ onAdd, onRemove })} />);
 
     await user.click(screen.getByTitle('Remove from team'));
@@ -348,7 +348,7 @@ describe('TeamStudentsDialog', () => {
   });
 
   test('Close calls the page\'s handler', async () => {
-    const onClose = jest.fn();
+    const onClose = vi.fn();
     render(<TeamStudentsDialog {...studentsProps({ onClose })} />);
     await user.click(screen.getByRole('button', { name: 'Close' }));
     expect(onClose).toHaveBeenCalledTimes(1);

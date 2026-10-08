@@ -49,11 +49,11 @@ jobs:
       - name: Lint (ESLint)
         run: npm run lint
 
-      - name: Unit tests (Jest + React Testing Library)
+      - name: Unit tests (Vitest + React Testing Library)
         id: unit
         run: |
           mkdir -p reports
-          npm test -- --watchAll=false --coverage --json --outputFile=reports/frontend-tests.json
+          npm test -- --coverage --reporter=default --reporter=json --outputFile.json=reports/frontend-tests.json
         env:
           CI: true
 

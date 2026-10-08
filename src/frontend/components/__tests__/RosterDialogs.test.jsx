@@ -28,7 +28,7 @@ describe('CsvUploadDialog', () => {
   });
 
   test('shows the chosen file, and Upload then calls the page', async () => {
-    const onUpload = jest.fn();
+    const onUpload = vi.fn();
     render(<CsvUploadDialog {...csvProps({ file: { name: 'roster.csv' }, onUpload })} />);
     expect(screen.getByText('Selected: roster.csv')).toBeInTheDocument();
 
@@ -37,7 +37,7 @@ describe('CsvUploadDialog', () => {
   });
 
   test('passes the chosen file\'s event to the page', async () => {
-    const onFileChange = jest.fn();
+    const onFileChange = vi.fn();
     render(<CsvUploadDialog {...csvProps({ onFileChange })} />);
 
     await user.upload(screen.getByLabelText('Choose CSV File'), new File(['a,b'], 'roster.csv', { type: 'text/csv' }));
@@ -81,7 +81,7 @@ describe('CsvUploadDialog', () => {
   });
 
   test('Close calls the page', async () => {
-    const onClose = jest.fn();
+    const onClose = vi.fn();
     render(<CsvUploadDialog {...csvProps({ onClose })} />);
     await user.click(screen.getByRole('button', { name: 'Close' }));
     expect(onClose).toHaveBeenCalledTimes(1);
@@ -106,8 +106,8 @@ describe('DeleteAllStudentsDialog', () => {
   });
 
   test('typing the wrong words does not delete; the page is told instead', async () => {
-    const onConfirm = jest.fn();
-    const onMismatch = jest.fn();
+    const onConfirm = vi.fn();
+    const onMismatch = vi.fn();
     render(<DeleteAllStudentsDialog {...deleteProps({ onConfirm, onMismatch })} />);
 
     await user.type(screen.getByPlaceholderText('Type DELETE ALL to confirm'), 'delete all');
@@ -118,8 +118,8 @@ describe('DeleteAllStudentsDialog', () => {
   });
 
   test('an empty box is not a confirmation either', async () => {
-    const onConfirm = jest.fn();
-    const onMismatch = jest.fn();
+    const onConfirm = vi.fn();
+    const onMismatch = vi.fn();
     render(<DeleteAllStudentsDialog {...deleteProps({ onConfirm, onMismatch })} />);
 
     await user.click(screen.getByRole('button', { name: 'Delete All Students' }));
@@ -129,8 +129,8 @@ describe('DeleteAllStudentsDialog', () => {
   });
 
   test('typing DELETE ALL exactly confirms', async () => {
-    const onConfirm = jest.fn();
-    const onMismatch = jest.fn();
+    const onConfirm = vi.fn();
+    const onMismatch = vi.fn();
     render(<DeleteAllStudentsDialog {...deleteProps({ onConfirm, onMismatch })} />);
 
     await user.type(screen.getByPlaceholderText('Type DELETE ALL to confirm'), 'DELETE ALL');
@@ -149,7 +149,7 @@ describe('DeleteAllStudentsDialog', () => {
   });
 
   test('Cancel calls the page, and the typed words are gone when it opens again', async () => {
-    const onClose = jest.fn();
+    const onClose = vi.fn();
     const { rerender } = render(<DeleteAllStudentsDialog {...deleteProps({ onClose })} />);
     await user.type(screen.getByPlaceholderText('Type DELETE ALL to confirm'), 'DELETE ALL');
     await user.click(screen.getByRole('button', { name: 'Cancel' }));

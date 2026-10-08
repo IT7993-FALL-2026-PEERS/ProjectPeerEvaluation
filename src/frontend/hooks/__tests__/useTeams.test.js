@@ -2,9 +2,9 @@ import { renderHook, act } from '@testing-library/react';
 import api from '../../services/api';
 import useTeams from '../useTeams';
 
-jest.mock('../../services/api', () => ({
+vi.mock('../../services/api', () => ({
   __esModule: true,
-  default: { get: jest.fn(), post: jest.fn(), put: jest.fn(), delete: jest.fn() },
+  default: { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() },
 }));
 
 // The Manage Teams dialog and the dialogs that open from it: edit and create a team, move students
@@ -29,9 +29,9 @@ let students;
 
 // api.get answers from `routes` (url -> data); an unknown url fails, like a server that is down.
 beforeEach(() => {
-  jest.restoreAllMocks();
-  jest.spyOn(console, 'error').mockImplementation(() => {});
-  jest.spyOn(console, 'log').mockImplementation(() => {});
+  vi.restoreAllMocks();
+  vi.spyOn(console, 'error').mockImplementation(() => {});
+  vi.spyOn(console, 'log').mockImplementation(() => {});
   Object.values(api).forEach((fn) => fn.mockReset());
   routes = {
     '/courses/c1/teams': [ALPHA, BETA],
@@ -45,10 +45,10 @@ beforeEach(() => {
   api.post.mockResolvedValue({ data: {} });
   api.put.mockResolvedValue({ data: {} });
   api.delete.mockResolvedValue({ data: {} });
-  setAlert = jest.fn();
-  refreshCourses = jest.fn().mockResolvedValue();
-  setStudents = jest.fn();
-  resetEvaluationState = jest.fn().mockResolvedValue();
+  setAlert = vi.fn();
+  refreshCourses = vi.fn().mockResolvedValue();
+  setStudents = vi.fn();
+  resetEvaluationState = vi.fn().mockResolvedValue();
   students = [ANN, BEN, CY];
 });
 
@@ -165,7 +165,7 @@ describe('useTeams: search', () => {
 
 describe('useTeams: clearing all teams', () => {
   let confirm;
-  beforeEach(() => { confirm = jest.spyOn(window, 'confirm').mockReturnValue(true); });
+  beforeEach(() => { confirm = vi.spyOn(window, 'confirm').mockReturnValue(true); });
 
   test('asks first, naming the course; saying no changes nothing', async () => {
     const view = await opened();
@@ -213,7 +213,7 @@ describe('useTeams: clearing all teams', () => {
 
 describe('useTeams: deleting one team', () => {
   let confirm;
-  beforeEach(() => { confirm = jest.spyOn(window, 'confirm').mockReturnValue(true); });
+  beforeEach(() => { confirm = vi.spyOn(window, 'confirm').mockReturnValue(true); });
 
   test('asks first, naming the team; saying no changes nothing', async () => {
     const view = await opened();

@@ -21,5 +21,18 @@ export default defineConfig(({ mode }) => {
     build: { outDir: 'build' },
     // Port 3000 is the origin the backend's CORS list allows.
     server: { host: '0.0.0.0', port: 3000, strictPort: true },
+    // Unit tests (npm test). Every file under __tests__ is a test, as it was with Jest.
+    test: {
+      environment: 'jsdom',
+      globals: true,
+      setupFiles: ['./src/setupTests.js'],
+      include: ['src/frontend/**/__tests__/**/*.{js,jsx}', 'src/frontend/**/*.{spec,test}.{js,jsx}'],
+      coverage: {
+        provider: 'istanbul',
+        include: ['src/frontend/**/*.{js,jsx}'],
+        exclude: ['src/frontend/**/__tests__/**', 'src/frontend/index.jsx'],
+        reporter: ['json-summary', 'lcov', 'text-summary'],
+      },
+    },
   };
 });

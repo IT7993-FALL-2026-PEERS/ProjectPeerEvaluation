@@ -5,7 +5,7 @@ import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import axios from 'axios';
 import ResetPassword from '../ResetPassword';
 
-jest.mock('axios');
+vi.mock('axios');
 
 function renderResetPage() {
   render(
@@ -25,7 +25,7 @@ async function submitNewPassword() {
 }
 
 describe('ResetPassword', () => {
-  afterEach(() => jest.clearAllMocks());
+  afterEach(() => vi.clearAllMocks());
 
   test('one button shows and hides both password fields without submitting', async () => {
     renderResetPage();

@@ -1,11 +1,11 @@
 import axios from 'axios';
 import { loginProfessor } from '../login';
 
-jest.mock('axios');
+vi.mock('axios');
 
 describe('loginProfessor', () => {
   afterEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   it('posts credentials to /api/auth/login and returns the response data', async () => {

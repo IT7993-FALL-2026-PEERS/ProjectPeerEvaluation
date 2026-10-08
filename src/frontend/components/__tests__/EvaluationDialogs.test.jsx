@@ -22,8 +22,8 @@ describe('EvaluationResetDialog', () => {
   });
 
   test('Cancel and Continue call the page\'s handlers', async () => {
-    const onCancel = jest.fn();
-    const onConfirm = jest.fn();
+    const onCancel = vi.fn();
+    const onConfirm = vi.fn();
     render(<EvaluationResetDialog open onCancel={onCancel} onConfirm={onConfirm} />);
 
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
@@ -77,7 +77,7 @@ describe('EvaluationStatusDialog', () => {
   });
 
   test('before sending, offers to send, and the button reports its press', async () => {
-    const onSend = jest.fn();
+    const onSend = vi.fn();
     render(<EvaluationStatusDialog {...statusProps({ status: { evaluations_sent: false }, onSend })} />);
     expect(screen.getByText('Evaluations Have Not Been Sent')).toBeInTheDocument();
 
@@ -115,7 +115,7 @@ describe('EvaluationStatusDialog', () => {
   });
 
   test('Send Reminders reports its press, and is off once everyone has finished', async () => {
-    const onRemind = jest.fn();
+    const onRemind = vi.fn();
     const { rerender } = render(<EvaluationStatusDialog {...statusProps({ onRemind })} />);
     await user.click(screen.getByRole('button', { name: 'Send Reminders' }));
     expect(onRemind).toHaveBeenCalledTimes(1);
@@ -125,8 +125,8 @@ describe('EvaluationStatusDialog', () => {
   });
 
   test('Reset Evaluation State and Close report their presses; while resetting the reset is off', async () => {
-    const onReset = jest.fn();
-    const onClose = jest.fn();
+    const onReset = vi.fn();
+    const onClose = vi.fn();
     const { rerender } = render(<EvaluationStatusDialog {...statusProps({ onReset, onClose })} />);
 
     await user.click(screen.getByRole('button', { name: 'Reset Evaluation State' }));

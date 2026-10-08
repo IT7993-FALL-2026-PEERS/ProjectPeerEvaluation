@@ -2,9 +2,9 @@ import { renderHook, act, waitFor } from '@testing-library/react';
 import api from '../../services/api';
 import useStudents from '../useStudents';
 
-jest.mock('../../services/api', () => ({
+vi.mock('../../services/api', () => ({
   __esModule: true,
-  default: { get: jest.fn(), post: jest.fn(), put: jest.fn(), delete: jest.fn() },
+  default: { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() },
 }));
 
 // The Manage Students dialog and the four dialogs that open from it: add, edit, roster upload and
@@ -22,12 +22,12 @@ let refreshCourses;
 let onAllStudentsDeleted;
 
 beforeEach(() => {
-  jest.restoreAllMocks();
+  vi.restoreAllMocks();
   Object.values(api).forEach((fn) => fn.mockReset());
   api.get.mockResolvedValue({ data: [ANN, BEN] });
-  setAlert = jest.fn();
-  refreshCourses = jest.fn().mockResolvedValue();
-  onAllStudentsDeleted = jest.fn();
+  setAlert = vi.fn();
+  refreshCourses = vi.fn().mockResolvedValue();
+  onAllStudentsDeleted = vi.fn();
 });
 
 const render = () => renderHook(() => useStudents({ setAlert, refreshCourses, onAllStudentsDeleted }));
@@ -296,8 +296,8 @@ describe('useStudents: editing a student', () => {
 describe('useStudents: deleting one student', () => {
   let confirm;
   beforeEach(() => {
-    confirm = jest.spyOn(window, 'confirm').mockReturnValue(true);
-    jest.spyOn(console, 'error').mockImplementation(() => {});
+    confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    vi.spyOn(console, 'error').mockImplementation(() => {});
   });
 
   test('asks first, naming the student, the team and what will be lost; saying no changes nothing', async () => {

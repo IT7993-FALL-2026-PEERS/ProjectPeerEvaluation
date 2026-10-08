@@ -5,9 +5,9 @@ import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import api from '../../services/api';
 import StudentEvaluation from '../StudentEvaluation';
 
-jest.mock('../../services/api', () => ({
+vi.mock('../../services/api', () => ({
   __esModule: true,
-  default: { get: jest.fn(), post: jest.fn() },
+  default: { get: vi.fn(), post: vi.fn() },
 }));
 
 // The page a student opens from the emailed link (CW-06, CW-07): no login, one form per teammate.
@@ -37,7 +37,7 @@ const FORM = {
 // Typing character by character re-renders the whole form for every key, which is slow; clicks are
 // quick when userEvent does not wait between actions.
 const user = userEvent.setup({ delay: null });
-jest.setTimeout(30000);
+vi.setConfig({ testTimeout: 30000 });
 
 const oneTeammate = () => api.get.mockResolvedValue({ data: { ...FORM, teammates: FORM.teammates.slice(0, 1) } });
 
@@ -67,13 +67,13 @@ const submit = () => user.click(screen.getByRole('button', { name: /submit evalu
 
 describe('StudentEvaluation', () => {
   beforeEach(() => {
-    jest.spyOn(console, 'log').mockImplementation(() => {});
-    jest.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => {});
     api.get.mockResolvedValue({ data: FORM });
   });
   afterEach(() => {
-    jest.restoreAllMocks();
-    jest.resetAllMocks();
+    vi.restoreAllMocks();
+    vi.resetAllMocks();
   });
 
   test('shows the course, the student and one form per teammate', async () => {
