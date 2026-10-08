@@ -1,7 +1,9 @@
 # Docker setup (M2)
 
 Docker is a **local-dev and CI convenience** for PEERS. It does not replace the Render
-deployment (see README "Deployment") or the plain `npm run dev` path; use whichever you like.
+deployment (see README "Deployment") or the plain `npm run dev` path; use whichever you like. The
+delivery pipeline also builds the same images and publishes them to GitHub Container Registry,
+tagged with the commit SHA, as the release-candidate record (Render still builds from source).
 
 The stack is three services started in order, each waiting for the previous one to be **healthy**:
 `mongo` → `backend` → `frontend`.
