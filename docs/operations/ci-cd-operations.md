@@ -49,7 +49,7 @@ or every pull request waits forever for a check that no longer runs.
 |---|---|---|---|
 | `RENDER_BACKEND_DEPLOY_HOOK_URL` | secret | environment `staging` | CD deploy and rollback |
 | `RENDER_FRONTEND_DEPLOY_HOOK_URL` | secret | environment `staging` | CD deploy and rollback |
-| `CD_RELEASE` | repository variable, `on` to enable | Settings > Secrets and variables > Actions > Variables | CD release stages. **Not set today** (off) |
+| `CD_RELEASE` | repository variable, `on` to enable | Settings > Secrets and variables > Actions > Variables | CD release stages. **On** since 7 Oct 2026 |
 | `STAGING_URL`, `STAGING_API_URL` | repository variables | same | Staging regression when run by hand. Not set; CD passes the URLs itself |
 | `staging` | environment, deploys from `main` only | Settings > Environments | holds the deploy hooks |
 | `production` | environment: Dr. Vyas or Khoa approves, no self-review, `rc-*` tags only, no secrets | Settings > Environments | `promote.yml` approval gate only |

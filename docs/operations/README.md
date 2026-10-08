@@ -49,7 +49,7 @@ Khoa, see [Render handover](render-handover.md)).
 
 - [ ] Follow the [release procedure](release-procedure.md): watch the CD run deploy (or skip) each service, then
       check `/api/health` and `/version.txt` show the commit.
-- [ ] Once the release stages are switched on (`CD_RELEASE=on`), find the `rc-*` release that the run created,
+- [ ] The release stages are on (`CD_RELEASE=on`), so find the `rc-*` release that the run created,
       and run a **dry-run** promotion of it ([release procedure, step 4](release-procedure.md#4-promote-a-release-candidate-optional)).
 
 ### 5. Roll it back
@@ -73,7 +73,7 @@ When every box is ticked, write in CICD-31 who did it, on which date, and what w
 | Staging hosting | Render, workspace on Khoa's account ([Render handover](render-handover.md)) |
 | Staging database | MongoDB Atlas M0 |
 | Staging email | Mailtrap sandbox: catches every message and delivers nothing |
-| Container images | GitHub Container Registry, `ghcr.io/it7993-fall-2026-peers/projectpeerevaluation/{backend,frontend}:<commit>` (once `CD_RELEASE` is on) |
+| Container images | GitHub Container Registry, `ghcr.io/it7993-fall-2026-peers/projectpeerevaluation/{backend,frontend}:<commit>` (`CD_RELEASE` is on) |
 
 ## Changes the next owner should know about
 

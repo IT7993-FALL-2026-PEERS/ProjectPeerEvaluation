@@ -27,6 +27,11 @@ updates:
     # block deploys.
     allow:
       - dependency-type: direct
+    # ESLint 10 breaks eslint-plugin-react 7.37 (lint crashes), so hold the major version
+    # until that plugin supports it (docs/architecture/vite-migration.md, section 7).
+    ignore:
+      - dependency-name: "eslint"
+        update-types: ["version-update:semver-major"]
     groups:
       frontend-minor-and-patch:
         update-types: [minor, patch]

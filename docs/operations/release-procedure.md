@@ -8,9 +8,7 @@ pull request ──► merge to main ──► CI on main ──► CD ──►
                 (8 required checks)               (deploy, smoke)   (CD_RELEASE=on)   (Dr. Vyas or Khoa)
 ```
 
-**Two modes.** While the repository variable `CD_RELEASE` is off (it is today), CD only deploys staging. Steps 3
-and 4 below need it **on**. The switch, and why it is still off, is in
-[`docs/cd-pipeline.md`](../cd-pipeline.md#release-pipeline-cdyml-cicd-28-design-for-review).
+**Two modes.** The repository variable `CD_RELEASE` is **on** (since 7 Oct 2026), so every merge that passes CI deploys staging and also runs steps 3 and 4 below. With it off, CD only deploys staging. How it was turned on, and how to switch it, is in [`docs/cd-pipeline.md`](../cd-pipeline.md#release-pipeline-cdyml-cicd-28).
 
 ## Before you start
 
