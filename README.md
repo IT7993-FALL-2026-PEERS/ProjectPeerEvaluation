@@ -78,7 +78,7 @@ flowchart TB
         end
         subgraph TESTS["Automated tests"]
             direction TB
-            UNIT["Unit tests<br/>Jest (frontend)<br/>node:test (backend)"]
+            UNIT["Unit tests<br/>Vitest (frontend)<br/>node:test (backend)"]
             INTEG["Integration tests<br/>real MongoDB"]
             REG["Functional regression<br/>tests (12 critical workflows)"]
             E2E["End-to-end tests<br/>Playwright"]
@@ -159,13 +159,13 @@ The numbers move as steps land.
 |---|---|---|---|
 | Install dependencies and build | `npm ci` and the production build | M1 / M4 | Live (`.github/workflows/ci.yml`) |
 | Workflow lint | `actionlint` checks the workflow files themselves | M1 / M4 | Live |
-| Unit tests | Jest and React Testing Library for the frontend (461 tests); Node's built-in test runner (`node:test`) for the backend (388 tests) | M4 / M5 | Live for both in CI on every pull request. Coverage is measured on every pull request and gated by floors just below today's baseline (`coverage-floors.json`; backend about 66% of lines, frontend about 93%), and the floors only go up. The team's target is 70%: the frontend now meets it, and the backend is close (`CourseManagement.js` has been split into tested components and hooks, and is now only the page that wires them together) |
+| Unit tests | Vitest and React Testing Library for the frontend (467 tests); Node's built-in test runner (`node:test`) for the backend (393 tests) | M4 / M5 | Live for both in CI on every pull request. Coverage is measured on every pull request and gated by floors just below today's baseline (`coverage-floors.json`; backend about 66% of lines, frontend about 93%), and the floors only go up. The team's target is 70%: the frontend now meets it, and the backend is close (`CourseManagement.js` has been split into tested components and hooks, and is now only the page that wires them together) |
 | Integration tests | Backend, database, authentication, and email, against a real MongoDB that the tests start themselves and an isolated email transport (never real student inboxes) | M4 / M5 | Live: 133 tests, required job `Integration (real MongoDB)` |
 | Functional regression tests | At least one automated test per critical business workflow | M5 | Live: all twelve critical workflows (CW-01 to CW-12) are covered, see [`docs/requirements/critical-workflows.md`](docs/requirements/critical-workflows.md) |
 | End-to-end tests | Playwright drives the real app in a browser: student and instructor workflows, on a throwaway database with email captured, never sent | M4 / M5 | Live: 41 tests, plus 4 `@staging` smoke tests that run only against staging; required job `E2E smoke (Playwright)` |
 | Static analysis | ESLint: frontend (`npm run lint`) and backend (`cd src/backend && npm run lint`) | M1 / M4 | Live |
 | Container build check | `docker compose up --build --wait` builds the frontend and backend images and starts them with MongoDB, then checks the stack is healthy | M2 | Live, required job `Containers (build + compose smoke)` |
-| Dependency validation and security scan | Dependabot, OWASP Dependency Check, CodeQL code scanning, secret scanning | M3 | Live and blocking: OWASP Dependency-Check runs on every pull request, on `main`, and weekly (`.github/workflows/security.yml`) and fails on any finding with CVSS 7 or higher that is not an accepted risk (`.github/dependency-check-suppressions.xml`, each entry with an expiry date); CodeQL (GitHub default setup) scans the code on every pull request. Both are required checks. Dependabot opens weekly update pull requests (`.github/dependabot.yml`); its alerts, all in `react-scripts` build tooling, are triaged and dismissed as accepted risk. Secret scanning and push protection are on. The policy, the triage and the 10 accepted findings are in [`docs/security/security-policy.md`](docs/security/security-policy.md) |
+| Dependency validation and security scan | Dependabot, OWASP Dependency Check, CodeQL code scanning, secret scanning | M3 | Live and blocking: OWASP Dependency-Check runs on every pull request, on `main`, and weekly (`.github/workflows/security.yml`) and fails on any finding with CVSS 7 or higher that is not an accepted risk (`.github/dependency-check-suppressions.xml`, each entry with an expiry date); CodeQL (GitHub default setup) scans the code on every pull request. Both are required checks. Dependabot opens weekly update pull requests (`.github/dependabot.yml`); the alerts that came from the old `react-scripts` build tooling went away with the move to Vite. Secret scanning and push protection are on. The policy, the triage and the history of the 10 findings that were accepted until the move to Vite are in [`docs/security/security-policy.md`](docs/security/security-policy.md) |
 | Test report | Executed, passed, and failed tests, duration, and coverage | M4 | Live in CI: each test job writes tests run, passed, failed, skipped and duration to its run summary (`scripts/test-summary.js`) next to the coverage table, and keeps the result files as downloadable artifacts |
 | Quality gate | `main-protection` ruleset: a pull request, eight passing required checks and an up-to-date branch before merge. No approval required, so authors merge their own pull requests. No bypass, and direct pushes are rejected | M1 | Live. More checks are added as jobs are added |
 | Build artifacts and Docker images | Build the deployment artifacts and the frontend and backend images for the exact commit that passed CI | M2 | Partly live: the container check builds both images on every pull request, and `image-build.yml` (reusable, or run by hand from the Actions tab) builds them, checks they start healthy and pushes both to GitHub Container Registry tagged with the commit SHA (see [`docs/cd-pipeline.md`](docs/cd-pipeline.md)). `cd.yml` calls it once its release stages are switched on (`CD_RELEASE`); it has not yet run on a real commit |
@@ -375,7 +375,7 @@ The step-by-step version follows.
 - `npm run verify` — wait for the frontend and backend and fail clearly if either is down
 - `npm run docker:up` / `npm run docker:down` — start/stop the Docker Compose stack (see `docs/docker-setup.md`)
 - `npm run start:backend` / `npm run start:frontend` — start one side only
-- `npm test` — frontend unit tests (Jest + React Testing Library)
+- `npm test` — frontend unit tests (Vitest + React Testing Library)
 - `npm run build` then `E2E_START_SERVER=1 npm run test:e2e` — end-to-end tests (Playwright) against the real app on a throwaway database; without `E2E_START_SERVER` only the install check runs
 - `cd src/backend && npm test` — backend unit tests (`node:test`); `npm run test:coverage` adds the coverage report
 - `cd src/backend && npm run test:integration` — backend integration tests against a real MongoDB that the tests start themselves (no Docker needed; the first run downloads the MongoDB binary)
@@ -398,7 +398,7 @@ Node 24 (see `.nvmrc`) and run:
 ```bash
 npm ci
 npm run lint
-npm test -- --watchAll=false --coverage && node scripts/coverage-gate.js frontend
+npm test -- --coverage && node scripts/coverage-gate.js frontend
 npm run build
 npx playwright install chromium                 # once: the browser for the end-to-end tests
 E2E_START_SERVER=1 npm run test:e2e
@@ -478,21 +478,24 @@ Primary contact for inquiries: Team Leader (Khoa Ho).
                          # release pipeline), promote.yml (production approval gate), image-build.yml (images
                          # to GHCR), deployment-status.yml (CD report), staging-regression.yml (smoke tests)
   dependabot.yml         # weekly dependency update pull requests
-  dependency-check-suppressions.xml  # accepted OWASP findings, each with an expiry date
+  dependency-check-suppressions.xml  # accepted OWASP findings (none at present)
   CODEOWNERS             # reviewers requested automatically
   pull_request_template.md
 .nvmrc                   # pinned Node version (24)
 render.yaml              # Render staging services (Blueprint)
+index.html               # the page Vite builds the frontend from
+vite.config.mjs          # Vite and Vitest settings (build, dev server, tests)
+eslint.config.mjs        # frontend lint rules (ESLint 9 flat config)
 playwright.config.js
 coverage-floors.json      # coverage floors that CI enforces (they only go up)
 package.json             # frontend dependencies and root scripts (setup, dev, test, lint)
 src/
-  frontend/              # React 19 (Create React App)
+  frontend/              # React 19 (Vite)
   backend/               # Express + MongoDB (Mongoose); own package.json, tests/ (unit) and integration/
 e2e/                     # Playwright end-to-end tests and the throwaway servers they run against
 docs/
   requirements/          # requirements, critical workflows, traceability matrix (RTM)
-  architecture/          # system architecture, API and database documentation
+  architecture/          # system architecture, API and database documentation, Vite migration record
   testing-strategy/      # team testing strategy, frontend testing strategy
   technical-assessment/  # Milestone 1 technical assessment and reviews
   security/              # security policy: accepted risks and triage
@@ -507,7 +510,7 @@ docs/
   deployment-review.md, dev-environment-review.md, containerization-recommendations.md
 DEPLOYMENT_GUIDE.md      # historical deployment notes (Render.com is the one in use)
 docker-compose.yml       # mongo + backend + frontend with health checks (docs/docker-setup.md)
-Dockerfile.frontend      # CRA build -> nginx
+Dockerfile.frontend      # Vite build -> nginx
 docker/nginx.conf        # SPA fallback for the frontend image
 src/backend/Dockerfile   # backend image (non-root)
 .env.example             # Docker Compose settings (src/backend/.env.example is for npm run dev)
@@ -520,9 +523,9 @@ scripts/                 # setup.js (npm run setup), setup.sh, verify-env.sh, co
 
 ## Tech Stack
 
-- **Frontend**: React 19, Create React App, MUI, React Router, Axios
+- **Frontend**: React 19, Vite, MUI, React Router, Axios
 - **Backend**: Node.js, Express, MongoDB via Mongoose, JWT auth, Nodemailer
-- **Testing**: Jest + React Testing Library (frontend unit), `node:test` (backend unit and
+- **Testing**: Vitest + React Testing Library (frontend unit), `node:test` (backend unit and
   integration, against a real MongoDB started by `mongodb-memory-server`), Playwright (end-to-end)
 - **CI/CD**: GitHub Actions (CI is live, eight required checks, with test and run reports in each
   summary); `cd.yml` deploys the tested commit to Render.com staging after CI passes; images, smoke tests,

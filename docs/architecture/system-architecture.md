@@ -56,10 +56,10 @@ flowchart LR
 
 ## 2. Frontend — `src/frontend/`
 
-A Create React App single-page app (React 19, React Router 7, MUI 7), built to static
+A Vite single-page app (React 19, React Router 7, MUI 7), built to static
 files and served by Render's static site with a rewrite of every path to `index.html`.
 
-| Route (`App.js`) | Page | Access |
+| Route (`App.jsx`) | Page | Access |
 |---|---|---|
 | `/` | `LoginPage.js` — login, registration and "forgot password" | Public |
 | `/course-management` | `CourseManagement.js` — courses, roster upload, students, teams, sending invitations and reminders | Professor (`ProtectedRoute`) |
@@ -221,7 +221,7 @@ the new bcrypt hash and clears the token so the link works once.
 | Staging email | With `DEPLOY_ENV=staging` (or a `*-staging` Render service) the mailer sends only through the Mailtrap sandbox and refuses any other transport (`utils/emailGuard.js`) | — (CICD-44) |
 | CORS | Only the origin of `FRONTEND_URL`, plus `localhost:3000` outside production, credentials allowed (`config/corsConfig.js`) | — (D-13 resolved, CICD-37) |
 | Exported data | CSV fields quoted and formula-prefixed | — |
-| Dependencies | Dependabot weekly; OWASP Dependency-Check and CodeQL on every PR, both required (OWASP fails on CVSS 7 or higher unless accepted) | Frontend: findings in `react-scripts` build tooling are accepted risks with expiry dates (`docs/security/security-policy.md`) |
+| Dependencies | Dependabot weekly; OWASP Dependency-Check and CodeQL on every PR, both required (OWASP fails on CVSS 7 or higher unless accepted) | No accepted risks at present: the old `react-scripts` findings left with the move to Vite (`docs/security/security-policy.md`) |
 
 ---
 

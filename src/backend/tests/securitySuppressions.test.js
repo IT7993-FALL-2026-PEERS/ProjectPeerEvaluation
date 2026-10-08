@@ -14,8 +14,9 @@ const policy = fs.readFileSync(path.join(root, 'docs', 'security', 'security-pol
 
 const blocks = [...xml.matchAll(/<suppress\b([^>]*)>([\s\S]*?)<\/suppress>/g)].map((m) => ({ attrs: m[1], body: m[2] }));
 
-test('TC-SEC-01: the suppression file lists at least one accepted risk and is well formed', () => {
-  assert.ok(blocks.length > 0, 'no <suppress> entries found');
+// The register may be empty (it is, since the frontend left Create React App); then the tests below have
+// nothing to check and start checking again as soon as an entry is added.
+test('TC-SEC-01: the suppression file is well formed', () => {
   assert.match(xml, /^<\?xml version="1.0" encoding="UTF-8"\?>/);
   assert.match(xml, /<suppressions xmlns="https:\/\/jeremylong\.github\.io\/DependencyCheck\/dependency-suppression\.1\.3\.xsd">/);
   assert.equal((xml.match(/<suppress\b/g) || []).length, (xml.match(/<\/suppress>/g) || []).length, 'unbalanced <suppress> tags');

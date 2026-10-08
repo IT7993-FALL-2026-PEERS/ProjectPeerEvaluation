@@ -5,7 +5,7 @@ name: Security scan
 # published against dependencies that haven't changed.
 #
 # Blocks on any finding with CVSS 7 or higher that is not an accepted risk. The
-# 9 inherited findings (all react-scripts build tooling) were triaged and are listed
+# inherited findings (all react-scripts build tooling, gone since the Vite migration) were triaged and are listed
 # in .github/dependency-check-suppressions.xml, each with an expiry date; the policy
 # and the reasons are in docs/security/security-policy.md (backlog CICD-24). A new
 # finding, or a new version of a package that already has one, fails the job.
@@ -81,7 +81,7 @@ jobs:
             console.log(`\n**Packages with critical or high findings (${packages.size}):**\n`);
             for (const [name, sev] of [...packages].sort()) console.log(`- ${name} (${sev})`);
           }
-          console.log(`\n${accepted} accepted risks are suppressed (they expire 31 Dec 2026): see docs/security/security-policy.md.`);
+          console.log(accepted ? `\n${accepted} accepted risks are suppressed: see docs/security/security-policy.md.` : '\nNo accepted risks are suppressed.');
           console.log('\nFull details: download the `dependency-check-report` artifact and open the HTML file.');
           EOF
 

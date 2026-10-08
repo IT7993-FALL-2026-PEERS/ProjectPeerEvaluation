@@ -52,7 +52,7 @@ stops one from hiding the other.
 3. Fix each conflict. Keep both intentions where you can. If they clash, pick the one that matches
    the goal of the merge and note the trade-off. Don't invent new behavior, and finish the merge
    instead of aborting it.
-4. Run the checks (`npm test -- --watchAll=false`, `npm run build`, `npm run test:e2e`) and fix
+4. Run the checks (`npm test`, `npm run build`, `npm run test:e2e`) and fix
    anything the merge broke.
 5. Commit the merge and let CI run again.
 

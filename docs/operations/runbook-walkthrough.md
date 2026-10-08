@@ -60,7 +60,7 @@ The same checks CI runs ([README, Continuous Integration](../../README.md#contin
 ```bash
 npm ci
 npm run lint
-npm test -- --watchAll=false --coverage && node scripts/coverage-gate.js frontend
+npm test -- --coverage && node scripts/coverage-gate.js frontend
 npm run build
 npx playwright install chromium                 # once per machine
 E2E_START_SERVER=1 npm run test:e2e

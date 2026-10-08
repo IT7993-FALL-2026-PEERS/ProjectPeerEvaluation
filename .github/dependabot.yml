@@ -17,13 +17,14 @@ updates:
       timezone: America/New_York
     open-pull-requests-limit: 5
     # Version updates only touch packages listed in package.json. This does not
-    # affect security updates, which ignore `allow`. The frontend's vulnerable
-    # transitive packages (svgo, postcss, webpack-dev-server, ...) are pinned by
-    # react-scripts 5.0.1, so security updates for them failed, and each failure
-    # posted a failed "Dependabot" check on the main commit that made Render's
-    # checksPass trigger skip the staging deploy. Those alerts are now dismissed
-    # as accepted risk (docs/security/security-policy.md); dismiss any new alert
-    # on the same packages the same way.
+    # affect security updates, which ignore `allow`. History: the frontend's
+    # vulnerable transitive packages (svgo, postcss, webpack-dev-server, ...) were
+    # pinned by react-scripts 5.0.1, so security updates for them failed, and each
+    # failure posted a failed "Dependabot" check on the main commit that made
+    # Render's checksPass trigger skip the staging deploy. react-scripts is gone
+    # (Vite), so those alerts no longer apply (docs/security/security-policy.md);
+    # if a security update fails again, dismiss it with a reason rather than let it
+    # block deploys.
     allow:
       - dependency-type: direct
     groups:
