@@ -68,6 +68,25 @@ test('the frontend can call the backend from a browser, and the backend allows e
   expect(check.headers()['access-control-allow-headers'].toLowerCase()).toContain('authorization');
 });
 
+// Proves the bundle's effective API address, which a scan of the files cannot: the legacy fallback URL
+// is always present in the bundle as an inert literal. The login request is answered by the test
+// itself, so nothing reaches the backend and nothing is saved or mailed.
+test('the app sends its API requests to the configured backend @staging', async ({ page }) => {
+  let requested = null;
+  await page.route('**/auth/login', async (route) => {
+    requested = route.request().url();
+    await route.fulfill({ status: 401, contentType: 'application/json', body: JSON.stringify({ message: 'answered by the test' }) });
+  });
+
+  await page.goto('/');
+  await page.getByPlaceholder('Email').fill('smoke@example.com');
+  await page.getByPlaceholder('Password').fill('not-a-real-password');
+  await page.getByRole('button', { name: 'Login' }).click();
+
+  await expect.poll(() => requested).not.toBeNull();
+  expect(requested).toBe(`${apiUrl}/auth/login`);
+});
+
 test('the backend gives no CORS permission to a site that is not the frontend @staging', async ({ request }) => {
   for (const origin of OTHER_SITES) {
     // The call itself is fine (CORS is the browser's rule); without the header the browser blocks the answer.

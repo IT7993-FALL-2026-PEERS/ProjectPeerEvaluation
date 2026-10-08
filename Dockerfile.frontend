@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
-# Frontend image: Create React App build served by nginx.
-# Build context is the REPO ROOT (CRA's src/index.jsx and public/ live there):
+# Frontend image: Vite build served by nginx.
+# Build context is the REPO ROOT (index.html, vite.config.mjs, src/index.jsx and public/ live there):
 #   docker build -t peers-frontend:local -f Dockerfile.frontend .
 # Keep the Node major in sync with .nvmrc, package.json "engines" and render.yaml.
 
@@ -8,7 +8,7 @@
 FROM node:24-alpine AS build
 WORKDIR /app
 
-# REACT_APP_* values are read by webpack at BUILD time and written into the JS
+# REACT_APP_API_URL is read by vite.config.mjs at BUILD time and written into the JS
 # bundle (see src/frontend/services/apiUrl.js). Changing them needs a rebuild;
 # setting them when the container starts does nothing. They are public: anyone
 # can read them in the browser, so never pass secrets here.
@@ -22,6 +22,7 @@ ENV REACT_APP_API_URL=$REACT_APP_API_URL
 COPY package.json package-lock.json ./
 RUN npm ci --ignore-scripts
 
+COPY index.html vite.config.mjs ./
 COPY public ./public
 COPY src/index.jsx ./src/index.jsx
 COPY src/frontend ./src/frontend
