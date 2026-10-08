@@ -4,8 +4,9 @@ const { test, expect } = require('@playwright/test');
 // the Staging regression workflow pick them: `npx playwright test --grep @staging`.
 //
 // They run against a deployed copy, not the throwaway one the other specs reset, so they only
-// look: no login, nothing saved, and no request that could send email (staging mails only through
-// Mailtrap's free sandbox). The addresses come from the environment:
+// look: no successful login, nothing saved, and no request that could send email (staging mails only
+// through Mailtrap's free sandbox). The one login they try uses an address that does not exist, which
+// the backend refuses without writing anything. The addresses come from the environment:
 //   BASE_URL  the frontend, read by playwright.config.js
 //   API_URL   the backend, ending in /api
 // Without API_URL (the normal CI run) they are skipped. To try them against staging:
@@ -85,6 +86,34 @@ test('the app sends its API requests to the configured backend @staging', async 
 
   await expect.poll(() => requested).not.toBeNull();
   expect(requested).toBe(`${apiUrl}/auth/login`);
+});
+
+// A real login with credentials that do not exist: the backend must refuse with 401 and its own error
+// (a read-only lookup, nothing is saved or mailed), and the app must show that error and stay signed out.
+test('a login with wrong credentials is refused and the app shows the error @staging', async ({ page }) => {
+  await page.goto('/');
+  await page.getByPlaceholder('Email').fill('smoke-test@example.invalid');
+  await page.getByPlaceholder('Password').fill('not-a-real-password');
+
+  const [response] = await Promise.all([
+    page.waitForResponse((res) => res.url() === `${apiUrl}/auth/login` && res.request().method() === 'POST'),
+    page.getByRole('button', { name: 'Login' }).click(),
+  ]);
+
+  expect(response.status()).toBe(401);
+  expect((await response.json()).error).toMatchObject({ code: 'AUTH_ERROR', message: 'Invalid email or password.' });
+  await expect(page.getByText('Invalid email or password.')).toBeVisible();
+  expect(await page.evaluate(() => localStorage.getItem('peer_eval_token'))).toBeNull();
+});
+
+// An emailed link is a deep link: the static host must answer a path that is not a file with the app
+// (a rewrite to index.html), not a not-found page. An unknown token only reads; nothing is changed.
+test('a deep link opens the app, not a not-found page @staging', async ({ page }) => {
+  const response = await page.goto('/evaluate/smoke-test-link');
+
+  expect(response.status()).toBe(200);
+  expect(new URL(page.url()).pathname).toBe('/evaluate/smoke-test-link');
+  await expect(page.locator('#root')).not.toBeEmpty();
 });
 
 test('the backend gives no CORS permission to a site that is not the frontend @staging', async ({ request }) => {
