@@ -104,6 +104,8 @@ is fine for practising pull requests, but CD then skips both services, so there'
 > **6 Oct 2026: passed.** [#166](https://github.com/IT7993-FALL-2026-PEERS/ProjectPeerEvaluation/pull/166) added an
 > HTML comment to `public/index.html`, a frontend file with no visible effect. All eight required checks and both
 > CodeQL analyses passed, and it merged as `f306afd`.
+>
+> *Update 8 Oct 2026:* the Vite migration moved that file: the page is now `index.html` at the repository root, and `public/` holds only `_redirects`. Pick another frontend file for this step, for example a comment in `index.html`.
 
 ## Step 4. Release it
 
@@ -136,6 +138,8 @@ With `CD_RELEASE=on`, the same run also makes an `rc-*` release candidate. You c
 >
 > **Not exercised:** the `rc-*` release candidate and its promotion, because `CD_RELEASE` is off (#146). The promotion
 > gate itself was proven separately with a dry run on 5 Oct (#147).
+>
+> **Update 8 Oct 2026:** `CD_RELEASE` has been on since 7 Oct (#146 is closed). Every merge to `main` that passes CI now creates an `rc-*` release candidate with its release record (for example `rc-20261008-0233-489044d`), so the release-candidate half of this step runs in every CD run. **Still to repeat by hand:** a dry run of promoting one (`Promote release candidate`, approved in the `production` environment by Dr. Vyas or Khoa).
 
 ## Step 5. Roll it back
 
@@ -163,6 +167,8 @@ Then watch CD deploy the revert, and check `/version.txt` (and `/api/health`) ag
 >
 > **Not exercised:** option A (`rollback_to`), because there are no `rc-*` releases while `CD_RELEASE` is off (#146),
 > and option B (Render's rollback), which needs the Render account.
+>
+> **Update 8 Oct 2026:** `rc-*` releases exist now, and CD's own automatic rollback has run for real: on 7 Oct a deliberate CORS break (#181) failed the smoke stage, no release was tagged, and both rollback jobs and their health and smoke checks passed ([CD run 37632984060](https://github.com/IT7993-FALL-2026-PEERS/ProjectPeerEvaluation/actions/runs/37632984060)); #182 reverted it. **Still to repeat by hand:** option A (`rollback_to`), which redeploys staging to an earlier release candidate.
 
 ## What the walkthrough changed in the docs
 
@@ -177,3 +183,5 @@ Then watch CD deploy the revert, and check `/version.txt` (and `/api/health`) ag
 | Date | Who | `main` at start | Result | Notes |
 |---|---|---|---|---|
 | 6 Oct 2026 | Donald (with Claude Code) | `d98b4a7` | Steps 1–3 ✔, step 4 deploy ✔, step 5 option C ✔ | Release candidate, promotion and rollback option A not possible while `CD_RELEASE` is off. Two README gaps fixed (Playwright browser and libraries) |
+
+Not yet repeated (8 Oct 2026): step 4's promotion dry run, step 5 option A by hand (`rollback_to`), and a run by a teammate who did not build the pipeline. Add a row above when they are done.
