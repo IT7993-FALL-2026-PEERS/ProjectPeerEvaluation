@@ -28,12 +28,9 @@ that already runs the commit, and never deploys an older commit than the live on
 for. After changing an environment variable in Render, use Render's **Save and deploy**, which redeploys the live
 commit with the new value. Force can't do that, because the commit is already live.
 
-## Release pipeline (`cd.yml`, CICD-28): design for review
+## Release pipeline (`cd.yml`, CICD-28)
 
-The deploy above is the middle of a longer pipeline. The other stages are built but **switched off**: they run only when
-the repository variable `CD_RELEASE` is `on` (Settings > Secrets and variables > Actions > Variables). While it is off,
-each CD run deploys as above. The `Prepare` job also writes a dry-run plan to the run summary showing what the other
-stages would have done, and those jobs show as skipped.
+The deploy above is the middle of a longer pipeline. The other stages run when the repository variable `CD_RELEASE` is `on` (Settings > Secrets and variables > Actions > Variables). **It has been on since 7 Oct 2026.** With it off, each CD run deploys as above, the `Prepare` job writes a dry-run plan to the run summary showing what the other stages would have done, and those jobs show as skipped.
 
 ```
 prepare ──► images ──► deploy (backend, frontend) ──► smoke ──► release (rc-* tag)
@@ -76,7 +73,7 @@ hand-made release can't stand in as a baseline: the pipeline ignores releases it
 `contents: write`. The deploy hooks are `staging` environment secrets, which only `main` can use. Every job runs the
 code from `main`; none checks out another ref.
 
-**Turning it on** (after Khoa has reviewed this design):
+**How it was turned on** (done on 7 Oct 2026; kept as the record, and as the checklist for switching it off and on again):
 
 1. Tag at least one `@staging` Playwright test (Kylee). Without one, `smoke` runs only the health and frontend checks
    and `release` refuses to tag. Khoa suggested a CORS check from the frontend's origin as the first.

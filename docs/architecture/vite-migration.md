@@ -42,7 +42,7 @@ Behaviour differences worth knowing:
 | `.github/workflows/ci.yml` | The frontend unit-test step runs `npm test -- --coverage --reporter=default --reporter=json --outputFile.json=reports/frontend-tests.json` (Vitest) instead of Jest. The test summary, coverage gate and artifact upload steps are unchanged, and the job names (the required checks) are unchanged. |
 | `.github/workflows/security.yml` | The summary line copes with an empty suppression register. |
 | `.github/dependency-check-suppressions.xml` | Empty (the ten `react-scripts` entries are gone). `src/backend/tests/securitySuppressions.test.js` still checks any future entry; TC-SEC-01 now accepts an empty register. |
-| `.github/dependabot.yml` | The comment about `react-scripts` pins is updated. |
+| `.github/dependabot.yml` | The comment about `react-scripts` pins is updated, and ESLint major-version updates are ignored until `eslint-plugin-react` supports ESLint 10 (a Dependabot ESLint 10 pull request fails lint, E2E and the container check). |
 | `scripts/render-deploy.js` | The frontend path filter (which changes trigger a frontend deploy) follows the renames and the new files: `src/index.jsx`, `index.html`, `vite.config.mjs`, and `*.test.jsx` is ignored like `*.test.js`. `src/backend/tests/renderDeploy.test.js` covers it. |
 | `Dockerfile.frontend`, `.dockerignore` | Copy `index.html`, `vite.config.mjs` and `src/index.jsx`; the build stage otherwise runs `npm run build` as before. |
 | `docker/nginx.conf` | Long-lived caching applies to `/assets/` (where Vite puts hashed files) instead of `/static/`. |
