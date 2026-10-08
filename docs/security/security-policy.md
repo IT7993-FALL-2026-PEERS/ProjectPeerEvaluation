@@ -38,6 +38,12 @@ is no longer needed, delete it.
 
 ## 3. Accepted risks: OWASP Dependency-Check (2 Oct 2026)
 
+> **Update (Oct 2026): closed.** The frontend moved from Create React App to Vite and Vitest, and `react-scripts`
+> and its dependency tree are gone from the lockfile. All 10 accepted risks below disappeared with them, so
+> `.github/dependency-check-suppressions.xml` is now empty and `npm audit` reports 0 vulnerabilities for the
+> frontend. The text below is kept as the record of what was accepted and why; the table is history, not a
+> current list. A new suppression needs a real reason, an expiry and a row here (section 3 rules unchanged).
+
 OWASP scanned 122 dependencies and found 23 issues: 9 at CVSS 7 or higher (the blocking ones), 13 moderate,
 1 low. **All 9 are in the frontend lockfile and reach the project only through `react-scripts` 5.0.1** (the
 inherited Create React App build tooling). The backend has none. `npm audit` for the backend reports 0.
@@ -46,7 +52,8 @@ None of these packages is part of the frontend production bundle or the backend 
 build time or by the development server (`npm start`), which is never deployed. Render builds the static
 bundle with `npm run build` and serves only its output. Upgrading is not possible without replacing
 `react-scripts` (no newer 5.x exists), and replacing the build tool is outside the sponsor's scope
-("replacing the existing technology stack"; a Vite migration is recommended as future work).
+("replacing the existing technology stack"). It was later done as a build-tool swap that keeps React, Express and
+MongoDB (see the update above).
 
 | Advisory | Package | CVSS | Reached through | Used for |
 |---|---|---|---|---|
@@ -68,6 +75,9 @@ The braces entry was added the same evening (backlog CICD-53): OWASP started rep
 report artifact.
 
 ## 4. Dependabot alerts (23 open on 2 Oct 2026)
+
+> **Update (Oct 2026):** the packages these alerts name left the frontend lockfile with the move to Vite; check the
+> Dependabot tab after the migration merges, and dismiss any alert that remains with a reason.
 
 Dependabot lists the same tooling: 9 high, 13 medium, 1 low, all in the frontend lockfile, all reached through
 `react-scripts` (`svgo`, `postcss`, `serialize-javascript`, `nth-check`, `node-forge`, `webpack-dev-middleware`,

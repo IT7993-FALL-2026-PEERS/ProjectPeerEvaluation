@@ -9,7 +9,7 @@ deliverable. This strategy only covers `src/frontend`.
 
 ## 1. Current state
 
-- Tooling already present via Create React App: Jest + `@testing-library/react` +
+- Tooling (Jest through Create React App at first, Vitest since the move to Vite in Oct 2026): `@testing-library/react` +
   `@testing-library/user-event` (in `package.json`, previously unused — no `src/setupTests.js`
   existed, so `jest-dom` matchers weren't even wired up).
 - First unit tests landed in [PR #1](../../pull/1): `AuthContext` (login/logout + localStorage
@@ -19,7 +19,7 @@ deliverable. This strategy only covers `src/frontend`.
 
 ## 2. Unit testing
 
-Continue with Jest + React Testing Library, colocated in `__tests__` folders next to the source
+Continue with Vitest + React Testing Library, colocated in `__tests__` folders next to the source
 file they cover (matches the convention started in PR #1). Prioritized by size/risk, not yet covered:
 
 | File | Lines | Notes |
@@ -68,8 +68,7 @@ evaluation → submit → verify)"* — matches user stories US-S1/US-S2 in
 
 ## 5. Automated test reporting
 
-- Unit/integration: Jest's built-in `--coverage` + a JUnit XML reporter (e.g.
-  `jest-junit`) so CI can surface pass/fail and coverage trend, not just a pass/fail boolean.
+- Unit/integration: Vitest's built-in `--coverage` + its JSON reporter (read by `scripts/test-summary.js`) so CI can surface pass/fail and coverage trend, not just a pass/fail boolean.
 - E2E: Playwright's built-in HTML report, published as a CI artifact.
 - Both need to plug into M1 (Donald)'s CI pipeline as a reporting step — coordinate on where
   artifacts get published (PR comment vs. Actions summary vs. dashboard).

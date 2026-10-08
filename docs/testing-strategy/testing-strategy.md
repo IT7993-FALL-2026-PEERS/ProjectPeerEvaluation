@@ -29,7 +29,7 @@ Measured against `main` on 27 September, not against the Milestone 1 baseline.
 | Level | State | Where |
 |---|---|---|
 | Unit — backend | 15 test files using Node's built-in `node --test` | `src/backend/tests/` |
-| Unit — frontend | 8 test files using Jest + React Testing Library | `src/frontend/**/__tests__/` |
+| Unit — frontend | 8 test files using Vitest + React Testing Library | `src/frontend/**/__tests__/` |
 | Integration | None yet as a distinct level | — |
 | Regression | None | — |
 | End-to-end | Playwright installed; one spec that verifies the install, not the app | `e2e/setup.spec.js` |
@@ -44,8 +44,7 @@ No `coverageThreshold` is configured in either package, and no CI step collects 
 coverage. So the suite can grow while the proportion of the application it actually exercises
 falls, and nobody would see it. Closing that is an M3 task in Milestone 2.
 
-**Two test runners are in use.** The backend uses `node --test`; the frontend uses Jest via
-Create React App. That is workable — they test different codebases — but it means two
+**Two test runners are in use.** The backend uses `node --test`; the frontend uses Vitest (through Vite, since Oct 2026). That is workable — they test different codebases — but it means two
 different coverage mechanisms and two report formats to merge. See [Decision 1, confirmed in §7].
 
 ## 2. Test levels
@@ -265,14 +264,14 @@ opening floors:
   `index.js`. Tests, seed scripts and migrations are not counted. Source files that no test loads
   still count, as 0%: the backend uses `c8 --all` for this (Node's built-in coverage only sees
   files a test imports, so an untested new controller would not have lowered it; checked with a
-  probe file), and Jest's `collectCoverageFrom` does the same for the frontend. A new folder of
+  probe file), and Vitest's `coverage.include` does the same for the frontend. A new folder of
   backend source has to be added to the `--include` list in `src/backend/package.json`.
 - **Floors live in `coverage-floors.json`** and are checked by `scripts/coverage-gate.js`
   (a missing or unreadable report fails the gate, so a broken run cannot pass).
 - **Ratchet rule:** floors only go up. When the job summary says a metric is 5 or more points
   above its floor, raise the floor in the same pull request. Never lower a floor to make a
   build pass; add tests instead.
-- **Run it locally:** `npm test -- --watchAll=false --coverage && node scripts/coverage-gate.js frontend`,
+- **Run it locally:** `npm test -- --coverage && node scripts/coverage-gate.js frontend`,
   and `cd src/backend && npm run test:coverage && node ../../scripts/coverage-gate.js backend`.
 - **The gap is on the frontend** (about 42% on 5 Oct, up from 8% on 2 Oct): `CourseManagement.js` was
   2,687 lines, 62% of the frontend's executable lines, and is being split into tested components
@@ -314,7 +313,7 @@ with the backend and database work.
 
 ## 7. Decisions (confirmed 27 September 2026)
 
-1. **Test runners — keep both.** `node --test` for the backend and Jest for the frontend.
+1. **Test runners — keep both.** `node --test` for the backend and Vitest for the frontend.
    CI publishes both coverage reports; switching runners mid-project costs more than it saves.
 2. **Coverage — 70% is the target, not the opening threshold.** CI first measures the
    baseline (reporting only), the enforced floor starts just below it, and it only ratchets
