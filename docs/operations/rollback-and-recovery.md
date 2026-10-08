@@ -52,6 +52,7 @@ Open the run and find the first red job.
 | Prepare: "No successful CI run on main for …" | A manual run for a commit whose CI on `main` failed or hasn't finished | Wait for CI (or re-run it if an outage cancelled it), then run CD again |
 | Prepare: rollback_to errors | Bad `rollback_to` value, or the tag isn't a release the pipeline made | Use an exact `rc-…` tag name from Releases, of a pipeline release |
 | images | The images didn't build or weren't healthy in Compose | Same as a red `Containers` check in CI: reproduce with `npm run docker:up` |
+| Deploy or rollback: "The RENDER_…_DEPLOY_HOOK_URL secret is empty or missing" | The named secret isn't set in the `staging` environment (the job stops before any deploy) | Add it ([Render handover](render-handover.md#render-settings-to-know)) |
 | Deploy to staging: "set SERVICE, SHA and HOOK_URL" | A deploy hook secret is missing | Add it to the `staging` environment ([Render handover](render-handover.md#render-settings-to-know)) |
 | Deploy: "Render refused the deploy hook (HTTP 4xx)" | The hook was regenerated or deleted in Render | New hook from Render > service > Settings > Deploy Hook, saved to the `staging` environment secret |
 | Deploy: "was not live after 20 minutes" | Render's build failed, the service is suspended, or the new version doesn't start | Render > service > **Events / Logs**. Suspended: R3. Build or start error: fix in a pull request, or roll back (R1) |
