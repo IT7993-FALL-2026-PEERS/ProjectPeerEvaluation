@@ -36,6 +36,9 @@ test('frontend code and its package files deploy the frontend; tests do not', ()
   // JSX files use the .jsx extension, and the entry file is src/index.jsx.
   assert.ok(matchesService('src/frontend/pages/LoginPage.jsx', SERVICES.frontend));
   assert.ok(matchesService('src/index.jsx', SERVICES.frontend));
+  // The Vite entry page and config change what the build produces.
+  assert.ok(matchesService('index.html', SERVICES.frontend));
+  assert.ok(matchesService('vite.config.mjs', SERVICES.frontend));
   assert.ok(!matchesService('src/frontend/pages/__tests__/LoginPage.test.jsx', SERVICES.frontend));
   assert.ok(!matchesService('src/frontend/components/Dialog.test.jsx', SERVICES.frontend));
   assert.ok(!matchesService('.github/workflows/ci.yml', SERVICES.frontend));

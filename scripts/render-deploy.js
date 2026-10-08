@@ -27,7 +27,7 @@ const SERVICES = {
   },
   frontend: {
     versionUrl: 'https://peers-frontend-staging.onrender.com/version.txt',
-    paths: ['src/index.jsx', 'src/frontend/**', 'public/**', 'package.json', 'package-lock.json'],
+    paths: ['index.html', 'vite.config.mjs', 'src/index.jsx', 'src/frontend/**', 'public/**', 'package.json', 'package-lock.json'],
     ignoredPaths: ['src/frontend/**/__tests__/**', '**/*.test.js', '**/*.test.jsx', '**/*.md'],
   },
 };
