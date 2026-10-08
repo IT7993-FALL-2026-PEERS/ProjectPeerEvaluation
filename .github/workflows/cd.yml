@@ -253,6 +253,25 @@ jobs:
         with:
           node-version-file: .nvmrc
 
+      # The expression below falls back to the frontend hook when the backend secret is empty, so
+      # check the service's own secret first: a missing one fails here, by name, and never deploys
+      # the wrong service.
+      - name: Check this service's deploy hook secret is set
+        env:
+          SERVICE: ${{ matrix.service }}
+          BACKEND_HOOK: ${{ secrets.RENDER_BACKEND_DEPLOY_HOOK_URL }}
+          FRONTEND_HOOK: ${{ secrets.RENDER_FRONTEND_DEPLOY_HOOK_URL }}
+        run: |
+          if [ "$SERVICE" = backend ]; then
+            name=RENDER_BACKEND_DEPLOY_HOOK_URL; hook="$BACKEND_HOOK"
+          else
+            name=RENDER_FRONTEND_DEPLOY_HOOK_URL; hook="$FRONTEND_HOOK"
+          fi
+          if [ -z "$hook" ]; then
+            echo "::error::The $name secret is empty or missing in the staging environment."
+            exit 1
+          fi
+
       - name: Deploy and wait until live
         run: node scripts/render-deploy.js
         env:
@@ -367,6 +386,25 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: .nvmrc
+
+      # The expression below falls back to the frontend hook when the backend secret is empty, so
+      # check the service's own secret first: a missing one fails here, by name, and never deploys
+      # the wrong service.
+      - name: Check this service's deploy hook secret is set
+        env:
+          SERVICE: ${{ matrix.service }}
+          BACKEND_HOOK: ${{ secrets.RENDER_BACKEND_DEPLOY_HOOK_URL }}
+          FRONTEND_HOOK: ${{ secrets.RENDER_FRONTEND_DEPLOY_HOOK_URL }}
+        run: |
+          if [ "$SERVICE" = backend ]; then
+            name=RENDER_BACKEND_DEPLOY_HOOK_URL; hook="$BACKEND_HOOK"
+          else
+            name=RENDER_FRONTEND_DEPLOY_HOOK_URL; hook="$FRONTEND_HOOK"
+          fi
+          if [ -z "$hook" ]; then
+            echo "::error::The $name secret is empty or missing in the staging environment."
+            exit 1
+          fi
 
       # ROLLBACK, the only mode that may deploy an older commit than the live one.
       - name: Redeploy ${{ needs.prepare.outputs.previous_tag }} and wait until live
