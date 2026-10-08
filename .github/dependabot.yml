@@ -63,3 +63,41 @@ updates:
     groups:
       github-actions:
         patterns: ["*"]
+
+  # Base images. Nothing else watches the image tags in the Dockerfiles and the Compose
+  # file; nginx 1.27 went out of support unnoticed before this was added. The tags are
+  # floating (node:24-alpine), so this reports newer minor and major tags, not a patch
+  # rebuilt under the same tag.
+  - package-ecosystem: docker
+    directories:
+      - /
+      - /src/backend
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: America/New_York
+    ignore:
+      # The runtime is Node 24 LTS to match .nvmrc and engines; moving to another Node
+      # major is a decision, not an automatic update.
+      - dependency-name: "node"
+        update-types: ["version-update:semver-major"]
+      # We follow nginx's stable branch (even minor numbers, Dockerfile.frontend). The odd
+      # ones are mainline. Add the next odd number here if Dependabot proposes it.
+      - dependency-name: "nginx"
+        versions: ["1.31.x", "1.33.x", "1.35.x"]
+    groups:
+      docker-minor-and-patch:
+        update-types: [minor, patch]
+
+  # docker-compose.yml: the mongo image used for local runs and the Compose smoke test.
+  - package-ecosystem: docker-compose
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: America/New_York
+    groups:
+      docker-minor-and-patch:
+        update-types: [minor, patch]
