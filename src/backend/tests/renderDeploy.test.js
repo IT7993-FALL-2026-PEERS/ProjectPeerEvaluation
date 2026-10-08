@@ -33,6 +33,11 @@ test('frontend code and its package files deploy the frontend; tests do not', ()
   assert.ok(matchesService('package-lock.json', SERVICES.frontend));
   assert.ok(!matchesService('src/frontend/pages/__tests__/Login.test.js', SERVICES.frontend));
   assert.ok(!matchesService('src/backend/index.js', SERVICES.frontend));
+  // JSX files use the .jsx extension, and the entry file is src/index.jsx.
+  assert.ok(matchesService('src/frontend/pages/LoginPage.jsx', SERVICES.frontend));
+  assert.ok(matchesService('src/index.jsx', SERVICES.frontend));
+  assert.ok(!matchesService('src/frontend/pages/__tests__/LoginPage.test.jsx', SERVICES.frontend));
+  assert.ok(!matchesService('src/frontend/components/Dialog.test.jsx', SERVICES.frontend));
   assert.ok(!matchesService('.github/workflows/ci.yml', SERVICES.frontend));
 });
 
