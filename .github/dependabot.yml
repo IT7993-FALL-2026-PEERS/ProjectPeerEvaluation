@@ -63,3 +63,47 @@ updates:
     groups:
       github-actions:
         patterns: ["*"]
+
+  # Base images. Nothing else watches the image tags in the Dockerfiles and the Compose
+  # file; nginx 1.27 went out of support unnoticed before this was added.
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: America/New_York
+    # The runtime is Node 24 LTS to match .nvmrc and engines; moving to another Node
+    # major is a decision, not an automatic update.
+    ignore:
+      - dependency-name: "node"
+        update-types: ["version-update:semver-major"]
+    groups:
+      docker-minor-and-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: docker
+    directory: /src/backend
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: America/New_York
+    ignore:
+      - dependency-name: "node"
+        update-types: ["version-update:semver-major"]
+    groups:
+      docker-minor-and-patch:
+        update-types: [minor, patch]
+
+  # docker-compose.yml: the mongo image used for local runs and the Compose smoke test.
+  - package-ecosystem: docker-compose
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: America/New_York
+    groups:
+      docker-minor-and-patch:
+        update-types: [minor, patch]
