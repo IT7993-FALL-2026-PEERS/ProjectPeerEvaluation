@@ -11,7 +11,7 @@ name: peers
 
 services:
   mongo:
-    image: mongo:7
+    image: mongo:9
     restart: unless-stopped
     ports:
       # Bound to loopback only so the database is not exposed to your network.
