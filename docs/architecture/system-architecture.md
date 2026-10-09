@@ -56,7 +56,7 @@ flowchart LR
 
 ## 2. Frontend — `src/frontend/`
 
-A Vite single-page app (React 19, React Router 7, MUI 7), built to static
+A Vite single-page app (React 19, React Router 7, MUI 9), built to static
 files and served by Render's static site with a rewrite of every path to `index.html`.
 
 | Route (`App.jsx`) | Page | Access |
