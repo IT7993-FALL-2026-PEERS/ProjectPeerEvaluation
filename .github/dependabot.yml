@@ -82,10 +82,11 @@ updates:
       # major is a decision, not an automatic update.
       - dependency-name: "node"
         update-types: ["version-update:semver-major"]
-      # We follow nginx's stable branch (even minor numbers, Dockerfile.frontend). The odd
-      # ones are mainline. Add the next odd number here if Dependabot proposes it.
+      # We follow nginx's stable branch (even minor numbers, Dockerfile.frontend); the odd
+      # ones are mainline. The branch changes by a minor step (1.30 to 1.32), so skip minor
+      # updates here and move to the next stable branch by hand each spring.
       - dependency-name: "nginx"
-        versions: ["1.31.x", "1.33.x", "1.35.x"]
+        update-types: ["version-update:semver-minor"]
     groups:
       docker-minor-and-patch:
         update-types: [minor, patch]
@@ -98,6 +99,11 @@ updates:
       day: monday
       time: "06:00"
       timezone: America/New_York
+    # Staging (Atlas) and the test suites run MongoDB 8.0; the Compose image follows them.
+    # A new MongoDB major is a decision, not an automatic update.
+    ignore:
+      - dependency-name: "mongo"
+        update-types: ["version-update:semver-major"]
     groups:
       docker-minor-and-patch:
         update-types: [minor, patch]

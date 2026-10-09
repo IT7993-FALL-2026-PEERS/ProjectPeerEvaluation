@@ -10,7 +10,7 @@ The stack is three services started in order, each waiting for the previous one 
 
 | Service | Image | Port on your machine | Healthy when |
 |---|---|---|---|
-| `mongo` | `mongo:7` | 27017 (loopback only) | `mongosh` ping succeeds |
+| `mongo` | `mongo:8` | 27017 (loopback only) | `mongosh` ping succeeds |
 | `backend` | built from `src/backend/Dockerfile` | 5000 | `GET /api/health` returns 200 (Mongo connected) |
 | `frontend` | built from `Dockerfile.frontend` (nginx) | 3000 | `GET /` returns 200 |
 

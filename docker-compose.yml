@@ -11,7 +11,7 @@ name: peers
 
 services:
   mongo:
-    image: mongo:7
+    image: mongo:8
     restart: unless-stopped
     ports:
       # Bound to loopback only so the database is not exposed to your network.
@@ -20,7 +20,7 @@ services:
       - mongo_data:/data/db
     networks: [peers]
     healthcheck:
-      # Asks mongod to answer a ping; mongosh ships in the mongo:7 image. Exits 1 if
+      # Asks mongod to answer a ping; mongosh ships in the mongo:8 image. Exits 1 if
       # the reply is not ok, so Compose marks the service unhealthy.
       test: ["CMD", "mongosh", "--quiet", "--eval", "quit(db.adminCommand('ping').ok ? 0 : 1)"]
       interval: 10s
