@@ -155,9 +155,9 @@ A caller must also grant `packages: write` to the job that calls this workflow.
 
 ## Staging regression (`staging-regression.yml`)
 
-Manual only (Actions tab > Run workflow) while no tests are tagged `@staging` and the variables below are not set. The weekly schedule (Tuesday 06:00 UTC) is kept as a comment in the workflow and comes back once staging is running. Read-only health and frontend checks, then Playwright tests tagged `@staging`.
+Runs every Tuesday at 06:00 UTC (CICD-43), when CD calls it after a deploy, and by hand (Actions tab > Run workflow). Read-only health and frontend checks, then Playwright tests tagged `@staging`. A scheduled run while staging is suspended fails, which is the signal that staging is down. Resume staging (ask Khoa) before relying on the schedule.
 Tests with that tag must not send email (Mailtrap allows 50 a month) and must not need the local E2E control server.
-Set the `STAGING_URL` and `STAGING_API_URL` repository variables; a manual run can override both.
+Set the `STAGING_URL` and `STAGING_API_URL` repository variables (the schedule reads them; they are not secrets). A manual run can override both: pointing it at a broken URL, such as `https://example.invalid`, must fail at the "Staging is up" step.
 
 ## Environments and secrets (CICD-38)
 
