@@ -14,7 +14,7 @@ settings and secrets are, and what to do when something is red. The design behin
 | CD | `cd.yml` | after CI passes on a push to `main`; by hand on `main` | Deploys staging; with `CD_RELEASE=on` also builds images, runs smoke tests, tags `rc-*`, rolls back on failure ([release procedure](release-procedure.md)) |
 | Image build and push | `image-build.yml` | called by CD; by hand | Builds both images, checks them healthy, pushes to GHCR tagged with the commit |
 | Deployment status | `deployment-status.yml` | called by CD | Health check and "Deployment status" section in the CD summary |
-| Staging regression | `staging-regression.yml` | called by CD (smoke); by hand | Read-only health, frontend and `@staging` Playwright tests against staging. Never sends email |
+| Staging regression | `staging-regression.yml` | called by CD (smoke); weekly, Tue 06:00 UTC; by hand | Read-only health, frontend and `@staging` Playwright tests against staging. Never sends email |
 | Promote release candidate | `promote.yml` | by hand, from an `rc-*` tag | Waits for approval in `production`, then publishes a GitHub Release ([release procedure](release-procedure.md#4-promote-a-release-candidate-optional)) |
 | Dependabot | `.github/dependabot.yml` | Mondays 06:00 New York | Update pull requests: npm frontend, npm backend, GitHub Actions |
 
@@ -50,7 +50,7 @@ or every pull request waits forever for a check that no longer runs.
 | `RENDER_BACKEND_DEPLOY_HOOK_URL` | secret | environment `staging` | CD deploy and rollback |
 | `RENDER_FRONTEND_DEPLOY_HOOK_URL` | secret | environment `staging` | CD deploy and rollback |
 | `CD_RELEASE` | repository variable, `on` to enable | Settings > Secrets and variables > Actions > Variables | CD release stages. **On** since 7 Oct 2026 |
-| `STAGING_URL`, `STAGING_API_URL` | repository variables | same | Staging regression when run by hand. Not set; CD passes the URLs itself |
+| `STAGING_URL`, `STAGING_API_URL` | repository variables | same | Staging regression on its weekly schedule and by hand. Must be set for the schedule; CD passes the URLs itself |
 | `staging` | environment, deploys from `main` only | Settings > Environments | holds the deploy hooks |
 | `production` | environment: Dr. Vyas or Khoa approves, no self-review, `rc-*` tags only, no secrets | Settings > Environments | `promote.yml` approval gate only |
 | `main - peers-*-staging` | environments created by Render | — | Render's own deploy records. Don't delete them; Render recreates them |
