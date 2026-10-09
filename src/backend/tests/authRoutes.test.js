@@ -17,6 +17,6 @@ test('auth routes: loads silently and registers each POST endpoint once', (t) =>
   for (const path of paths) {
     const matches = routes.filter(route => route.path === path);
     assert.equal(matches.length, 1, path + ' should be registered once');
-    assert.deepEqual(matches[0].methods, { post: true });
+    assert.deepEqual({ ...matches[0].methods }, { post: true });
   }
 });

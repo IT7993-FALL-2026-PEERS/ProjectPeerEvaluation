@@ -19,6 +19,7 @@ app.set('trust proxy', trustProxyHops());
 // CORS: only the frontend at FRONTEND_URL, plus localhost outside production. See config/corsConfig.js.
 app.use(cors(corsOptions()));
 app.use(express.json());
+app.use(require('./middleware/defaultBody'));
 
 // Request logger middleware (redacts student evaluation tokens)
 app.use(requestLogger);
@@ -78,4 +79,12 @@ const PORT = process.env.PORT || 5000;
 // The deployed commit in the startup line, so Render's log shows which version started (Render sets
 // RENDER_GIT_COMMIT; it's also in /api/health).
 const commit = process.env.RENDER_GIT_COMMIT ? ` (commit ${process.env.RENDER_GIT_COMMIT.slice(0, 7)})` : '';
-applyServerTimeouts(app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}${commit}`)));
+// Express 5 passes a failed bind (such as EADDRINUSE) to this callback instead of throwing, and the
+// open MongoDB connection would keep a listener-less process alive, so stop here.
+applyServerTimeouts(app.listen(PORT, (err) => {
+  if (err) {
+    console.error(`❌ Could not listen on port ${PORT}: ${err.message}`);
+    process.exit(1);
+  }
+  console.log(`🚀 Server running on port ${PORT}${commit}`);
+}));

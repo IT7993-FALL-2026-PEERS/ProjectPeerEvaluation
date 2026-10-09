@@ -346,11 +346,10 @@ exports.getCourseReport = async (req, res, next) => {
 exports.downloadReport = async (req, res, next) => {
   try {
     const { course_id } = req.params;
-    const { gradingMethod = 'mean', boostFactor = 0.5, protectionThreshold = 80 } = req.query;
-    
-    // Get the report data (reuse the logic from getCourseReport)
+
+    // Get the report data (reuse the logic from getCourseReport, which reads the same query and
+    // applies the same defaults; req.query is read-only in Express 5)
     req.params.course_id = course_id;
-    req.query = { gradingMethod, boostFactor, protectionThreshold };
     
     // Create a mock response object to capture the report data
     const mockRes = {

@@ -98,3 +98,20 @@ test('TC-10-25: another professor cannot send for the course, and no email goes 
   assert.equal(sentEmails.length, 0);
   assert.equal((await Student.findById(IDS.ann)).evaluation_token, null);
 });
+
+test('TC-10-26: sending with no request body works, the way the course page sends it', async () => {
+  // The page calls api.post(url) with nothing to send. Every other test passes body: {}, which hides
+  // handlers that read req.body when the request has none (Express 5 leaves it undefined).
+  const post = (path) => fetch(`${app.baseUrl}${path}`, { method: 'POST', headers: { Authorization: `Bearer ${ada}` } });
+  const course = await post(sendPath(IDS.courseAda));
+  assert.equal(course.status, 200);
+  assert.equal((await course.json()).emails_sent, 4);
+
+  clearEmails();
+  const team = await post(`/api/courses/${IDS.courseAda}/teams/${IDS.teamAlpha}/evaluations/send`);
+  assert.equal(team.status, 200);
+  assert.ok(sentEmails.length > 0);
+
+  const remind = await post(`/api/courses/${IDS.courseAda}/evaluations/remind`);
+  assert.equal(remind.status, 200);
+});

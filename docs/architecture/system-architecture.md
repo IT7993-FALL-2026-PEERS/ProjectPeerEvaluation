@@ -87,7 +87,7 @@ components (CICD-57) and was 1,478 lines on 5 Oct 2026.
 
 ## 3. Backend — `src/backend/`
 
-An Express 4 application started by `index.js`. Requests pass through the same layers:
+An Express 5 application started by `index.js`. Requests pass through the same layers:
 
 ```mermaid
 flowchart TB
