@@ -19,6 +19,7 @@ app.set('trust proxy', trustProxyHops());
 // CORS: only the frontend at FRONTEND_URL, plus localhost outside production. See config/corsConfig.js.
 app.use(cors(corsOptions()));
 app.use(express.json());
+app.use(require('./middleware/defaultBody'));
 
 // Request logger middleware (redacts student evaluation tokens)
 app.use(requestLogger);

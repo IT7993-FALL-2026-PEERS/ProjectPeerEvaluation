@@ -120,6 +120,21 @@ test('TC-19-20: the CSV export has one row per student with the same scores as t
   assert.ok(lines.includes('1004,Di Diaz,di@example.edu,Beta,58.33,58.33,F,1,0'));
 });
 
+test('TC-19-22: the CSV export applies the grading method from the query, like the report does', async () => {
+  const res = await fetch(`${app.baseUrl}/api/courses/${IDS.courseAda}/reports/download?gradingMethod=curved`, { headers: { Authorization: `Bearer ${ada}` } });
+  assert.equal(res.status, 200);
+  const rows = Object.fromEntries((await res.text()).split('\n').slice(1).map((line) => {
+    const cells = line.split(',');
+    return [cells[1].split(' ')[0].toLowerCase(), cells];
+  }));
+  // Columns: ..., 4 Original Score, 5 Final Score. Ben (79.17) and Di (58.33) are lifted, Ann and Cy are not.
+  near(Number(rows.ben[4]), 79.17, 'Ben original');
+  near(Number(rows.ben[5]), 80.52, 'Ben lifted');
+  near(Number(rows.di[5]), 70.1, 'Di lifted');
+  assert.equal(Number(rows.ann[5]), 100);
+  assert.equal(Number(rows.cy[5]), 90);
+});
+
 test('TC-19-21: a name that starts like a spreadsheet formula or holds a comma cannot break out of its cell', async () => {
   await Student.updateOne({ _id: IDS.ann }, { name: '=HYPERLINK("http://x")' });
   await Student.updateOne({ _id: IDS.ben }, { name: 'Baker, Ben' });

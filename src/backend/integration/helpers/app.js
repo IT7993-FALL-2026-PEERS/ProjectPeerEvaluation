@@ -28,6 +28,7 @@ nodemailer.createTransport = () => {
 async function startApp() {
   const app = express();
   app.use(express.json());
+  app.use(require('../../middleware/defaultBody'));
   app.use('/api/auth', require('../../routes/auth'));
   app.use('/api/courses', require('../../routes/courses'));
   app.use('/api/evaluate', require('../../routes/evaluate'));
