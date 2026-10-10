@@ -10,14 +10,17 @@ name: Staging regression
 # cannot run here; tests meant for staging carry the @staging tag in their title.
 #
 # Weekly, not nightly: staging is suspended to save money, and each run would fail while it is.
-# Ask Khoa to resume staging before a manual run. Set the repository variables STAGING_URL
+# A scheduled run while staging is suspended fails on purpose (a red run is the signal). Ask Khoa to
+# resume staging before a manual run. Set the repository variables STAGING_URL
 # (frontend) and STAGING_API_URL (backend, ending in /api) under Settings > Variables; they are
 # not secrets. A manual run can override both to point at a broken URL and should fail.
 
 on:
-  # Re-enable once staging is running and the STAGING_URL / STAGING_API_URL variables are set:
-  # schedule:
-  #   - cron: "0 6 * * 2" # Tuesdays 06:00 UTC, away from the Monday security scan
+  # Weekly, Tuesdays 06:00 UTC, away from the Monday security scan. A scheduled run has no inputs, so it
+  # reads the STAGING_URL / STAGING_API_URL repository variables and fails by name if they are not set.
+  # GitHub only runs schedules from the default branch (main).
+  schedule:
+    - cron: "0 6 * * 2"
   # cd.yml calls it as the post-deploy smoke tests (CICD-28), with the staging URLs as inputs.
   workflow_call:
     outputs:
