@@ -4,16 +4,16 @@ The staging environment runs on accounts that belong to people, not to the unive
 paid for on Khoa's card. **Before Khoa graduates, the team has to hand it over or shut it down.** This page lists
 what exists and both options, and ends with the final repository delivery checklist (M1).
 
-Cells marked **to confirm** weren't recorded anywhere in the repository when this was written (5 Oct 2026). Khoa
-fills them in.
+The MongoDB Atlas and Mailtrap accounts are Khoa's personal accounts, not the university's. The repository does not
+record their email addresses.
 
 ## What runs where
 
 | Service | Account holder | What's in it | Cost |
 |---|---|---|---|
 | Render workspace | Khoa (paid on Khoa's card) | `peers-backend-staging`: Node web service, Starter plan, Virginia. `peers-frontend-staging`: static site. Both from the Blueprint in `render.yaml`. Older, unused services were suspended in CICD-38 | Starter plan for the backend (doesn't sleep, can send SMTP); the static site is free. 500 build minutes a month |
-| MongoDB Atlas | **to confirm** | One M0 (free) cluster, the staging database | free |
-| Mailtrap | **to confirm** | The Email Testing sandbox that staging sends to | free plan (1 email per 10 s) |
+| MongoDB Atlas | Khoa (personal account) | One M0 (free) cluster, the staging database | free |
+| Mailtrap | Khoa (personal account) | The Email Testing sandbox that staging sends to | free plan (1 email per 10 s) |
 | GitHub organisation `IT7993-FALL-2026-PEERS` | admins `dgobin-ksu`, `KhoaHo-kho6` | Repository, Actions, environments, releases, GHCR images | free (public repository) |
 
 ### Render settings to know
@@ -43,10 +43,14 @@ Ask the sponsor (Dr. Vyas) whether the department wants to keep a running stagin
 
 The new owner (the sponsor, the department, or next year's team) takes over the accounts.
 
-1. **Render.** Invite the new owner to the workspace as Admin, then transfer ownership (Workspace > Settings >
-   Members), or have them create a workspace and deploy `render.yaml` as a new Blueprint there. Put the paid plan
-   on their billing details, and remove Khoa's card.
-2. **New workspace only:** copy the `sync: false` environment variables across (MongoDB, SMTP), generate new
+1. **Render.** A Hobby workspace cannot have other members, and Render's documentation describes no way to
+   transfer a workspace to someone else ([Workspaces, Members, and Roles](https://render.com/docs/team-members)).
+   So the usual route is for the new owner to create their own workspace, put the paid plan on their billing
+   details, and deploy `render.yaml` as a new Blueprint there (step 2). Khoa then deletes the old workspace and
+   removes his card. The other route is to upgrade this workspace to a plan that allows members, invite the new
+   owner as Admin, and ask Render support whether the creator role can be handed over. Check which plan the
+   workspace is on (Billing) before choosing.
+2. **New workspace** (the usual route): copy the `sync: false` environment variables across (MongoDB, SMTP), generate new
    deploy hooks, and save them as the `staging` environment secrets in GitHub. If the service URLs change,
    update `FRONTEND_URL` and `REACT_APP_API_URL` in `render.yaml` and the URLs in `cd.yml`,
    `scripts/render-deploy.js` and `promote.yml`.
