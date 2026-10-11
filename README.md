@@ -404,12 +404,17 @@ E2E_START_SERVER=1 npm run test:e2e
 The first end-to-end run on a new machine also needs Chromium's system libraries. If it fails with
 `error while loading shared libraries: libnspr4.so` (or `libnss3`, `libasound`), install them once with
 `sudo npx playwright install-deps chromium`. Without sudo, run the tests in Playwright's own image, which has the
-browser and its libraries (use the image tag that matches the `@playwright/test` version in `package-lock.json`):
+browser and its libraries. The image tag has to match the `@playwright/test` version in `package-lock.json`, so the
+command reads it from there and keeps working after a Playwright update:
 
 ```bash
+PW=$(node -p "require('./package-lock.json').packages['node_modules/@playwright/test'].version")
 docker run --rm --network host --user "$(id -u):$(id -g)" -e HOME=/tmp/home -e CI=true -e E2E_START_SERVER=1 \
-  -v "$PWD:/work" -w /work mcr.microsoft.com/playwright:v1.63.0-noble npm run test:e2e
+  -v "$PWD:/work" -w /work "mcr.microsoft.com/playwright:v${PW}-noble" npm run test:e2e
 ```
+
+After a Playwright version bump, a local run (without Docker) also needs the matching browser once:
+`npx playwright install chromium`. Without it every end-to-end test fails with "Executable doesn't exist".
 
 `npm ci` may warn that install scripts (for example `core-js`) were not run and need approving. That is npm 11
 being cautious; the app, tests and build don't need them.
