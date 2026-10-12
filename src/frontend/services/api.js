@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { getApiBaseUrl } from './apiUrl';
+import { isSessionExpired, notifySessionExpired } from './sessionExpired';
 
 const API_BASE_URL = getApiBaseUrl();
 
@@ -67,6 +68,9 @@ api.interceptors.response.use(
       error.userMessage = 'Server error occurred. Please try again later.';
     }
     
+    // An expired login token: say so once, whatever page the request came from.
+    if (isSessionExpired(error)) notifySessionExpired();
+
     return Promise.reject(error);
   }
 );

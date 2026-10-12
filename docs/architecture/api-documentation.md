@@ -34,7 +34,9 @@ Authorization: Bearer <access_token>
 
 Tokens are signed with `JWT_SECRET` (HS256) and expire after **1 hour**. There is no
 working refresh endpoint, so the user logs in again (see D-18 for the 30-minute
-requirement). Student endpoints under `/evaluate` use no login: the evaluation token in
+requirement). When a logged-in request gets a 401 (not a login or password-reset call),
+the app shows "Session timed out. Please log-in again!" with a Log in button that clears the
+stored login and opens the login page. Student endpoints under `/evaluate` use no login: the evaluation token in
 the URL is the only credential. It is 32 random bytes (64 hex characters) and expires
 `EVALUATION_TOKEN_TTL_DAYS` (default 14) after the latest invitation or reminder. The
 request log redacts it.

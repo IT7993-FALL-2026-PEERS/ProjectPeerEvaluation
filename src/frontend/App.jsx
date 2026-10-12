@@ -8,10 +8,12 @@ import Reports from './pages/Reports';
 import ResetPassword from './pages/ResetPassword';
 import Settings from './pages/Settings';
 import ProtectedRoute from './components/ProtectedRoute';
+import SessionExpiredBanner from './components/SessionExpiredBanner';
 
 function App() {
     return (
         <Router>
+            <SessionExpiredBanner />
             <Routes>
                 <Route path="/" element={<LoginPage />} />
                 <Route path="/course-management" element={<ProtectedRoute><CourseManagement /></ProtectedRoute>} />

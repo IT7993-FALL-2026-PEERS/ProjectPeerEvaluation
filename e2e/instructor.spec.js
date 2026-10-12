@@ -169,3 +169,21 @@ test('E2E-15: if the team list cannot be refreshed after a delete, the delete st
   await expect(alertWith(page, 'Failed to delete team')).toHaveCount(0);
   await expect(page.getByRole('cell', { name: 'Gamma', exact: true })).toHaveCount(0);
 });
+
+test('E2E-41: when the login has expired the page says so, and Log in goes back to the login page', async ({ page }) => {
+  await loginAsAda(page, passwords);
+  await expect(page).toHaveURL(/course-management/);
+
+  // An expired token and a bad one fail the same check on the server (a 401), so replace it with a bad one.
+  await page.evaluate(() => localStorage.setItem('peer_eval_token', 'an-expired-token'));
+  await page.reload();
+
+  await expect(page.getByText('Session timed out. Please log-in again!')).toBeVisible();
+  await expect(page).toHaveURL(/course-management/);
+
+  await page.getByRole('button', { name: 'Log in', exact: true }).click();
+  await expect(page).toHaveURL('/');
+  await expect(page.getByRole('heading', { name: 'Professor Login' })).toBeVisible();
+  await expect(page.getByText('Session timed out. Please log-in again!')).toHaveCount(0);
+  expect(await page.evaluate(() => localStorage.getItem('peer_eval_token'))).toBeNull();
+});
