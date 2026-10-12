@@ -110,6 +110,22 @@ test('TC-06-24: rows missing a required field are reported and the good rows are
   assert.equal(await Student.countDocuments({ course_id: IDS.courseAda, student_id: '1006' }), 0);
 });
 
+// FR-07 (CICD-47): a row whose email is not in the form name@domain.tld is reported, is not
+// saved, and the good rows are still added.
+test('TC-07-10: a row with a badly formed email is reported and not saved, and the good rows are still added', async () => {
+  const csv = [
+    'student_id,name,email,group_assignment',
+    '1005,Fay Foster,fay@example.edu,Gamma',
+    '1006,Gus Green,gus@example,Gamma',
+    '',
+  ].join('\n');
+  const res = await app.uploadCsv(uploadPath(IDS.courseAda), csv, { token: ada });
+  assert.equal(res.status, 200);
+  assert.deepEqual(res.body.students, ['1005']);
+  assert.equal(res.body.errors.length, 1);
+  assert.match(res.body.errors[0], /Invalid email/);
+  assert.equal(await Student.countDocuments({ course_id: IDS.courseAda, student_id: '1006' }), 0);
+});
 // Behaviour today, not a decision: a successful re-upload resets every evaluation link and deletes
 // submitted evaluations. Whether that should stay is a sponsor question (backlog CICD-39). If it is
 // changed on purpose, update this test with it.

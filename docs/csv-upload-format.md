@@ -30,20 +30,21 @@ ST004,Alice Brown,alice.brown@university.edu,
 3. **Required Fields**: student_id, name, and email are mandatory
 4. **Duplicates**: Students with existing student_ids in the course will be skipped
 5. **Group Assignment**: This field is optional and can be left empty
-6. **Email Format**: Should be valid email addresses
+6. **Email Format**: Each email must have the form `name@domain.tld`: one `@`, text before it, and a domain with a dot in it (for example `jane.smith@university.edu`), with no spaces inside the address. A row whose email does not match, such as `bob@`, `bob` or `bob@x`, is reported as an error and that student is not added. Only the form is checked: the system does not check that the address exists or can receive mail. Adding or editing a student by hand uses the same check.
 7. **Encoding**: UTF-8 encoding is recommended
 
 ## Error Handling
 
 A file with no usable rows (empty, header only, wrong column names, or every row missing a
-required field) is rejected with an error, and nothing on the course is changed. If only some
-rows have problems, those rows are reported and the rest are added.
+required field or having a badly formed email) is rejected with an error, and nothing on the
+course is changed. If only some rows have problems, those rows are reported and the rest are added.
 
 The system will provide feedback on:
 - Missing required columns
 - Invalid file format
 - Duplicate student IDs
 - Malformed data rows
+- Badly formed email addresses (the row is skipped)
 - Processing errors
 
 ## Column Flexibility

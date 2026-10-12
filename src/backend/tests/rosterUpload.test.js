@@ -141,3 +141,21 @@ test('TC-07-01: bad rows are reported and the good rows are still added', async 
   assert.match(body.errors[0], /Missing required fields/);
   assert.ok(calls.includes('delete-evaluations'));
 });
+
+// FR-07 (CICD-47): a row whose email is not in the form name@domain.tld is reported as an
+// error and not added, and the other rows are still added. Only the form is checked: this
+// makes no claim that the address can receive mail. Each case is its own test with its ID
+// written out, so scripts/check-rtm.js can find it.
+async function assertBadEmailReported(t, email) {
+  const csv = `${HEADER}S1,Alice,alice@example.com,Team A\nS2,Bob,${email},Team A\nS3,Carol,carol@example.com,\n`;
+  const { body, error } = await upload(t, csv);
+  assert.equal(error, undefined);
+  assert.deepEqual(body.students.sort(), ['S1', 'S3']);
+  assert.equal(body.errors.length, 1);
+  assert.match(body.errors[0], /Invalid email/);
+  assert.match(body.errors[0], /"student_id":"S2"/);
+}
+
+test('TC-07-04: a row with the email "bob@" is reported and the good rows are still added', (t) => assertBadEmailReported(t, 'bob@'));
+test('TC-07-05: a row with the email "bob" is reported and the good rows are still added', (t) => assertBadEmailReported(t, 'bob'));
+test('TC-07-06: a row with the email "bob@x" is reported and the good rows are still added', (t) => assertBadEmailReported(t, 'bob@x'));
