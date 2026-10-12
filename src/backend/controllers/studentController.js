@@ -3,6 +3,7 @@ const Student = require('../models/Student');
 const csv = require('csv-parser');
 const fs = require('fs');
 const { asText, firstNonText, validationError } = require('../utils/inputGuards');
+const { isEmailFormat } = require('../utils/emailFormat');
 
 // Manual add student to course
 exports.addStudent = async (req, res, next) => {
@@ -22,6 +23,9 @@ exports.addStudent = async (req, res, next) => {
       err.code = 'VALIDATION_ERROR';
       err.status = 400;
       return next(err);
+    }
+        if (!isEmailFormat(email.trim())) {
+      return next(validationError('email is not a valid email address.'));
     }
     // Check for duplicate student_id in this course
     const existing = await Student.findOne({ course_id, student_id: asText(student_id) });
@@ -150,6 +154,10 @@ exports.updateStudent = async (req, res, next) => {
         return next(err);
       }
       updates[field] = clearsTeam ? null : asText(value);
+    }
+    
+    if (updates.email !== undefined && !isEmailFormat(updates.email.trim())) {
+      return next(validationError('email is not a valid email address.'));
     }
     
     // Look the student up by ObjectIds, never by the raw request values
@@ -390,6 +398,10 @@ exports.uploadRoster = async (req, res, next) => {
         const email = (row.email || '').trim();
         if (!studentId || !name || !email) {
           errors.push(`Missing required fields in row: ${JSON.stringify(row)}`);
+          return;
+        }
+        if (!isEmailFormat(email)) {
+          errors.push(`Invalid email in row: ${JSON.stringify(row)}`);
           return;
         }
         // Prepare student object (evaluation_token will be generated when evaluations are sent)
