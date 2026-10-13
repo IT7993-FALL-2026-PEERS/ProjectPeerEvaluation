@@ -366,12 +366,19 @@ Multipart form with the CSV in the field `file` (format: [csv-upload-format.md](
 New students are created, existing ones (same university ID) are updated, and teams are
 created from the group column.
 
-> **Warning:** a roster upload that succeeds **deletes all submitted evaluations** for the
-> course and clears all evaluation tokens, even when students have already submitted. This
-> happens last, after the roster is applied. Whether it should is a sponsor decision (API-3).
+> A roster upload **never deletes submitted evaluations or clears evaluation links** (sponsor
+> decision of 12 Oct 2026, API-3). It adds the students who are new and applies the team names in
+> the file to students already in the course; students not in the file stay. A student who is moved
+> to another team is taken out of the old team (both lists and counts are updated). A student who has
+> **submitted or received evaluations keeps their team**, and the answer says so in `errors`, because a
+> move would leave the saved evaluations pointing at a team they are no longer in; their team can be
+> changed by hand. A student id that appears twice in the file is added once (the first row) and
+> reported. If the database saves only some of the new students, `students_failed` lists the ones it did
+> not save and the message says so. Clearing evaluations is a separate, explicit action
+> (`DELETE /courses/:course_id/evaluations/reset`).
 
 **200** `{ "message", "students": [ids added], "students_updated": [...], "teams_created",
-"team_names": [...], "evaluations_cleared", ... }`. Rows with problems come back in an
+"team_names": [...], "students_failed": [...], "errors": [...] }`. Rows with problems come back in an
 `errors` array, and the other rows are still added. **400** `VALIDATION_ERROR` when there
 is no file, or the file has no usable rows (empty, header only, wrong column names, or every
 row missing `student_id`, `name` or `email`); nothing is changed in that case, and the
@@ -568,7 +575,7 @@ Found while writing this document. Defect IDs refer to the
 |---|---|---|
 | API-1 | **Fixed (CICD-17).** Tokens were generated with `Math.random()`, never expired, and were written to the request log | Tokens now come from `crypto.randomBytes(32)`, expire `EVALUATION_TOKEN_TTL_DAYS` after the latest email, and are redacted from logs. Links sent before the fix have no expiry and are refused until the professor re-sends |
 | API-2 | **Fixed (CICD-18).** `POST /evaluate/:token` did not check that each `student_id` is one of the evaluator's teammates, or that it appears only once | Submissions must now cover exactly the teammates the form lists, each once; anything else is a 400 and nothing is saved |
-| API-3 | Uploading a roster deletes every submitted evaluation in the course. **Partly fixed (CICD-19):** an empty or unusable file, or a database error while applying the roster, no longer deletes anything. A successful upload still does | Re-uploading a corrected roster mid-evaluation silently destroys student work; what a valid re-upload should do is a sponsor decision (CICD-39) |
+| API-3 | **Fixed (CICD-19, then CICD-66).** Uploading a roster deleted every submitted evaluation in the course. An empty or unusable file, or a database error, stopped deleting anything in CICD-19; a successful upload no longer deletes or clears anything either, following the sponsor's decision of 12 Oct 2026 | Re-uploading or updating a roster mid-evaluation keeps student work and the links already sent |
 | API-4 | **Fixed (CICD-45).** `PUT .../students/:student_id`, `PUT .../teams/:team_id` and `POST .../teams` saved the request body as sent, and the team list returned each member's evaluation token | They now read only the editable fields, teams are created empty (members go through the add-student endpoint, which checks the course), and the team list omits tokens. The team report is now looked up within the course (CICD-51) |
 | API-5 | **Fixed (CICD-34).** There was no rate limiting on `/auth/login`, `/auth/reset-password` or `/evaluate/*` | Limits are now in place (see the table in §1) and the API has a general limit. Per-address only, in memory |
 | API-6 | 500 responses include the raw internal error message | Can leak database or library details |

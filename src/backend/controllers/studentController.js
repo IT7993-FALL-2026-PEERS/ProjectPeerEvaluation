@@ -382,6 +382,7 @@ exports.uploadRoster = async (req, res, next) => {
   const { course_id } = req.params;
   const errors = [];
   const studentsToCreate = [];
+  const idsInFile = new Set();
   try {
     // Parse CSV and collect students
     fs.createReadStream(req.file.path)
@@ -404,6 +405,13 @@ exports.uploadRoster = async (req, res, next) => {
           errors.push(`Invalid email in row: ${JSON.stringify(row)}`);
           return;
         }
+        // The same student twice in one file: the first row is used, and the professor is told. Two inserts
+        // for one id would otherwise fail on the unique index and leave the roster half applied.
+        if (idsInFile.has(studentId)) {
+          errors.push(`Duplicate student_id ${studentId}: it appears more than once in the file, so only the first row was used.`);
+          return;
+        }
+        idsInFile.add(studentId);
         // Prepare student object (evaluation_token will be generated when evaluations are sent)
         const teamAssignment = (row.team_name || row.group_assignment || row.group || '').trim() || null;
         console.log('Final team assignment for student:', row.student_id, '=', teamAssignment);
@@ -440,7 +448,8 @@ exports.uploadRoster = async (req, res, next) => {
           const existingStudents = await Student.find({
             course_id: courseObjectId,
             student_id: { $in: studentsToCreate.map(s => s.student_id) }
-          }).select('student_id');
+          }).select('student_id team_id group_assignment');
+          const existingByStudentId = new Map(existingStudents.map(s => [s.student_id, s]));
           const existingIds = new Set(existingStudents.map(s => s.student_id));
           const filteredToCreate = studentsToCreate.filter(s => !existingIds.has(s.student_id));
           
@@ -451,8 +460,31 @@ exports.uploadRoster = async (req, res, next) => {
           const studentsToUpdate = studentsToCreate.filter(s => existingIds.has(s.student_id));
           console.log('Existing students to potentially update with teams:', studentsToUpdate.length);
           
-          // Combine new students and existing students for team processing
-          const allStudentsForTeamProcessing = [...filteredToCreate, ...studentsToUpdate];
+          // A student who has submitted or received evaluations keeps their team: a move would leave the saved
+          // evaluations pointing at a team they are no longer in (the evaluation form, completion checks and
+          // reports all work from the team). The professor is told, and can change the team by hand.
+          // Everyone else is moved as the file says (Codex review, 13 Oct 2026).
+          const lockedIds = new Set();
+          const wantsMove = studentsToUpdate.filter((s) => s.group_assignment
+            && (existingByStudentId.get(s.student_id).group_assignment || null) !== s.group_assignment);
+          if (wantsMove.length > 0) {
+            const Evaluation = require('../models/Evaluation');
+            const [evaluators, recipients] = await Promise.all([
+              Evaluation.distinct('evaluator_id', { course_id: courseObjectId }),
+              Evaluation.distinct('student_id', { course_id: courseObjectId })
+            ]);
+            const involved = new Set([...evaluators, ...recipients].map(String));
+            for (const s of wantsMove) {
+              if (involved.has(String(existingByStudentId.get(s.student_id)._id))) {
+                lockedIds.add(s.student_id);
+                errors.push(`Student ${s.student_id} was not moved to ${s.group_assignment}: they have submitted or received evaluations in this course, so their team was kept.`);
+              }
+            }
+          }
+          const movableStudents = studentsToUpdate.filter((s) => !lockedIds.has(s.student_id));
+
+          // Combine new students and the existing students who may move, for team processing
+          const allStudentsForTeamProcessing = [...filteredToCreate, ...movableStudents];
 
           // Step 1: Create Team records for unique team names
           console.log('Starting team creation process...');
@@ -521,12 +553,20 @@ exports.uploadRoster = async (req, res, next) => {
             throw new Error('No students could be saved.');
           }
 
+          // Say which new students were not saved. The insert can save some rows and not others, with or without
+          // throwing, and that used to be reported as a plain success (Codex review, 13 Oct 2026).
+          const savedIds = new Set(created.map((s) => s.student_id));
+          const failedToSave = filteredToCreate.map((s) => s.student_id).filter((id) => !savedIds.has(id));
+          if (failedToSave.length > 0) {
+            errors.push(`Could not save ${failedToSave.length} new student(s): ${failedToSave.join(', ')}.`);
+          }
+
           // Step 3: Link all students to teams (use original CSV data for team assignments)
           console.log('Starting team linking process...');
           
           // Create a map of student_id to team assignment from CSV data
           const studentTeamMap = {};
-          studentsToCreate.forEach(student => {
+          allStudentsForTeamProcessing.forEach(student => {
             if (student.group_assignment) {
               studentTeamMap[student.student_id] = student.group_assignment;
             }
@@ -538,6 +578,7 @@ exports.uploadRoster = async (req, res, next) => {
           const allStudentsInCourse = await Student.find({ course_id: courseObjectId });
           
           // Step 4: Link students to teams using the CSV mapping
+          const teamsLeft = new Set();
           for (const student of allStudentsInCourse) {
             try {
               const teamAssignment = studentTeamMap[student.student_id];
@@ -545,6 +586,12 @@ exports.uploadRoster = async (req, res, next) => {
                 const teamId = createdTeams[teamAssignment];
                 console.log(`Linking student ${student.student_id} to team ${teamAssignment} (ID: ${teamId})`);
                 
+                // A move takes the student out of the team they were in, or they would be listed in both
+                if (student.team_id && String(student.team_id) !== String(teamId)) {
+                  await Team.findByIdAndUpdate(student.team_id, { $pull: { students: student._id } });
+                  teamsLeft.add(String(student.team_id));
+                }
+
                 // Update student with team_id and group_assignment
                 await Student.findByIdAndUpdate(student._id, { 
                   team_id: teamId,
@@ -569,7 +616,7 @@ exports.uploadRoster = async (req, res, next) => {
 
           // Step 4: Update student_count for all affected teams
           console.log('Updating team student counts...');
-          for (const teamId of Object.values(createdTeams)) {
+          for (const teamId of [...Object.values(createdTeams), ...teamsLeft]) {
             const teamStudentCount = await Student.countDocuments({ team_id: teamId });
             await Team.findByIdAndUpdate(teamId, { student_count: teamStudentCount });
             console.log(`Updated team ${teamId} student count to ${teamStudentCount}`);
@@ -587,23 +634,9 @@ exports.uploadRoster = async (req, res, next) => {
           console.log(`Updated course student count to ${studentCount}`);
           console.log(`Updated course team count to ${teamCount}`);
 
-          // Last step, after the roster is applied: clear evaluation links and
-          // evaluations for a fresh start. Doing it last means an error above leaves
-          // submitted evaluations alone. Whether a successful re-upload should still
-          // delete them is a sponsor decision (backlog CICD-39).
-          console.log('Clearing evaluation state for course:', course_id);
-
-          // Clear evaluation tokens from all existing students in this course
-          await Student.updateMany(
-            { course_id: courseObjectId },
-            { $unset: { evaluation_token: 1, evaluation_token_expires_at: 1 } }
-          );
-
-          // Clear all evaluation records for this course
-          const Evaluation = require('../models/Evaluation');
-          const deletedEvaluations = await Evaluation.deleteMany({ course_id: courseObjectId });
-          console.log(`Cleared ${deletedEvaluations.deletedCount} evaluation records`);
-
+          // A roster upload never touches evaluations or evaluation links: previously submitted evaluations must be
+          // saved, and rosters can be uploaded or updated without losing existing data (sponsor decision, 12 Oct 2026).
+          // Clearing them is a separate, explicit action (the reset-evaluation-state endpoint).
           fs.unlinkSync(req.file.path); // Clean up temp file
           
           // Add error for duplicates if any were filtered
@@ -619,13 +652,14 @@ exports.uploadRoster = async (req, res, next) => {
           console.log(`Team names: ${Object.keys(createdTeams).join(', ')}`);
           
           res.status(200).json({
-            message: `Roster processed successfully. ${created.length} new students added, ${studentsToUpdate.length} existing students updated. Evaluation state reset for fresh start.`,
+            message: failedToSave.length > 0
+              ? `Roster processed with some errors. ${created.length} new students added, ${failedToSave.length} could not be saved.`
+              : `Roster processed successfully. ${created.length} new students added, ${studentsToUpdate.length} existing students updated.`,
             students: created.map(s => s.student_id),
+            students_failed: failedToSave,
             students_updated: studentsToUpdate.map(s => s.student_id),
             teams_created: teamsCreatedCount,
             team_names: Object.keys(createdTeams),
-            evaluations_cleared: deletedEvaluations.deletedCount,
-            evaluation_state_reset: true,
             errors
           });
         } catch (insertErr) {
