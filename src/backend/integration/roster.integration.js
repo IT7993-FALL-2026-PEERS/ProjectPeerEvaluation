@@ -161,6 +161,7 @@ test('TC-06-81: an updated roster adds new students and moves those with no eval
   const res = await app.uploadCsv(uploadPath(IDS.courseAda), updated, { token: ada });
   assert.equal(res.status, 200);
   assert.deepEqual(res.body.students, ['1005']);
+  assert.deepEqual(res.body.students_updated, ['1003'], 'only the student who was moved is listed as updated; the two who kept their team are not');
   assert.equal(await Evaluation.countDocuments({ course_id: IDS.courseAda }), 1, 'the evaluation is kept');
   assert.equal(await Student.countDocuments({ course_id: IDS.courseAda }), 5, 'nobody who was not in the file was removed');
 
@@ -177,6 +178,84 @@ test('TC-06-81: an updated roster adds new students and moves those with no eval
   const gamma = await Team.findOne({ course_id: IDS.courseAda, team_name: 'Gamma' });
   assert.deepEqual([...gamma.students].map(String).sort(), [String(IDS.cy), String((await Student.findOne({ student_id: '1005', course_id: IDS.courseAda }))._id)].sort());
   assert.equal(gamma.student_count, 2);
+});
+
+// Codex review, second pass (13 Oct). The guard compares the requested team with the team the student is really in
+// (their team id), not the label; a failed write must not leave a student out of their own team; and a submission
+// that arrives after the first check is caught by a second look just before the move.
+test('TC-06-91: the evaluation guard uses the team the student is really in, not the label, so a mismatched label does not let a move through', async () => {
+  await seedSubmittedEvaluation();
+  await Student.updateOne({ _id: IDS.ann }, { group_assignment: 'Gamma' }); // the label says Gamma, the team id says Alpha
+  const csv = ['student_id,name,email,group_assignment', '1001,Ann Archer,ann@example.edu,Gamma', ''].join('\n');
+  const res = await app.uploadCsv(uploadPath(IDS.courseAda), csv, { token: ada });
+  assert.equal(res.status, 200);
+  assert.match(res.body.errors.join(' | '), /1001.*submitted or received evaluations/);
+  const ann = await Student.findById(IDS.ann);
+  assert.equal(String(ann.team_id), String(IDS.teamAlpha), 'she was not moved');
+  assert.ok([...(await Team.findById(IDS.teamAlpha)).students].map(String).includes(String(IDS.ann)), 'and she is still listed in her team');
+  assert.equal(await Team.countDocuments({ course_id: IDS.courseAda, team_name: 'Gamma' }), 0, 'no team was made only for a student who could not move');
+  assert.equal(await Evaluation.countDocuments({ course_id: IDS.courseAda }), 1);
+});
+
+test('TC-06-92: if writing a moved student fails, they stay in their team, and uploading again completes the move cleanly', async (t) => {
+  const csv = ['student_id,name,email,group_assignment', '1003,Cy Cole,cy@example.edu,Alpha', ''].join('\n');
+  const original = Student.findByIdAndUpdate.bind(Student);
+  const failing = t.mock.method(Student, 'findByIdAndUpdate', async (id, ...rest) => {
+    if (String(id) === String(IDS.cy)) throw new Error('write failed');
+    return original(id, ...rest);
+  });
+
+  const first = await app.uploadCsv(uploadPath(IDS.courseAda), csv, { token: ada });
+  assert.equal(first.status, 200);
+  assert.match(first.body.errors.join(' | '), /1003/);
+  assert.equal(String((await Student.findById(IDS.cy)).team_id), String(IDS.teamBeta), 'still in Beta');
+  assert.ok([...(await Team.findById(IDS.teamBeta)).students].map(String).includes(String(IDS.cy)), 'and still listed in Beta');
+  assert.ok(![...(await Team.findById(IDS.teamAlpha)).students].map(String).includes(String(IDS.cy)), 'and not listed in Alpha');
+
+  failing.mock.restore();
+  const second = await app.uploadCsv(uploadPath(IDS.courseAda), csv, { token: ada });
+  assert.equal(second.status, 200);
+  const alpha = await Team.findById(IDS.teamAlpha);
+  const beta = await Team.findById(IDS.teamBeta);
+  assert.equal([...alpha.students].map(String).filter((id) => id === String(IDS.cy)).length, 1);
+  assert.ok(![...beta.students].map(String).includes(String(IDS.cy)));
+  assert.equal(alpha.student_count, 3);
+  assert.equal(beta.student_count, 1);
+});
+
+test('TC-06-93: an upload run again repairs a student left in two teams\' lists by an earlier failure', async () => {
+  // Cy is really in Alpha but is still listed in Beta's array (a leftover of an interrupted move)
+  await Student.updateOne({ _id: IDS.cy }, { team_id: IDS.teamAlpha, group_assignment: 'Alpha' });
+  await Team.updateOne({ _id: IDS.teamAlpha }, { $addToSet: { students: IDS.cy } });
+  const csv = ['student_id,name,email,group_assignment', '1003,Cy Cole,cy@example.edu,Alpha', ''].join('\n');
+  const res = await app.uploadCsv(uploadPath(IDS.courseAda), csv, { token: ada });
+  assert.equal(res.status, 200);
+  const beta = await Team.findById(IDS.teamBeta);
+  assert.ok(![...beta.students].map(String).includes(String(IDS.cy)), 'no longer listed in the old team');
+  assert.equal(beta.student_count, 1);
+  assert.equal((await Team.findById(IDS.teamAlpha)).student_count, 3);
+});
+
+test('TC-06-94: an evaluation saved after the first check but before the move still stops the move', async (t) => {
+  const csv = ['student_id,name,email,group_assignment', '1003,Cy Cole,cy@example.edu,Alpha', ''].join('\n');
+  const original = Team.findOne.bind(Team);
+  let submitted = false;
+  t.mock.method(Team, 'findOne', async (...args) => {
+    if (!submitted) {
+      submitted = true; // Cy submits an evaluation of Di while the upload is working, after it has already looked
+      await Evaluation.create({
+        course_id: IDS.courseAda, student_id: IDS.di, evaluator_id: IDS.cy, evaluation_token: 'c'.repeat(64),
+        ratings: { professionalism: 4, communication: 4, work_ethic: 4, content_knowledge_skills: 4, overall_contribution: 4, participation: 3 },
+        overall_feedback: 'Reliable and prepared every week.',
+      });
+    }
+    return original(...args);
+  });
+  const res = await app.uploadCsv(uploadPath(IDS.courseAda), csv, { token: ada });
+  assert.equal(res.status, 200);
+  assert.match(res.body.errors.join(' | '), /1003.*submitted or received evaluations/);
+  assert.equal(String((await Student.findById(IDS.cy)).team_id), String(IDS.teamBeta), 'Cy was not moved');
+  assert.equal(await Evaluation.countDocuments({ course_id: IDS.courseAda }), 1);
 });
 
 test('TC-06-84: moving a student with no evaluations takes them out of the old team and keeps both teams\' lists and counts right', async () => {

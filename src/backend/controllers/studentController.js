@@ -464,11 +464,24 @@ exports.uploadRoster = async (req, res, next) => {
           // evaluations pointing at a team they are no longer in (the evaluation form, completion checks and
           // reports all work from the team). The professor is told, and can change the team by hand.
           // Everyone else is moved as the file says (Codex review, 13 Oct 2026).
+          const Team = require('../models/Team');
+          const Evaluation = require('../models/Evaluation');
+          // Compared by team id, not by the name stored on the student: the two can disagree after an interrupted
+          // write, and the name alone would let a student with evaluations be moved (Codex review, second pass).
+          const requestedNames = [...new Set(studentsToUpdate.map((s) => s.group_assignment).filter(Boolean))];
+          const teamIdByName = new Map();
+          if (requestedNames.length > 0) {
+            const found = await Team.find({ course_id: courseObjectId, team_name: { $in: requestedNames } }).select('team_name');
+            for (const team of found) teamIdByName.set(team.team_name, String(team._id));
+          }
           const lockedIds = new Set();
-          const wantsMove = studentsToUpdate.filter((s) => s.group_assignment
-            && (existingByStudentId.get(s.student_id).group_assignment || null) !== s.group_assignment);
+          const wantsMove = studentsToUpdate.filter((s) => {
+            if (!s.group_assignment) return false;
+            const current = existingByStudentId.get(s.student_id).team_id;
+            const target = teamIdByName.get(s.group_assignment);
+            return !target || !current || String(current) !== target;
+          });
           if (wantsMove.length > 0) {
-            const Evaluation = require('../models/Evaluation');
             const [evaluators, recipients] = await Promise.all([
               Evaluation.distinct('evaluator_id', { course_id: courseObjectId }),
               Evaluation.distinct('student_id', { course_id: courseObjectId })
@@ -481,6 +494,11 @@ exports.uploadRoster = async (req, res, next) => {
               }
             }
           }
+          // A second look just before a move: an evaluation may have been saved since the check above.
+          const hasEvaluations = async (studentObjectId) => !!(await Evaluation.exists({
+            course_id: courseObjectId,
+            $or: [{ evaluator_id: studentObjectId }, { student_id: studentObjectId }]
+          }));
           const movableStudents = studentsToUpdate.filter((s) => !lockedIds.has(s.student_id));
 
           // Combine new students and the existing students who may move, for team processing
@@ -488,7 +506,6 @@ exports.uploadRoster = async (req, res, next) => {
 
           // Step 1: Create Team records for unique team names
           console.log('Starting team creation process...');
-          const Team = require('../models/Team');
           const uniqueTeamNames = [...new Set(allStudentsForTeamProcessing
             .map(s => s.group_assignment)
             .filter(teamName => teamName && teamName.trim() !== '')
@@ -577,31 +594,37 @@ exports.uploadRoster = async (req, res, next) => {
           // Get all students in the course to link them
           const allStudentsInCourse = await Student.find({ course_id: courseObjectId });
           
-          // Step 4: Link students to teams using the CSV mapping
-          const teamsLeft = new Set();
+          // Step 4: Link students to teams using the CSV mapping. For each student: write the student, add them to
+          // the new team's list, then take them out of every other team's list in the course. If a write fails the
+          // student is still somewhere consistent, and uploading the file again finishes the job (every step can be
+          // repeated). A student already in the course who is about to move is checked for evaluations once more
+          // here, because one may have been saved since the first check.
           for (const student of allStudentsInCourse) {
             try {
               const teamAssignment = studentTeamMap[student.student_id];
               if (teamAssignment && createdTeams[teamAssignment]) {
                 const teamId = createdTeams[teamAssignment];
-                console.log(`Linking student ${student.student_id} to team ${teamAssignment} (ID: ${teamId})`);
-                
-                // A move takes the student out of the team they were in, or they would be listed in both
-                if (student.team_id && String(student.team_id) !== String(teamId)) {
-                  await Team.findByIdAndUpdate(student.team_id, { $pull: { students: student._id } });
-                  teamsLeft.add(String(student.team_id));
+                const isExisting = existingIds.has(student.student_id);
+                const isMove = !student.team_id || String(student.team_id) !== String(teamId);
+                if (isExisting && isMove && await hasEvaluations(student._id)) {
+                  errors.push(`Student ${student.student_id} was not moved to ${teamAssignment}: they have submitted or received evaluations in this course, so their team was kept.`);
+                  continue;
                 }
+                console.log(`Linking student ${student.student_id} to team ${teamAssignment} (ID: ${teamId})`);
 
-                // Update student with team_id and group_assignment
-                await Student.findByIdAndUpdate(student._id, { 
+                await Student.findByIdAndUpdate(student._id, {
                   team_id: teamId,
-                  group_assignment: teamAssignment 
+                  group_assignment: teamAssignment
                 });
-                
-                // Add student to team's students array
                 await Team.findByIdAndUpdate(teamId, {
                   $addToSet: { students: student._id }
                 });
+                if (isExisting) {
+                  await Team.updateMany(
+                    { course_id: courseObjectId, _id: { $ne: teamId } },
+                    { $pull: { students: student._id } }
+                  );
+                }
                 console.log(`✅ Linked student ${student.student_id} to team ${teamAssignment}`);
               } else if (studentTeamMap[student.student_id]) {
                 console.log(`Student ${student.student_id} has team assignment but team not found:`, teamAssignment);
@@ -614,9 +637,11 @@ exports.uploadRoster = async (req, res, next) => {
             }
           }
 
-          // Step 4: Update student_count for all affected teams
+          // Recount every team in the course: a move changes two of them, and an earlier partial failure may
+          // have left a count stale.
           console.log('Updating team student counts...');
-          for (const teamId of [...Object.values(createdTeams), ...teamsLeft]) {
+          const teamsInCourse = await Team.find({ course_id: courseObjectId }).select('_id');
+          for (const { _id: teamId } of teamsInCourse) {
             const teamStudentCount = await Student.countDocuments({ team_id: teamId });
             await Team.findByIdAndUpdate(teamId, { student_count: teamStudentCount });
             console.log(`Updated team ${teamId} student count to ${teamStudentCount}`);
@@ -657,7 +682,7 @@ exports.uploadRoster = async (req, res, next) => {
               : `Roster processed successfully. ${created.length} new students added, ${studentsToUpdate.length} existing students updated.`,
             students: created.map(s => s.student_id),
             students_failed: failedToSave,
-            students_updated: studentsToUpdate.map(s => s.student_id),
+            students_updated: movableStudents.map(s => s.student_id),
             teams_created: teamsCreatedCount,
             team_names: Object.keys(createdTeams),
             errors

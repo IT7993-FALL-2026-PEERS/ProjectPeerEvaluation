@@ -372,7 +372,12 @@ created from the group column.
 > to another team is taken out of the old team (both lists and counts are updated). A student who has
 > **submitted or received evaluations keeps their team**, and the answer says so in `errors`, because a
 > move would leave the saved evaluations pointing at a team they are no longer in; their team can be
-> changed by hand. A student id that appears twice in the file is added once (the first row) and
+> changed by hand. This is decided by the team the student is really in (their team id), not by
+> the name stored on the student, and it is checked a second time just before each move; an evaluation
+> saved in the few milliseconds between that check and the move is still a theoretical gap. Each
+> student is written first, then added to the new team's list, then taken out of every other team's
+> list, so a failed write leaves them somewhere consistent and uploading the file again finishes the
+> job; every team's count in the course is recalculated at the end. A student id that appears twice in the file is added once (the first row) and
 > reported. If the database saves only some of the new students, `students_failed` lists the ones it did
 > not save and the message says so. Clearing evaluations is a separate, explicit action
 > (`DELETE /courses/:course_id/evaluations/reset`).

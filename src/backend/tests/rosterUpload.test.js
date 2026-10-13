@@ -31,6 +31,9 @@ function stubModels(t, { existing = [], findFails = false, insertFails = false, 
   t.mock.method(Evaluation, 'deleteMany', record('delete-evaluations', { deletedCount: 3 }));
   let lookups = 0;
   t.mock.method(Evaluation, 'distinct', async () => []);
+  t.mock.method(Evaluation, 'exists', async () => null);
+  t.mock.method(Team, 'find', () => query([]));
+  t.mock.method(Team, 'updateMany', record('pull-from-other-teams', {}));
   t.mock.method(Student, 'find', (filter) => {
     if (findFails) return query(Promise.reject(new Error('database down')));
     if (!filter.student_id) return query([]);
