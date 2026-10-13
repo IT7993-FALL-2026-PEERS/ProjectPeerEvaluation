@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { getApiBaseUrl } from './apiUrl';
 import { isSessionExpired, notifySessionExpired } from './sessionExpired';
+import { learnServerTime } from './sessionActivity';
 
 const API_BASE_URL = getApiBaseUrl();
 
@@ -18,10 +19,24 @@ const api = axios.create({
   timeout: 180000, // 3 minute timeout for email sending in production
 });
 
+// While the professor keeps working, the server answers with a fresh login token in X-Access-Token
+// (FR-04: the session ends after a period of inactivity). Keep it where the old one was, but only if the
+// login is still the one the request was sent with. An answer that arrives late (after a log out and a
+// login as someone else, after another tab renewed the login, or behind a newer answer) is dropped, so it
+// can never replace a newer login or bring back one that was ended (Codex review, 13 Oct).
+function storeRenewedToken(token, sentAuthorization) {
+  const sent = String(sentAuthorization || '').replace(/^Bearer /, '');
+  if (!sent) return;
+  if (localStorage.getItem('peer_eval_token') === sent) localStorage.setItem('peer_eval_token', token);
+  else if (sessionStorage.getItem('peer_eval_session') === sent) sessionStorage.setItem('peer_eval_session', token);
+}
+
 // Attach JWT token from localStorage/sessionStorage to every request
 api.interceptors.request.use(
   (config) => {
     // Try localStorage first, then sessionStorage
+    // When the request leaves, so the server time in the answer can be placed within the round trip.
+    config.metadata = { ...config.metadata, sentAt: Date.now() };
     const token = localStorage.getItem('peer_eval_token') || sessionStorage.getItem('peer_eval_session');
     console.log('API Request - Token found:', !!token);
     console.log('API Request - Token preview:', token ? `${token.substring(0, 20)}...` : 'none');
@@ -43,6 +58,13 @@ api.interceptors.response.use(
     }
     if (response.headers['server']) {
       console.log('Server Info:', response.headers['server']);
+    }
+    // The server's clock, so the time left on the login does not depend on this browser's clock.
+    if (response.headers['x-server-time']) {
+      learnServerTime(Number(response.headers['x-server-time']), response.config?.metadata?.sentAt, Date.now());
+    }
+    if (response.headers['x-access-token']) {
+      storeRenewedToken(response.headers['x-access-token'], response.config?.headers?.Authorization);
     }
     return response;
   },

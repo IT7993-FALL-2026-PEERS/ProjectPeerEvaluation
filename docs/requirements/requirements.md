@@ -128,18 +128,32 @@ complete login at all**. The feature is scaffolded, not built.
 removed or permanently disabled so the login path cannot reach a dead end.
 
 ### FR-04 — Session expiry
-*Inherited: FR1.4* · **Status: Defective** · **Defect: D-18**
+*Inherited: FR1.4* · **Status: Partial** · **Defect: D-18 (length still to be confirmed)**
 
 **Required functionality.** A professor's session expires after a period of inactivity.
 
-**Given** a professor who signed in more than the configured session lifetime ago,
+**Given** a professor who has made no request for longer than the configured idle period,
 **when** they make a request with the expired token,
 **then** the request is refused and they are asked to sign in again.
 
-**Current behaviour.** Tokens are issued with a fixed one-hour expiry
-(`JWT_EXPIRES_IN = '1h'`), against an inherited requirement of 30 minutes. The expiry is
-also absolute rather than inactivity-based. The sponsor should confirm the intended
-value, and the requirement or the code should then be corrected to match.
+**Given** a professor who keeps working,
+**when** they make requests within the idle period,
+**then** they stay logged in.
+
+**Current behaviour (12 Oct 2026).** Expiry is inactivity-based: a login token lasts 60 minutes
+(`SESSION_IDLE_MINUTES`), and a request made a minute or more after the token was issued is
+answered with a fresh one in the `X-Access-Token` header, which the frontend stores. The browser
+counts clicks, key presses, scrolling and touch as activity (not mouse movement) and calls
+`POST /auth/refresh` at most every 5 minutes, so a professor who is working but making no other request
+stays logged in; with 2 minutes left and no activity a "Stay logged in" warning appears. The time left is worked out against
+the server's clock (`X-Server-Time`), and a login that only looks expired is checked with the server before
+the timeout message is shown. A session
+is capped at 8 hours since login (`SESSION_MAX_HOURS`). Before this change the expiry was
+absolute, one hour after login. **Still open for the sponsor:** the inherited requirement says
+30 minutes, the app uses 60, and the 8-hour cap is the team's own choice.
+
+*Evidence.* `utils/sessionToken.js`, `middleware/auth.js`, `controllers/authController.js` (`refreshToken`),
+`src/frontend/services/sessionActivity.js`, `src/frontend/components/SessionTimeoutWarning.jsx`.
 
 ---
 

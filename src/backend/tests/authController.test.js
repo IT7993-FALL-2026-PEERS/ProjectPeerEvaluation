@@ -90,7 +90,7 @@ test('login: wrong password returns 401', async (t) => {
   assert.equal(save.mock.callCount(), 0);
 });
 
-test('TC-04-11: login: returns a signed access token containing the professor id, valid for one hour (D-18)', async (t) => {
+test('TC-04-11: login: returns a signed access token containing the professor id, valid for the 60-minute idle period (FR-04)', async (t) => {
   const professor = new Professor({ ...fields, password: await bcrypt.hash(fields.password, 4) });
   t.mock.method(Professor, 'findOne', async () => professor);
   const save = stubSave(t);
@@ -184,8 +184,15 @@ test('updatePassword: hashes the new password and clears reset credentials', asy
   assert.equal(professor.securityTokenExpires, undefined);
 });
 
-for (const action of ['refreshToken', 'verifyMfa']) {
-  test(`${action}: returns 501 NOT_IMPLEMENTED`, async () => {
-    error(await call(action, {}), 501, 'NOT_IMPLEMENTED');
-  });
-}
+test('verifyMfa: returns 501 NOT_IMPLEMENTED', async () => {
+  error(await call('verifyMfa', {}), 501, 'NOT_IMPLEMENTED');
+});
+
+// FR-04: the keep-alive the browser calls while the professor is active. The middleware has already
+// checked the token and puts a fresh one in X-Access-Token; the handler only has to answer.
+test('TC-04-29: refreshToken: answers 200 with the idle period, so the browser knows the session was extended', async () => {
+  const result = await call('refreshToken', {});
+  success(result, 200);
+  assert.equal(result.res.body.expires_in_seconds, 60 * 60);
+  assert.match(result.res.body.message, /extended/i);
+});
