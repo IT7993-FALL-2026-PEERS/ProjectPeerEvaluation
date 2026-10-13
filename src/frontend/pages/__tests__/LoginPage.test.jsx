@@ -150,7 +150,16 @@ describe('LoginPage registration', () => {
     localStorage.clear();
   });
 
-  test('switching to registration asks for a name and department and clears what was typed', async () => {
+  // Registration takes no password (CW-11): it is chosen from the emailed link, once the mailbox is proven.
+  const fillRegistration = async (email = 'grace@example.com') => {
+    await userEvent.click(screen.getByRole('button', { name: 'New here? Register' }));
+    await userEvent.type(screen.getByPlaceholderText('Full Name'), 'Grace Hopper');
+    await userEvent.type(screen.getByPlaceholderText('Department'), 'Computer Science');
+    await userEvent.type(screen.getByLabelText('Email:'), email);
+    await userEvent.click(screen.getByRole('button', { name: 'Register' }));
+  };
+
+  test('switching to registration asks for a name, department and email, not a password, and clears what was typed', async () => {
     renderApp();
     await fillLogin();
     await userEvent.click(screen.getByRole('button', { name: 'New here? Register' }));
@@ -159,39 +168,53 @@ describe('LoginPage registration', () => {
     expect(screen.getByPlaceholderText('Full Name')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('Department')).toBeInTheDocument();
     expect(screen.getByLabelText('Email:')).toHaveValue('');
-    expect(screen.getByLabelText('Password:')).toHaveValue('');
+    expect(screen.queryByLabelText('Password:')).not.toBeInTheDocument();
+    expect(screen.getByText(/choose your password from the link/i)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Forgot Password?' })).not.toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: 'Already have an account? Log in' }));
     expect(screen.getByRole('heading', { name: 'Professor Login' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Password:')).toBeInTheDocument();
     expect(screen.queryByPlaceholderText('Full Name')).not.toBeInTheDocument();
   });
 
-  test('registering sends all four fields, says it worked, and returns to the login form', async () => {
-    axios.post.mockResolvedValue({ data: { message: 'Professor registered successfully.' } });
+  test('registering sends the email, name and department only, shows the server\'s message, and returns to the login form', async () => {
+    axios.post.mockResolvedValue({ data: { message: 'Registration started. Check your email.', verification_email_sent: true } });
     renderApp();
-    await userEvent.click(screen.getByRole('button', { name: 'New here? Register' }));
-    await userEvent.type(screen.getByPlaceholderText('Full Name'), 'Grace Hopper');
-    await userEvent.type(screen.getByPlaceholderText('Department'), 'Computer Science');
-    await fillLogin('grace@example.com', 'a-long-password');
-    await userEvent.click(screen.getByRole('button', { name: 'Register' }));
+    await fillRegistration();
 
     expect(await screen.findByRole('heading', { name: 'Professor Login' })).toBeInTheDocument();
     expect(axios.post).toHaveBeenCalledWith('http://localhost:5000/api/auth/register', {
-      email: 'grace@example.com', password: 'a-long-password', name: 'Grace Hopper', department: 'Computer Science',
+      email: 'grace@example.com', name: 'Grace Hopper', department: 'Computer Science',
     });
-    expect(window.alert).toHaveBeenCalledWith('Registration successful! You can now log in.');
+    expect(window.alert).toHaveBeenCalledWith('Registration started. Check your email.');
     expect(localStorage.getItem('peer_eval_token')).toBeNull();
+  });
+
+  test('falls back to a plain message when the server sends none', async () => {
+    axios.post.mockResolvedValue({ data: {} });
+    renderApp();
+    await fillRegistration();
+    expect(await screen.findByRole('heading', { name: 'Professor Login' })).toBeInTheDocument();
+    expect(window.alert).toHaveBeenCalledWith(
+      'Registration started! We emailed you a link. Open it to choose your password and finish.'
+    );
+  });
+
+  test('shows that registration is limited to instructor email addresses', async () => {
+    axios.post.mockRejectedValue({ response: { data: { error: { code: 'EMAIL_NOT_ALLOWED', message: 'Registration is limited to instructor email addresses (@kennesaw.edu).' } } } });
+    renderApp();
+    await fillRegistration('grace@gmail.com');
+
+    expect(await screen.findByText('Registration is limited to instructor email addresses (@kennesaw.edu).')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Professor Registration' })).toBeInTheDocument();
+    expect(window.alert).not.toHaveBeenCalled();
   });
 
   test('shows why a registration was refused and stays on the registration form', async () => {
     axios.post.mockRejectedValue({ response: { data: { error: { message: 'An account with this email already exists.' } } } });
     renderApp();
-    await userEvent.click(screen.getByRole('button', { name: 'New here? Register' }));
-    await userEvent.type(screen.getByPlaceholderText('Full Name'), 'Grace Hopper');
-    await userEvent.type(screen.getByPlaceholderText('Department'), 'Computer Science');
-    await fillLogin('grace@example.com', 'a-long-password');
-    await userEvent.click(screen.getByRole('button', { name: 'Register' }));
+    await fillRegistration();
 
     expect(await screen.findByText('An account with this email already exists.')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Professor Registration' })).toBeInTheDocument();

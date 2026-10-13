@@ -195,8 +195,54 @@ async function sendPasswordResetEmail(email, token, frontendUrl = 'http://localh
   }
 }
 
+/**
+ * Send the email-confirmation link to a newly registered professor (CW-11)
+ * @param {String} email - Professor's email
+ * @param {String} token - Confirmation token (only its hash is stored)
+ */
+async function sendVerificationEmail(email, token, frontendUrl = 'http://localhost:3000') {
+  const baseUrl = process.env.FRONTEND_URL || frontendUrl;
+  const verifyUrl = `${baseUrl}/verify-email/${token}`;
+  const htmlContent = `
+    <html>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+        <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+          <h2 style="color: #2c5aa0;">Confirm your email address</h2>
+          <p>Someone registered a PEERS instructor account with this email address. If that was you, open the link below to confirm it and choose your password. If not, ignore this email: no password has been set, so nobody can log in to the account.</p>
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${verifyUrl}" style="background-color: #2c5aa0; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">Confirm email and choose a password</a>
+          </div>
+          <p>This link will expire in 48 hours.</p>
+          <hr style="margin-top: 30px; border: none; border-top: 1px solid #ddd;">
+          <p style="font-size: 12px; color: #888;">If you cannot click the link above, copy and paste this URL into your browser:<br>${verifyUrl}</p>
+        </div>
+      </body>
+    </html>
+  `;
+  const mailOptions = {
+    from: process.env.SMTP_FROM || 'noreply@peerevaluation.com',
+    to: email,
+    subject: 'Confirm your PEERS instructor account',
+    html: htmlContent
+  };
+  // A developer without a working mail server would otherwise be locked out of a new account.
+  // The link is a credential, so it is never printed in production.
+  if (process.env.NODE_ENV !== 'production') {
+    console.log('Email confirmation link (development only):', verifyUrl);
+  }
+  try {
+    const info = await deliver(mailOptions);
+    console.log('Confirmation email sent:', info.messageId);
+    return { success: true, messageId: info.messageId };
+  } catch (error) {
+    console.error('Error sending confirmation email:', error);
+    return { success: false, error: error.message };
+  }
+}
+
 module.exports = {
   sendEvaluationInvitation,
   sendEvaluationReminder,
-  sendPasswordResetEmail
+  sendPasswordResetEmail,
+  sendVerificationEmail
 };

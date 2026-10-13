@@ -57,14 +57,15 @@ function LoginPage() {
       : `${baseURL}/auth/login`;
 
     const payload = isRegistering
-      ? { email, password, name, department }
+      ? { email, name, department }
       : { email, password };
 
     try {
       const res = await axios.post(endpoint, payload);
 
       if (isRegistering) {
-        alert('Registration successful! You can now log in.');
+        // CW-11: registration takes no password. The professor chooses one from the emailed link.
+        alert(res.data?.message || 'Registration started! We emailed you a link. Open it to choose your password and finish.');
         setIsRegistering(false);
         setName('');
         setDepartment('');
@@ -121,29 +122,35 @@ function LoginPage() {
             style={{ width: '100%', padding: '8px' }}
           />
         </div>
-        <div style={{ marginBottom: '10px' }}>
-          <label htmlFor="login-password" style={{ display: 'block', marginBottom: '4px' }}>Password:</label>
-          <div style={{ display: 'flex', gap: '6px' }}>
-            <input
-              id="login-password"
-              type={showPassword ? 'text' : 'password'}
-              placeholder="Password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              style={{ flex: 1, minWidth: 0, padding: '8px' }}
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword((shown) => !shown)}
-              aria-label={showPassword ? 'Hide password' : 'Show password'}
-              aria-pressed={showPassword}
-              style={{ padding: '8px 12px' }}
-            >
-              {showPassword ? 'Hide' : 'Show'}
-            </button>
+        {isRegistering ? (
+          <p style={{ marginBottom: '10px', fontSize: '14px' }}>
+            We will email you a link. Open it to confirm your address and choose your password from the link.
+          </p>
+        ) : (
+          <div style={{ marginBottom: '10px' }}>
+            <label htmlFor="login-password" style={{ display: 'block', marginBottom: '4px' }}>Password:</label>
+            <div style={{ display: 'flex', gap: '6px' }}>
+              <input
+                id="login-password"
+                type={showPassword ? 'text' : 'password'}
+                placeholder="Password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                style={{ flex: 1, minWidth: 0, padding: '8px' }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((shown) => !shown)}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                aria-pressed={showPassword}
+                style={{ padding: '8px 12px' }}
+              >
+                {showPassword ? 'Hide' : 'Show'}
+              </button>
+            </div>
           </div>
-        </div>
+        )}
         <button
           type="submit"
           style={{ width: '100%', padding: '10px', display: 'block', maxWidth: '100%' }}

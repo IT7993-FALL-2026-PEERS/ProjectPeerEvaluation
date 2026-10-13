@@ -58,7 +58,7 @@ thing, or answers 501) is marked as such below and is not acceptance coverage.
 | FR6.2 | FR-22 Flag concerning language | CW-09 | Integration `reports.integration.js`: TC-22-20, TC-22-21 · Integration `settings.integration.js`: TC-22-30..32 (the professor's word list) · Unit `reportController.test.js` | Unit + integration | — | Validated |
 | FR6.3 | FR-23 Sentiment trends | CW-10 | Integration `settings.integration.js`: TC-21-20 (sentiment answers 501: **documents the missing feature**) | Integration | None — AI features are out of scope | Unsupported |
 | *(implementation only)* | — | CW-02 Password reset | Integration `passwordReset.integration.js`: TC-01-30..35 · Unit `rateLimit.test.js`: TC-01-05, TC-01-11, TC-01-12 · Unit `injectionGuards.test.js`: TC-01-14..17 · Unit `authController.test.js`, `emailUtils.test.js` · FE `ResetPassword.test.jsx`, `App.routing.test.jsx` | Unit + integration | — | Validated |
-| *(implementation only)* | — | CW-11 Professor self-registration | Integration `login.integration.js`: TC-01-23..25 · Unit `rateLimit.test.js`: TC-01-06 · Unit `injectionGuards.test.js`: TC-01-19 · Unit `authController.test.js` | Unit + integration | — | Needs verification — sponsor to confirm public sign-up is intended |
+| *(implementation only)* | — | CW-11 Professor self-registration | Integration `login.integration.js`: TC-01-23..25, TC-01-62..65, TC-01-66, TC-01-67, TC-01-74..80 (overlapping requests, including a send that outlives its slot: a resend still waiting on the mail server, two confirmations at once, several resends or first registrations at once; instructor domains only, the password is chosen from the emailed link, an attacker who registers first gets nothing, hostile resends, old accounts) · Unit `registrationPolicy.test.js`: TC-01-40..45, TC-01-69 · Unit `authController.test.js`: TC-01-49..55, TC-01-57..60, TC-01-66..68, TC-01-70..73 (register takes no password, the wait before another link, a failed send keeps the old link, every change one conditional operation, the login gate, verify-email sets the password once) · Unit `emailUtils.test.js` (the confirmation email: recipient and link, a failed send is reported, the link is printed only outside production) · Unit `rateLimit.test.js`: TC-01-06, TC-01-61 · Unit `injectionGuards.test.js`: TC-01-19 · Unit `authController.test.js` | Unit + integration | — | Validated against the sponsor's 12 Oct decision (instructor-only, confirmed by email); domain list to be confirmed |
 | *(sponsor spec only)* | — | CW-12 Rubric management | — (the rubric is fixed in code; TC-13-20 documents it under FR-13) | — | Unit: rubric validation once the scope is decided | Planned (D-09) — rubric is hardcoded |
 
 ## Tests that cover non-functional requirements
@@ -92,10 +92,10 @@ security) and to fixed defects. IDs here may use a backlog number or `SEC` inste
 | | Requirements |
 |---|---|
 | Rows that cite at least one automated test that exists | 25 of 26 (all except CW-12, which has no feature to test) |
-| Validated, with tests | FR-02, FR-05, FR-06, FR-08, FR-09, FR-11, FR-15, FR-16, FR-17, FR-18, FR-22, CW-02 |
+| Validated, with tests | CW-11, FR-02, FR-05, FR-06, FR-08, FR-09, FR-11, FR-15, FR-16, FR-17, FR-18, FR-22, CW-02 |
 | Partial, with tests for what works | FR-07 (email format, CICD-47), FR-19 (PDF) |
 | Defective: the tests cover the working part or **only document the defect** | FR-03, FR-04 (tests only document the defect); FR-12, FR-13, FR-14 (the behaviour that exists is tested) |
-| Needs verification | FR-01, FR-10, FR-20, CW-11 |
+| Needs verification | FR-01, FR-10, FR-20 |
 | Out of scope | FR-21, FR-23 (AI features; the 501 answers are documented by tests) |
 | Planned | CW-12 (rubric management, D-09) |
 

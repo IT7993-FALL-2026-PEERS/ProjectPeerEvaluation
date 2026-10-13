@@ -159,16 +159,30 @@ so the two are never confused.
   itself is a real implementation or a stub has not been checked as part of this pass.
 
 ## CW-11: Professor Self-Registration
-- **Actor:** Anyone with access to the login page
-- **Priority:** Pending sponsor — see open items
-- **Trigger:** A new user wants a professor account
-- **Steps:** toggle the login page into "Professor Registration" mode → submit details →
-  account is created → log in
+- **Actor:** An instructor with an authorized KSU email address
+- **Priority:** Sponsor decision (12 Oct 2026): registration is restricted to authorized KSU
+  instructors, because the system may hold student records protected under FERPA
+- **Trigger:** A new instructor wants a professor account
+- **Steps:** toggle the login page into "Professor Registration" mode → submit name, department
+  and an instructor email address (no password) → open the link emailed to that address and
+  choose a password → log in
 - **Requirements:** none — not in the inherited FR list
-- **Implementation:** `LoginPage.js` (`isRegistering` mode) → `POST /auth/register`
-  (`authController.js`, `routes/auth.js`)
-- **Status:** Implemented, but unrestricted — the route is public, so anyone who can reach the
-  app can create a professor account. Whether that is intended is an open question below.
+- **Implementation:** `LoginPage.jsx` (`isRegistering` mode) → `POST /auth/register`, then
+  `VerifyEmail.jsx` → `POST /auth/verify-email` (`authController.js`, `utils/registrationPolicy.js`,
+  `utils/emailVerification.js`, `routes/auth.js`)
+- **Status:** Implemented (12 and 13 Oct 2026). The email domain must be one of `ALLOWED_EMAIL_DOMAINS`
+  (default `kennesaw.edu`, exact match: subdomains and look-alikes are refused). Registration takes
+  **no password**: the account is created unconfirmed and without one, and the owner of the mailbox
+  chooses it from the emailed link (valid 48 hours; only the token's hash is stored). So whoever
+  registers an address first cannot choose the password of the person who owns it (found by the
+  Codex review of 13 Oct). A pending address can be sent another link only after 15 minutes, and a
+  new link replaces the old one only once it has been sent, so a stranger cannot keep cancelling
+  the real link. Every change is one conditional database operation (the send slot is taken first,
+  the link is published only while the account is still pending, and confirming needs a pending
+  account and an unexpired link), so requests that overlap cannot undo each other (second Codex
+  review, 13 Oct). Accounts that existed before this change keep working.
+  **Still open for the sponsor:** whether the domain alone plus the confirmation link is enough, or
+  an explicit list of approved instructors is wanted; and the exact domain(s) to allow.
 
 ## CW-12: Rubric Management
 - **Actor:** Professor
@@ -189,10 +203,10 @@ so the two are never confused.
 - Team leader (Khoa Ho) to decide, informed by that sponsor input, whether CW-01's broken MFA
   (D-17) and CW-09's CSV/PDF export gap should block Milestone 1 sign-off or carry forward as
   tracked defects.
-- Confirm with the sponsor whether open professor self-registration (CW-11) is intended. As
-  built, anyone who can reach the login page can create a professor account. If signup should
-  be restricted (invite-only, admin-created, or limited to university email), CW-11 is a
-  security defect and needs a D-number.
+- ~~Confirm whether open professor self-registration (CW-11) is intended.~~ Answered 12 Oct 2026:
+  it must be restricted to authorized KSU instructors; built as a domain check plus an emailed
+  confirmation link (see CW-11). The sponsor still has to confirm the domain(s) and whether an
+  approved-instructor list is also wanted.
 
 ## Automated regression coverage (CICD-22)
 
@@ -213,5 +227,5 @@ the feature is built.
 | CW-08 Tracking and reminders | `status.integration.js` (TC-11-20..21, TC-12-20..25) | Status counts, reminders only to students who have not submitted, reuse of the existing link, reset, authorization | Reminders are manual only (FR-12 asks for scheduled) |
 | CW-09 Reports | `reports.integration.js` (TC-17-20..27, TC-18-20, TC-19-20..21, TC-20-30, TC-22-20..21) | Scores, grades, summary and team averages from a fixed set of evaluations, curved grading, no-data cases, CSV export and formula safety, outlier and concerning-word flags, authorization | PDF export is not built (FR-19) |
 | CW-10 AI-assisted feedback | `settings.integration.js` (TC-21-20..21, TC-22-30..32) | Flag-word list: defaults, add, edit, delete, per professor | Summaries, red flags and sentiment are 501 stubs (FR-21, FR-23) |
-| CW-11 Self-registration | `login.integration.js` (TC-01-23, 24) | Register, hash, duplicate | Open to anyone (sponsor question) |
+| CW-11 Self-registration | `login.integration.js` (TC-01-23, 24, 62..65) | Register, hash, duplicate, instructor domains only, confirmation link (once, expiry, resend), unconfirmed accounts cannot log in | Domain list and approved-instructor list to be confirmed by the sponsor |
 | CW-12 Rubric management | `settings.integration.js` (TC-13-20) | The one fixed rubric reaches the student form with the right scales | No rubric management exists (D-09) |

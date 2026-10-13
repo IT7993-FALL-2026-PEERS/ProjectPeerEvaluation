@@ -12,7 +12,7 @@ test('auth routes: loads silently and registers each POST endpoint once', (t) =>
   const router = require('../routes/auth');
   assert.equal(log.mock.callCount(), 0);
   const routes = router.stack.filter(layer => layer.route).map(layer => layer.route);
-  const paths = ['/login', '/register', '/logout', '/refresh', '/verify-mfa', '/reset-password', '/update-password'];
+  const paths = ['/login', '/register', '/logout', '/refresh', '/verify-mfa', '/reset-password', '/update-password', '/verify-email'];
   assert.equal(routes.length, paths.length);
   for (const path of paths) {
     const matches = routes.filter(route => route.path === path);

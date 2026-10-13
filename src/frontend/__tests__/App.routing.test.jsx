@@ -23,6 +23,11 @@ describe('App routing for emailed links', () => {
     expect(screen.getByRole('heading', { name: 'Reset Your Password' })).toBeInTheDocument();
   });
 
+  test('an email confirmation link opens the confirmation page', () => {
+    renderAt('/verify-email/abc123');
+    expect(screen.getByRole('heading', { name: 'Confirm Your Email' })).toBeInTheDocument();
+  });
+
   test('the root path still opens the login page', () => {
     renderAt('/');
     expect(screen.getByRole('heading', { name: 'Professor Login' })).toBeInTheDocument();
