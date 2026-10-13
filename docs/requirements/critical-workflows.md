@@ -31,11 +31,15 @@ so the two are never confused.
 - **Implementation:** `LoginPage.js` → `POST /auth/login`, `POST /auth/logout`,
   `POST /auth/refresh` (`authController.js`, `authRoutes: auth.js`)
 - **Status:** Partial — login works. Logout is a server-side no-op (it returns 200; the client
-  just discards the token, so tokens stay valid until expiry). Refresh is a stub that returns
-  501 `NOT_IMPLEMENTED` (`authController.js:98-104`). MFA is advertised (`mfa_required: true`) but
+  just discards the token, so tokens stay valid until expiry). `POST /auth/refresh` is the
+  session keep-alive (see below). MFA is advertised (`mfa_required: true`) but
   `verifyMfa` is unimplemented, so a professor with MFA enabled cannot complete login (tracked
-  as **D-17**, High, in the technical assessment report). Session timeout is also 1 hour, not
-  the 30 minutes FR1.4 specifies (**D-18**).
+  as **D-17**, High, in the technical assessment report). Since 12 Oct a session lasts 60 minutes
+  of inactivity (renewed while the professor works), not the fixed 1 hour after login it was
+  before; FR1.4 says 30 minutes, which the sponsor still has to confirm (**D-18**). The browser
+  counts clicks, key presses, scrolling and touch as activity (not mouse movement), asks the server
+  to extend the login at most every 5 minutes, and shows a "Stay logged in" warning 2 minutes before
+  it ends (`SessionTimeoutWarning.jsx`).
 
 ## CW-02: Password Reset
 - **Actor:** Professor

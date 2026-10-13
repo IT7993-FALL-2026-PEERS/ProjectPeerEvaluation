@@ -32,9 +32,16 @@ except the roster upload (multipart form) and the report download (CSV).
 Authorization: Bearer <access_token>
 ```
 
-Tokens are signed with `JWT_SECRET` (HS256) and expire after **1 hour**. There is no
-working refresh endpoint, so the user logs in again (see D-18 for the 30-minute
-requirement). When a logged-in request gets a 401 (not a login or password-reset call),
+Tokens are signed with `JWT_SECRET` (HS256) and expire after **60 minutes of inactivity**
+(`SESSION_IDLE_MINUTES`, FR-04). Any request made a minute or more after the token was issued
+is answered with a fresh token in the `X-Access-Token` response header (exposed through CORS),
+which the frontend stores, so a professor who keeps working stays logged in. Every authenticated answer also carries the server's time in `X-Server-Time` (milliseconds, also exposed through CORS), because the browser works out how long the login has left from the token's dates and its own clock can be minutes off. The browser places the stamp halfway through the request's round trip and ignores a sample whose round trip took longer than 5 seconds, because the server stamps the time when the request arrives, not when the answer does. A session is
+capped at 8 hours since login (`SESSION_MAX_HOURS`). The browser counts clicks, key presses,
+scrolling and touch as activity (not mouse movement) and, at most every 5 minutes, calls
+`POST /auth/refresh` so the login is extended even when the page makes no other request; with 2
+minutes left and no activity it asks "Stay logged in?" (it reads the expiry from the token; the
+server still decides whether the token is valid). The inherited requirement says 30 minutes (D-18, the
+sponsor still has to confirm). When a logged-in request gets a 401 (not a login or password-reset call),
 the app shows "Session timed out. Please log-in again!" with a Log in button that clears the
 stored login and opens the login page. Student endpoints under `/evaluate` use no login: the evaluation token in
 the URL is the only credential. It is 32 random bytes (64 hex characters) and expires
@@ -115,7 +122,7 @@ on 404 instead of this shape.
 | POST | `/auth/logout` | 🔒 | No-op; the client discards the token |
 | POST | `/auth/reset-password` | 🌐 | Email a password reset link |
 | POST | `/auth/update-password` | 🌐 | Set a new password with the reset token |
-| POST | `/auth/refresh` | 🌐 | **501** — not implemented |
+| POST | `/auth/refresh` | 🔒 | Keep-alive: extends the session while the professor is active |
 | POST | `/auth/verify-mfa` | 🌐 | **501** — not implemented (D-17) |
 | GET | `/professor/ai-words` | 🔒 | The professor's concerning-words list |
 | POST | `/professor/ai-words` | 🔒 | Add, edit or delete a word |
@@ -232,9 +239,17 @@ Body: `{ "token", "password" }`. **200** `{ "message": "Password updated success
 and the token is cleared, so it works once. **400** `VALIDATION_ERROR` missing field ·
 **400** `TOKEN_ERROR` unknown or expired token.
 
-### `POST /auth/refresh`, `POST /auth/verify-mfa`
+### `POST /auth/refresh`
 
-Both return **501** `NOT_IMPLEMENTED`.
+Keep-alive (FR-04). Needs a valid login token. **200** `{ "message": "Session extended.",
+"expires_in_seconds": 3600 }`; when the token is a minute or more old the response also carries a
+fresh token in `X-Access-Token` (see section 1). **401** without a valid token. The handler does
+nothing else: the renewal is done by the authentication middleware, which does it for every
+authenticated request.
+
+### `POST /auth/verify-mfa`
+
+Returns **501** `NOT_IMPLEMENTED`.
 
 ---
 
@@ -540,7 +555,7 @@ is a **400** `VALIDATION_ERROR` (API-2).
 
 ## 12. Not implemented
 
-`/auth/refresh`, `/auth/verify-mfa`, `/courses/:course_id/teams/auto-assign` and the three
+`/auth/verify-mfa`, `/courses/:course_id/teams/auto-assign` and the three
 `/ai/*` endpoints are routed but return **501**. The frontend's AI-flagging feature does
 not use `/ai/*`; flags are computed inside the course report (section 10).
 

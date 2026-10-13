@@ -7,7 +7,7 @@ const { authenticateToken } = require('../middleware/auth');
 router.post('/login', authController.login);
 router.post('/register', authController.register);
 router.post('/logout', authenticateToken, authController.logout);
-router.post('/refresh', authController.refreshToken);
+router.post('/refresh', authenticateToken, authController.refreshToken);
 router.post('/verify-mfa', authController.verifyMfa);
 
 // Password reset endpoint

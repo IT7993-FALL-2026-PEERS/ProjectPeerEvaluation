@@ -213,7 +213,7 @@ the new bcrypt hash and clears the token so the link works once.
 | Concern | How it works today | Gap |
 |---|---|---|
 | Professor passwords | bcrypt, cost 10 | No strength rule. Login, register, reset and the student links are rate limited per client address (API-5) |
-| Professor sessions | Stateless JWT (HS256, `JWT_SECRET`), 1 hour, stored in `localStorage` | Requirement is 30 minutes (D-18); no refresh or server-side logout; `localStorage` is readable by any script on the page |
+| Professor sessions | Stateless JWT (HS256, `JWT_SECRET`), 60 minutes of inactivity (renewed through the `X-Access-Token` header while the professor works; 8-hour cap), stored in `localStorage` | Inherited requirement says 30 minutes (D-18, to be confirmed); no server-side logout; `localStorage` is readable by any script on the page |
 | Authorization | Every professor endpoint needs a JWT; every course-scoped endpoint checks course ownership | Student and team updates change only whitelisted fields, and IDs in a payload are checked against the course (API-4) |
 | Student access | A per-student token in the link, the only credential | Random (`crypto.randomBytes`) and valid for 14 days (API-1); a submission must rate exactly the evaluator's teammates, once each, with whole-number ratings (API-2) |
 | MFA | Model field and login branch exist | Verification returns 501, so MFA can't be used (D-17) |
@@ -278,7 +278,7 @@ New findings from this review. Items already in the defects log keep their D-num
 | A-5 | **Partly fixed (CICD-57).** Most of the professor UI was one 2,687-line component; its dialogs are now separate tested components and the page is 1,478 lines (5 Oct) | Hard to test and change safely | Split by feature when tests need it; not a rewrite |
 | A-6 | Leftover placeholder files: `config/db.js`, `utils/tokenUtils.js` (one-line comments; `config/corsConfig.js` was one too, and now holds the CORS policy, CICD-37, so keep it), the unused `Report` model, and the frontend `Dashboard.js` and `TeamAssignment.js` pages | Confusing; `migrations/migrateCourses.js` requires the empty `config/db.js` and can't run | Delete, and fix or retire the migration |
 | A-7 | **Fixed (CICD-34).** There was no rate limiting anywhere (API-5) | Password guessing and email flooding | Add `express-rate-limit` to auth and evaluation routes |
-| A-8 | Stubs return 501: token refresh, MFA (D-17), team auto-assign, the three `/api/ai/*` endpoints | Features the UI or data model suggest don't exist | Confirm with the sponsor which are in scope |
+| A-8 | Stubs return 501: MFA (D-17), team auto-assign, the three `/api/ai/*` endpoints | Features the UI or data model suggest don't exist | Confirm with the sponsor which are in scope |
 
 The two most important of these for the sponsor review are **A-2** (grade integrity) and
 **A-1** (email at class scale).

@@ -20,3 +20,17 @@ test('auth routes: loads silently and registers each POST endpoint once', (t) =>
     assert.deepEqual({ ...matches[0].methods }, { post: true });
   }
 });
+
+test('TC-04-30: the keep-alive route needs a valid login token, so nobody can use it to probe or to get a token', (t) => {
+  const originalSecret = process.env.JWT_SECRET;
+  process.env.JWT_SECRET = 'auth-routes-test-secret-at-least-32-characters';
+  t.after(() => {
+    if (originalSecret === undefined) delete process.env.JWT_SECRET;
+    else process.env.JWT_SECRET = originalSecret;
+  });
+  t.mock.method(console, 'log', () => {});
+  const router = require('../routes/auth');
+  const refresh = router.stack.map((layer) => layer.route).find((route) => route && route.path === '/refresh');
+  assert.equal(refresh.stack.length, 2, 'authenticateToken, then the handler');
+  assert.equal(refresh.stack[0].name, 'authenticateToken');
+});

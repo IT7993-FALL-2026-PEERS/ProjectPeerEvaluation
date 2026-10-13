@@ -40,6 +40,9 @@ function corsOptions(env = process.env) {
     origin: originCheck(env),
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    // A browser hides other response headers from the page. The renewed login token and the server time
+    // (FR-04) must be readable.
+    exposedHeaders: ['X-Access-Token', 'X-Server-Time'],
     credentials: true,
   };
 }

@@ -1,13 +1,9 @@
 const Professor = require('../models/Professor');
-const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 
-const { getConfig } = require('../config/env');
+const { signSessionToken, getSessionSettings } = require('../utils/sessionToken');
 const { asText, firstNonText, validationError } = require('../utils/inputGuards');
-
-const JWT_SECRET = getConfig().jwtSecret;
-const JWT_EXPIRES_IN = '1h';
 
 exports.login = async (req, res, next) => {
 	try {
@@ -39,12 +35,8 @@ exports.login = async (req, res, next) => {
 			// Return MFA required response (frontend will call verify-mfa)
 			return res.status(200).json({ mfa_required: true, professor_id: professor._id });
 		}
-		// Generate JWT token
-		const access_token = jwt.sign(
-			{ id: professor._id, email: professor.email, name: professor.name },
-			JWT_SECRET,
-			{ expiresIn: JWT_EXPIRES_IN }
-		);
+		// Login token: valid for the idle period, renewed while the professor keeps working (FR-04)
+		const access_token = signSessionToken({ id: String(professor._id), email: professor.email, name: professor.name });
 		professor.last_login = new Date();
 		await professor.save();
 		res.status(200).json({
@@ -100,12 +92,10 @@ exports.logout = async (req, res) => {
   res.status(200).json({ message: 'Logout successful.' });
 };
 
-exports.refreshToken = async (req, res, next) => {
-	// Placeholder: implement refresh token logic as needed
-	const err = new Error('Refresh token not implemented.');
-	err.code = 'NOT_IMPLEMENTED';
-	err.status = 501;
-	next(err);
+// Keep-alive (FR-04). The browser calls this while the professor is active. authenticateToken has already
+// checked the token and, when one is due, put a fresh one in X-Access-Token; there is nothing left to do here.
+exports.refreshToken = async (req, res) => {
+	res.status(200).json({ message: 'Session extended.', expires_in_seconds: getSessionSettings().idleSeconds });
 };
 
 exports.verifyMfa = async (req, res, next) => {
