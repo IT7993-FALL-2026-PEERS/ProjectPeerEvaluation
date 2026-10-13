@@ -191,6 +191,14 @@ is shown.
 **then** the upload is rejected with an error identifying the problem, and no partial
 roster is created.
 
+**Given** a course in which students have already submitted evaluations,
+**when** the professor uploads a roster (a new one, or an updated one) for it,
+**then** the submitted evaluations and the evaluation links already sent are kept
+(sponsor decision, 12 Oct 2026: "Previously submitted evaluations must be saved. Professors
+should be able to upload or update rosters for multiple course sections without losing
+existing data"). Each section is its own course, so rosters for several sections do not
+affect each other.
+
 *Evidence.* `controllers/studentController.js` (CSV parsing and bulk create); `multer` and
 `csv-parser` dependencies; format documented in `docs/csv-upload-format.md`.
 

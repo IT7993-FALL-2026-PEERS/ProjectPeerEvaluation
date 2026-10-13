@@ -84,7 +84,7 @@ test('TC-06-22: uploading the same roster twice adds nobody twice', async () => 
   assert.equal(await Team.countDocuments({ course_id: IDS.courseAda, team_name: 'Gamma' }), 1);
 });
 
-test('TC-06-23: a file with no usable rows gets 400 and changes nothing, evaluations included (API-3)', async () => {
+test('TC-06-23: a file with no usable rows gets 400 and changes nothing, evaluations included', async () => {
   await seedSubmittedEvaluation();
   for (const csv of ['', 'student_id,name,email,group_assignment\n', 'ID,Full Name,Mail\n9,Zed,zed@example.edu\n']) {
     const res = await app.uploadCsv(uploadPath(IDS.courseAda), csv, { token: ada });
@@ -126,17 +126,117 @@ test('TC-07-10: a row with a badly formed email is reported and not saved, and t
   assert.match(res.body.errors[0], /Invalid email/);
   assert.equal(await Student.countDocuments({ course_id: IDS.courseAda, student_id: '1006' }), 0);
 });
-// Behaviour today, not a decision: a successful re-upload resets every evaluation link and deletes
-// submitted evaluations. Whether that should stay is a sponsor question (backlog CICD-39). If it is
-// changed on purpose, update this test with it.
-test('TC-06-25: a successful re-upload currently clears evaluation links and submitted evaluations', async () => {
+// Sponsor decision (12 Oct 2026): "Previously submitted evaluations must be saved. Professors should be able to
+// upload or update rosters for multiple course sections without losing existing data."
+test('TC-06-25: a successful re-upload keeps the submitted evaluations and the evaluation links', async () => {
   await seedSubmittedEvaluation();
+  const before = await Student.findById(IDS.ann);
   const res = await app.uploadCsv(uploadPath(IDS.courseAda), ROSTER, { token: ada });
   assert.equal(res.status, 200);
-  assert.equal(res.body.evaluations_cleared, 1);
-  assert.equal(await Evaluation.countDocuments({ course_id: IDS.courseAda }), 0);
+  assert.deepEqual(res.body.students.sort(), ['1005', '1006'], 'the new students are added');
+  assert.equal(res.body.evaluations_cleared, undefined);
+  assert.equal(res.body.evaluation_state_reset, undefined);
+  assert.doesNotMatch(res.body.message, /reset|fresh start|cleared/i);
+
+  assert.equal(await Evaluation.countDocuments({ course_id: IDS.courseAda }), 1, 'the submitted evaluation is still there');
   const ann = await Student.findById(IDS.ann);
-  assert.ok(!ann.evaluation_token, "the link is cleared");
+  assert.equal(ann.evaluation_token, 'a'.repeat(64), 'the link is still the one she was sent');
+  assert.equal(new Date(ann.evaluation_token_expires_at).getTime(), new Date(before.evaluation_token_expires_at).getTime());
+  assert.equal(ann.evaluation_completed, true, 'and she is still marked as having submitted');
+});
+
+// Codex review (13 Oct): evaluations are tied to who is on a team. A student who has submitted or received
+// evaluations keeps their team when a roster says otherwise (the upload says so in `errors`), because moving
+// them would leave the saved evaluations pointing at a team they are no longer in. Everyone else can move.
+test('TC-06-81: an updated roster adds new students and moves those with no evaluations; students with evaluations keep their team', async () => {
+  await seedSubmittedEvaluation(); // Ann submitted an evaluation of Ben (both in Alpha)
+  const updated = [
+    'student_id,name,email,group_assignment',
+    '1001,Ann Archer,ann@example.edu,Gamma', // submitted: stays in Alpha
+    '1002,Ben Baker,ben@example.edu,Gamma', // received one: stays in Alpha
+    '1003,Cy Cole,cy@example.edu,Gamma', // nothing yet: moves
+    '1005,Fay Foster,fay@example.edu,Gamma', // new
+    '',
+  ].join('\n');
+  const res = await app.uploadCsv(uploadPath(IDS.courseAda), updated, { token: ada });
+  assert.equal(res.status, 200);
+  assert.deepEqual(res.body.students, ['1005']);
+  assert.equal(await Evaluation.countDocuments({ course_id: IDS.courseAda }), 1, 'the evaluation is kept');
+  assert.equal(await Student.countDocuments({ course_id: IDS.courseAda }), 5, 'nobody who was not in the file was removed');
+
+  assert.equal((await Student.findById(IDS.ann)).group_assignment, 'Alpha');
+  assert.equal((await Student.findById(IDS.ben)).group_assignment, 'Alpha');
+  const reported = res.body.errors.join(' | ');
+  assert.match(reported, /1001/);
+  assert.match(reported, /1002/);
+  assert.match(reported, /submitted or received evaluations/);
+  assert.doesNotMatch(reported, /1003/, 'Cy was moved, so there is nothing to report');
+
+  const cy = await Student.findById(IDS.cy);
+  assert.equal(cy.group_assignment, 'Gamma');
+  const gamma = await Team.findOne({ course_id: IDS.courseAda, team_name: 'Gamma' });
+  assert.deepEqual([...gamma.students].map(String).sort(), [String(IDS.cy), String((await Student.findOne({ student_id: '1005', course_id: IDS.courseAda }))._id)].sort());
+  assert.equal(gamma.student_count, 2);
+});
+
+test('TC-06-84: moving a student with no evaluations takes them out of the old team and keeps both teams\' lists and counts right', async () => {
+  const csv = ['student_id,name,email,group_assignment', '1003,Cy Cole,cy@example.edu,Alpha', ''].join('\n');
+  const res = await app.uploadCsv(uploadPath(IDS.courseAda), csv, { token: ada });
+  assert.equal(res.status, 200);
+  const alpha = await Team.findById(IDS.teamAlpha);
+  const beta = await Team.findById(IDS.teamBeta);
+  const inAlpha = [...alpha.students].map(String);
+  assert.equal(inAlpha.filter((id) => id === String(IDS.cy)).length, 1, 'in the new team once');
+  assert.ok(![...beta.students].map(String).includes(String(IDS.cy)), 'and no longer in the old team');
+  assert.equal(alpha.student_count, 3);
+  assert.equal(beta.student_count, 1, 'the old team\'s count was recalculated');
+  assert.equal(String((await Student.findById(IDS.cy)).team_id), String(IDS.teamAlpha));
+
+  // uploading the same file again changes nothing
+  await app.uploadCsv(uploadPath(IDS.courseAda), csv, { token: ada });
+  const alphaAgain = await Team.findById(IDS.teamAlpha);
+  assert.equal([...alphaAgain.students].length, 3);
+  assert.equal(alphaAgain.student_count, 3);
+});
+
+test('TC-06-87: the same student id twice in one file adds one student (the first row) and says so', async () => {
+  const csv = [
+    'student_id,name,email,group_assignment',
+    '1005,Fay Foster,fay@example.edu,Gamma',
+    '1005,Someone Else,other@example.edu,Delta',
+    '1006,Gus Green,gus@example.edu,Gamma',
+    '',
+  ].join('\n');
+  const res = await app.uploadCsv(uploadPath(IDS.courseAda), csv, { token: ada });
+  assert.equal(res.status, 200);
+  assert.deepEqual(res.body.students.sort(), ['1005', '1006']);
+  assert.match(res.body.errors.join(' | '), /1005.*(twice|more than once|duplicate)/i);
+  const fay = await Student.findOne({ student_id: '1005', course_id: IDS.courseAda });
+  assert.equal(fay.name, 'Fay Foster', 'the first row was used');
+  assert.equal(fay.group_assignment, 'Gamma');
+  assert.equal(await Team.countDocuments({ course_id: IDS.courseAda, team_name: 'Delta' }), 0, 'the ignored row made no team');
+});
+
+test('TC-06-82: uploading rosters for several sections of the same professor keeps every section\'s data', async () => {
+  const sectionTwo = await Course.create({
+    course_name: 'Capstone', course_number: 'CS 4850', course_section: '02', professor_id: IDS.ada,
+    semester: 'Fall', year: 2026, course_status: 'Active',
+  });
+  await seedSubmittedEvaluation();
+  const sameIds = ['student_id,name,email,group_assignment', '1001,Ann Archer,ann@example.edu,Delta', '1007,Hal Hart,hal@example.edu,Delta', ''].join('\n');
+  const res = await app.uploadCsv(uploadPath(sectionTwo._id), sameIds, { token: ada });
+  assert.equal(res.status, 200);
+  assert.deepEqual(res.body.students.sort(), ['1001', '1007'], 'the same university id may be in two sections');
+  assert.equal(await Student.countDocuments({ course_id: sectionTwo._id }), 2);
+  assert.equal(await Evaluation.countDocuments({ course_id: IDS.courseAda }), 1, 'the first section keeps its evaluation');
+  assert.equal(await Student.countDocuments({ course_id: IDS.courseAda }), 4, 'and its students');
+  assert.equal((await Student.findById(IDS.ann)).evaluation_token, 'a'.repeat(64));
+
+  // and uploading the same file again changes nothing in either section
+  const again = await app.uploadCsv(uploadPath(sectionTwo._id), sameIds, { token: ada });
+  assert.equal(again.status, 200);
+  assert.equal(await Student.countDocuments({ course_id: sectionTwo._id }), 2);
+  assert.equal(await Evaluation.countDocuments({ course_id: IDS.courseAda }), 1);
 });
 
 test('TC-06-26: another professor cannot upload to the course, and nothing changes', async () => {

@@ -68,7 +68,9 @@ so the two are never confused.
 - **Trigger:** Professor needs to populate a course with students
 - **Steps:** bulk upload CSV/Excel (with validation and error handling) or add/edit/remove
   students individually or in bulk
-- **Requirements:** FR2.2 (bulk upload), FR2.3 (validation)
+- **Requirements:** FR2.2 (bulk upload), FR2.3 (validation). A roster upload never deletes submitted
+  evaluations or evaluation links (sponsor decision, 12 Oct 2026); a student who has submitted or
+  received evaluations keeps their team, and a student who moves leaves the old team's list
 - **Implementation:** `CourseManagement.js` → `POST /courses/:course_id/roster` (multer upload),
   `GET/POST/PUT/DELETE /courses/:course_id/students`,
   `POST /courses/:course_id/students/bulk-delete` (`studentController.js`)
@@ -210,7 +212,7 @@ the feature is built.
 | CW-01 Professor authentication | `login.integration.js` (TC-01-20..28) | Login, saved last login, bad credentials, operator payload, register, duplicate email, unique index; logout, refresh and MFA as they behave today | Logout is a no-op, refresh is a 501 stub, MFA cannot complete (D-17) |
 | CW-02 Password reset | `passwordReset.integration.js` (TC-01-30..35) | Emailed link and stored token, no account enumeration, one-time use, expiry, forged and operator tokens | |
 | CW-03 Course setup | `courses.integration.js` (TC-05-30..36), `courseOwnership.integration.js` (TC-05-20..25) | Create, list, edit, validation, soft delete and reactivation, search, ownership across professors | |
-| CW-04 Roster management | `roster.integration.js` (TC-06-20..27), `students.integration.js` (TC-06-30..40) | Roster upload, invalid files keep data, rows with missing fields, manual add, edit, delete, bulk delete, counts | Email format is not validated yet (FR-07); a valid re-upload deletes evaluations (sponsor decision, API-3) |
+| CW-04 Roster management | `roster.integration.js` (TC-06-20..27), `students.integration.js` (TC-06-30..40) | Roster upload, invalid files keep data, rows with missing fields, manual add, edit, delete, bulk delete, counts | A valid re-upload keeps evaluations and links (TC-06-25, TC-06-81, TC-06-82; sponsor decision, API-3) |
 | CW-05 Team assignment | `teams.integration.js` (TC-08-20..33), consistency helper `helpers/consistency.js` | Create, move, remove, rename, delete, clear, membership and counts agree on both sides | Auto-assign is a 501 stub |
 | CW-06 Evaluation distribution | `invitation.integration.js` (TC-10-20..25) | Emails captured at the transport, link matches stored token, 14-day expiry, resend, team send, authorization | |
 | CW-07 Student submission | `submission.integration.js` (TC-16-20..27), `atomicSubmission.*.integration.js` (TC-16-30..34), `duplicateEvaluations.integration.js` | Full path from the emailed link, validation, duplicates, concurrent double submit, all-or-nothing save | Participation 1-4 and a 10-character feedback minimum are as built (D-19, FR-14) |
