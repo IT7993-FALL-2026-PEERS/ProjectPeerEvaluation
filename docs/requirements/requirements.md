@@ -270,7 +270,25 @@ own evaluation link.
 **then** every student on the roster receives an email addressed to them containing a link
 carrying their own token, and no student receives another student's link.
 
-*Evidence.* `sendEvaluationInvitation` in `utils/emailUtils.js`.
+**Deadline (sponsor, 14 Oct 2026; CICD-67).** "Students must submit their evaluations within the deadline
+set by the instructor."
+
+**Given** an instructor sending evaluations,
+**when** they send without a valid deadline in the future (at most one year ahead),
+**then** nothing is sent or stored and the request is refused with a reason;
+**when** they send with one,
+**then** each student who has no working link and has not submitted gets a link that works until that
+deadline, and students who already have a working link or have submitted are not emailed again.
+
+**Given** a student's link,
+**when** its deadline has passed,
+**then** the form, the status check and the submission all refuse it ("The deadline for this evaluation
+has passed. Ask your instructor for an extension."), and a reminder neither reaches that student nor
+extends the link.
+
+*Evidence.* `sendEvaluationInvitation` in `utils/emailUtils.js`; `parseDeadline` in
+`utils/evaluationDeadline.js`; the send, remind and student handlers in
+`controllers/evaluationController.js`.
 
 *Why verification is needed.* Delivery depends on SMTP credentials and on `FRONTEND_URL`
 being set correctly at deployment time; link correctness cannot be confirmed without a

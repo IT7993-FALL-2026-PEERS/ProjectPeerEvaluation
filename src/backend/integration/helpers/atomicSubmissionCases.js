@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const Student = require('../../models/Student');
 const Evaluation = require('../../models/Evaluation');
 const { startDatabase, stopDatabase, clearDatabase } = require('./db');
-const { startApp, clearEmails } = require('./app');
+const { startApp, clearEmails, deadlineBody } = require('./app');
 const { seed, IDS } = require('./seed');
 const { STUDENT_RATINGS: RATINGS } = require('./evaluations');
 
@@ -37,7 +37,7 @@ function registerAtomicSubmissionTests({ standalone }) {
     await clearDatabase();
     await seed();
     clearEmails();
-    await app.request('POST', `/api/courses/${IDS.courseAda}/evaluations/send`, { token: ada, body: {} });
+    await app.request('POST', `/api/courses/${IDS.courseAda}/evaluations/send`, { token: ada, body: deadlineBody() });
   });
 
   const tokenOf = (studentId) => Student.findById(studentId).then((s) => s.evaluation_token);
@@ -48,7 +48,7 @@ function registerAtomicSubmissionTests({ standalone }) {
       student_id: '1007', name: 'Fay Fox', email: 'fay@example.edu',
       course_id: IDS.courseAda, team_id: IDS.teamAlpha, group_assignment: 'Alpha',
     });
-    await app.request('POST', `/api/courses/${IDS.courseAda}/evaluations/send`, { token: ada, body: {} });
+    await app.request('POST', `/api/courses/${IDS.courseAda}/evaluations/send`, { token: ada, body: deadlineBody() });
     return fay;
   }
 
@@ -154,7 +154,7 @@ function registerAtomicSubmissionTests({ standalone }) {
     assert.equal(first.status, 201);
 
     await app.request('DELETE', `/api/courses/${IDS.courseAda}/evaluations/reset`, { token: ada });
-    await app.request('POST', `/api/courses/${IDS.courseAda}/evaluations/send`, { token: ada, body: {} });
+    await app.request('POST', `/api/courses/${IDS.courseAda}/evaluations/send`, { token: ada, body: deadlineBody() });
     const second = await app.request('POST', `/api/evaluate/${await tokenOf(IDS.ann)}`, { body: { evaluations: [rating(IDS.ben)] } });
     assert.equal(second.status, 201);
     assert.equal(await Evaluation.countDocuments({ evaluator_id: IDS.ann }), 1);

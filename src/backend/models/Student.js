@@ -10,6 +10,7 @@ const StudentSchema = new mongoose.Schema({
 	group_assignment: { type: String, trim: true, default: null }, // Group name from CSV (used to create/find team)
 	evaluation_token: { type: String, default: null }, // Unique token for evaluation links (set when evaluations are sent)
 	evaluation_token_expires_at: { type: Date, default: null }, // Link stops working after this; see utils/evaluationToken.js
+	evaluation_deadline_zone: { type: String, default: null }, // Zone the deadline is written in for this student's emails (CICD-67)
 	evaluation_completed: { type: Boolean, default: false },
 	created_at: { type: Date, default: Date.now }
 });

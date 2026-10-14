@@ -1,5 +1,7 @@
 const { test, expect } = require('@playwright/test');
-const { resetData, capturedEmails, loginAs, loginAsAda, courseAction, alertWith, ROSTER_CSV, HEADER_ONLY_CSV } = require('./support/app');
+const {
+  resetData, capturedEmails, invitationPath, loginAs, loginAsAda, courseAction, alertWith, sendWithDeadline, ROSTER_CSV, HEADER_ONLY_CSV,
+} = require('./support/app');
 
 // The instructor's workflow through the real UI (CW-01, 03 to 09): sign in, load a roster, form a
 // team, send invitations, read the reports. Run with E2E_START_SERVER=1 (see playwright.config.js).
@@ -83,6 +85,7 @@ test('E2E-05: the Create Team dialog creates a team (CICD-52)', async ({ page })
 test('E2E-06: sending invitations emails every student a link and opens the status, with nobody done yet', async ({ page }) => {
   await loginAsAda(page, passwords);
   await courseAction(page, 'Send Evaluations').click();
+  await sendWithDeadline(page);
 
   await expect(alertWith(page, 'Emails sent to 4 students')).toBeVisible();
   await expect(page.getByText('Progress: 0/4 evaluations completed')).toBeVisible();
@@ -186,4 +189,29 @@ test('E2E-41: when the login has expired the page says so, and Log in goes back 
   await expect(page.getByRole('heading', { name: 'Professor Login' })).toBeVisible();
   await expect(page.getByText('Session timed out. Please log-in again!')).toHaveCount(0);
   expect(await page.evaluate(() => localStorage.getItem('peer_eval_token'))).toBeNull();
+});
+
+// CICD-67: the instructor sets the deadline with each send, and the student sees it.
+test('E2E-42: a student opens the emailed link and sees when the evaluation is due', async ({ page, browser }) => {
+  await loginAsAda(page, passwords);
+  await courseAction(page, 'Send Evaluations').click();
+  await sendWithDeadline(page, { days: 3 });
+  await expect(alertWith(page, 'Emails sent to 4 students')).toBeVisible();
+  expect((await capturedEmails()).every((e) => /Deadline:<\/strong> [A-Z][a-z]{2}, /.test(e.html))).toBe(true);
+
+  const student = await (await browser.newContext()).newPage();
+  await student.goto(await invitationPath('ann@example.edu'));
+  const due = student.getByRole('alert').filter({ hasText: 'Due:' });
+  await expect(due).toBeVisible();
+  await expect(due).toContainText(String(new Date(Date.now() + 3 * 86400000).getFullYear()));
+});
+
+test('E2E-43: sending needs a deadline: Send stays disabled without one, and Cancel sends nothing', async ({ page }) => {
+  await loginAsAda(page, passwords);
+  await courseAction(page, 'Send Evaluations').click();
+  const dialog = page.getByRole('dialog').filter({ has: page.getByLabel('Deadline') });
+  await expect(dialog.getByRole('button', { name: 'Send', exact: true })).toBeDisabled();
+  await dialog.getByRole('button', { name: 'Cancel' }).click();
+  await expect(dialog).toBeHidden();
+  expect((await capturedEmails()).length).toBe(0);
 });

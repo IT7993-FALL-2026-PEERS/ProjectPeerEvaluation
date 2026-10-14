@@ -1,6 +1,7 @@
 import { renderHook, act } from '@testing-library/react';
 import api from '../../services/api';
 import useTeams from '../useTeams';
+import { toLocalInputValue } from '../../services/deadline';
 
 vi.mock('../../services/api', () => ({
   __esModule: true,
@@ -661,18 +662,28 @@ describe('useTeams: changing a team after the evaluations were sent', () => {
 });
 
 describe('useTeams: sending the evaluations to one team', () => {
+  // CICD-67: the send button asks for a deadline first; this chooses one and confirms.
+  const CHOSEN = '2999-01-01T10:00';
+  const sendTo = async (view, team) => {
+    act(() => view.result.current.teamsDialog.onSend(team));
+    await act(() => view.result.current.teamSendDialog.onConfirm(CHOSEN));
+  };
+  const WITH_DEADLINE = { deadline: new Date(CHOSEN).toISOString(), deadline_zone: expect.any(String) };
+
   test('emails the team, says so, refreshes the counts, and is busy only while it runs', async () => {
     const view = await opened();
     let release;
     api.post.mockReturnValue(new Promise((resolve) => { release = resolve; }));
 
     let sending;
-    act(() => { sending = view.result.current.teamsDialog.onSend(ALPHA); });
+    act(() => view.result.current.teamsDialog.onSend(ALPHA));
+    // The promise is kept, not awaited: the post is held open until release() below
+    act(() => { sending = view.result.current.teamSendDialog.onConfirm(CHOSEN); });
     expect(view.result.current.teamsDialog.sendingTeamIds).toEqual({ t1: true });
 
     await act(async () => { release({ data: { emails_sent: 2, total_students: 2, failed: [] } }); await sending; });
 
-    expect(api.post).toHaveBeenCalledWith('/courses/c1/teams/t1/evaluations/send', {});
+    expect(api.post).toHaveBeenCalledWith('/courses/c1/teams/t1/evaluations/send', WITH_DEADLINE);
     expect(setAlert).toHaveBeenCalledWith({ severity: 'success', message: 'Evaluation invitations sent to team "Alpha".' });
     expect(refreshCourses).toHaveBeenCalledTimes(1);
     expect(view.result.current.teamsDialog.sendingTeamIds).toEqual({ t1: false });
@@ -682,7 +693,7 @@ describe('useTeams: sending the evaluations to one team', () => {
     const view = await opened();
     api.post.mockResolvedValue({ data: { emails_sent: 1, total_students: 2, failed: ['Ben Baker (ben@example.edu): refused'] } });
 
-    await act(() => view.result.current.teamsDialog.onSend(ALPHA));
+    await sendTo(view, ALPHA);
 
     expect(setAlert).toHaveBeenCalledWith({ severity: 'warning', message: 'Sent 1 of 2 emails. Not sent to: Ben Baker.' });
   });
@@ -690,15 +701,15 @@ describe('useTeams: sending the evaluations to one team', () => {
   test('shows the user message of a failure, or says it failed', async () => {
     const view = await opened();
     api.post.mockRejectedValueOnce({ userMessage: 'Mail is down' });
-    await act(() => view.result.current.teamsDialog.onSend(ALPHA));
+    await sendTo(view, ALPHA);
     expect(setAlert).toHaveBeenLastCalledWith({ severity: 'error', message: 'Mail is down' });
 
     api.post.mockRejectedValueOnce({ response: { data: { error: { message: 'No students in this team' } } } });
-    await act(() => view.result.current.teamsDialog.onSend(ALPHA));
+    await sendTo(view, ALPHA);
     expect(setAlert).toHaveBeenLastCalledWith({ severity: 'error', message: 'No students in this team' });
 
     api.post.mockRejectedValueOnce(new Error('network'));
-    await act(() => view.result.current.teamsDialog.onSend(ALPHA));
+    await sendTo(view, ALPHA);
     expect(setAlert).toHaveBeenLastCalledWith({ severity: 'error', message: 'Failed to send evaluations to team "Alpha".' });
     expect(view.result.current.teamsDialog.sendingTeamIds).toEqual({ t1: false });
     expect(refreshCourses).not.toHaveBeenCalled();
@@ -706,9 +717,11 @@ describe('useTeams: sending the evaluations to one team', () => {
 
   test('does nothing without a team, or before a course has been opened', async () => {
     const view = await opened();
-    await act(() => view.result.current.teamsDialog.onSend(undefined));
+    act(() => view.result.current.teamsDialog.onSend(undefined));
+    expect(view.result.current.teamSendDialog.open).toBe(false);
     const utils = render();
-    await act(() => utils.result.current.teamsDialog.onSend(ALPHA));
+    act(() => utils.result.current.teamsDialog.onSend(ALPHA));
+    expect(utils.result.current.teamSendDialog.open).toBe(false);
 
     expect(api.post).not.toHaveBeenCalled();
     expect(setAlert).not.toHaveBeenCalled();
@@ -718,9 +731,38 @@ describe('useTeams: sending the evaluations to one team', () => {
   test('identifies a team by id when it has no _id', async () => {
     const view = await opened();
 
-    await act(() => view.result.current.teamsDialog.onSend({ id: 'plain', team_name: 'Old' }));
+    await sendTo(view, { id: 'plain', team_name: 'Old' });
 
-    expect(api.post).toHaveBeenCalledWith('/courses/c1/teams/plain/evaluations/send', {});
+    expect(api.post).toHaveBeenCalledWith('/courses/c1/teams/plain/evaluations/send', WITH_DEADLINE);
     expect(view.result.current.teamsDialog.sendingTeamIds).toEqual({ plain: false });
+  });
+});
+
+describe('useTeams: the team send asks for a deadline (CICD-67)', () => {
+  test('the send button opens the deadline dialog for that team and sends nothing yet', async () => {
+    const view = await opened();
+    act(() => view.result.current.teamsDialog.onSend(ALPHA));
+    expect(view.result.current.teamSendDialog.open).toBe(true);
+    expect(view.result.current.teamSendDialog.title).toMatch(/Alpha/);
+    expect(api.post).not.toHaveBeenCalled();
+  });
+
+  test('cancelling sends nothing', async () => {
+    const view = await opened();
+    act(() => view.result.current.teamsDialog.onSend(ALPHA));
+    act(() => view.result.current.teamSendDialog.onClose());
+    expect(view.result.current.teamSendDialog.open).toBe(false);
+    expect(api.post).not.toHaveBeenCalled();
+  });
+
+  test('the next team send is prefilled with the deadline just used, and the alert says who was skipped', async () => {
+    const used = new Date(Date.now() + 3 * 86400000);
+    api.post.mockResolvedValue({ data: { emails_sent: 1, total_students: 1, failed: [], already_invited: 1, already_submitted: 0, deadline: used.toISOString() } });
+    const view = await opened();
+    act(() => view.result.current.teamsDialog.onSend(ALPHA));
+    await act(() => view.result.current.teamSendDialog.onConfirm(toLocalInputValue(used)));
+    expect(setAlert).toHaveBeenCalledWith({ severity: 'success', message: 'Evaluation invitations sent to team "Alpha". 1 already had a link.' });
+    act(() => view.result.current.teamsDialog.onSend(ALPHA));
+    expect(view.result.current.teamSendDialog.initialValue).toBe(toLocalInputValue(used));
   });
 });

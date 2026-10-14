@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import api from '../services/api';
-import { describeEmailResult } from '../services/emailResult';
+import { describeInvitationResult } from '../services/emailResult';
+import { prefillDeadline, toDeadlinePayload } from '../services/deadline';
 import { getErrorMessage } from '../services/apiError';
 import { buildCreateTeamBody } from '../services/teamRequest';
 
@@ -20,17 +21,23 @@ const EMPTY_TEAM_FORM = { team_name: '', team_status: 'Active' };
 export default function useTeams({ setAlert, refreshCourses, students, setStudents, resetEvaluationState }) {
   // --- Team evaluation send state/handler ---
   const [sendingTeamEvaluations, setSendingTeamEvaluations] = useState({});
+  // The team a deadline is being chosen for (CICD-67); nothing is sent until the instructor confirms.
+  const [teamSendRequest, setTeamSendRequest] = useState(null);
+  // The deadline last used for each course in this session, to prefill the next send (the opened
+  // course object is not reloaded after a send).
+  const [lastTeamDeadlines, setLastTeamDeadlines] = useState({});
 
-  const handleSendTeamEvaluations = async (team) => {
+  const handleSendTeamEvaluations = async (team, deadlinePayload) => {
     if (!teamsCourse || !team) return;
     const teamId = team._id || team.id;
     setSendingTeamEvaluations((prev) => ({ ...prev, [teamId]: true }));
     try {
-      const response = await api.post(`/courses/${teamsCourse._id || teamsCourse.id}/teams/${teamId}/evaluations/send`, {});
-      setAlert(describeEmailResult(
-        { sent: response.data.emails_sent, total: response.data.total_students, failed: response.data.failed },
-        `Evaluation invitations sent to team "${team.team_name}".`
-      ));
+      const courseId = teamsCourse._id || teamsCourse.id;
+      const response = await api.post(`/courses/${courseId}/teams/${teamId}/evaluations/send`, deadlinePayload);
+      setAlert(describeInvitationResult(response.data, `Evaluation invitations sent to team "${team.team_name}".`));
+      if (response.data.emails_sent > 0 && response.data.deadline) {
+        setLastTeamDeadlines((prev) => ({ ...prev, [courseId]: response.data.deadline }));
+      }
       refreshCourses();
     } catch (error) {
       setAlert({ severity: 'error', message: error.userMessage || getErrorMessage(error, `Failed to send evaluations to team "${team.team_name}".`) });
@@ -369,7 +376,29 @@ export default function useTeams({ setAlert, refreshCourses, students, setStuden
     setShowTeamSearch(false);
   };
 
+  const requestTeamSend = (team) => {
+    if (!teamsCourse || !team) return;
+    setTeamSendRequest(team);
+  };
+  const confirmTeamSend = async (localValue) => {
+    const team = teamSendRequest;
+    const payload = toDeadlinePayload(localValue, { keep: lastTeamDeadline() });
+    setTeamSendRequest(null);
+    if (!team || !payload) return;
+    await handleSendTeamEvaluations(team, payload);
+  };
+  const lastTeamDeadline = () => teamsCourse && (lastTeamDeadlines[teamsCourse._id || teamsCourse.id] || teamsCourse.last_evaluation_deadline);
+
   return {
+    teamSendDialog: {
+      open: teamSendRequest !== null,
+      title: `Send evaluations to team "${teamSendRequest?.team_name || ''}"`,
+      description: 'Students in this team who have no working link and have not submitted get one that works until this deadline.',
+      initialValue: prefillDeadline(lastTeamDeadline()),
+      busy: false,
+      onConfirm: confirmTeamSend,
+      onClose: () => setTeamSendRequest(null),
+    },
     openTeams: handleViewTeams,
     clearTeamsState,
     teamsDialog: {
@@ -385,7 +414,7 @@ export default function useTeams({ setAlert, refreshCourses, students, setStuden
       onClearSearch: clearTeamSearch,
       onCreate: () => setCreateTeamDialogOpen(true),
       onManageStudents: handleManageTeamStudents,
-      onSend: handleSendTeamEvaluations,
+      onSend: requestTeamSend,
       onEdit: handleEditTeam,
       onDelete: (team) => handleDeleteTeam(team._id || team.id, team.team_name),
       onClearAll: handleClearAllTeams,

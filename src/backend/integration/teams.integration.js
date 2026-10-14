@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const Student = require('../models/Student');
 const Team = require('../models/Team');
 const { startDatabase, stopDatabase, clearDatabase } = require('./helpers/db');
-const { startApp } = require('./helpers/app');
+const { startApp, deadlineBody } = require('./helpers/app');
 const { seed, IDS } = require('./helpers/seed');
 const { assertCourseConsistent } = require('./helpers/consistency');
 
@@ -109,7 +109,7 @@ test('TC-08-29: clearing all teams unassigns every student and zeroes the team c
 });
 
 test('TC-08-30: the team list shows members without their evaluation links', async () => {
-  await app.request('POST', `/api/courses/${IDS.courseAda}/evaluations/send`, { token: ada, body: {} });
+  await app.request('POST', `/api/courses/${IDS.courseAda}/evaluations/send`, { token: ada, body: deadlineBody() });
   const res = await app.request('GET', teams(), { token: ada });
   assert.equal(res.status, 200);
   const members = res.body.flatMap((t) => t.students);

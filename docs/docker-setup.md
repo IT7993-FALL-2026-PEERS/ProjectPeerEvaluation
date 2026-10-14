@@ -47,7 +47,7 @@ Compose reads the **root** `.env` (copied from `.env.example`). The non-Docker p
 | `FRONTEND_API_URL` | URL the **browser** uses for the API; **baked into the frontend image at build time** | No | `http://localhost:5000/api` |
 | `FRONTEND_URL` | Base of links in invitation/reset emails | No | `http://localhost:3000` |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | Outgoing email | Only to send email | Mailtrap sandbox values |
-| `EMAIL_SEND_INTERVAL_MS`, `EVALUATION_TOKEN_TTL_DAYS` | Email pacing / link lifetime | No | `0`, `14` |
+| `EMAIL_SEND_INTERVAL_MS` | Email pacing | No | `0` |
 
 Notes:
 - `REACT_APP_*` values are compiled into the JavaScript bundle. Changing `FRONTEND_API_URL`

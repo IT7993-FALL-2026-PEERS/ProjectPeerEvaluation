@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const Student = require('../models/Student');
 const { startDatabase, stopDatabase, clearDatabase } = require('./helpers/db');
-const { startApp, sentEmails, clearEmails } = require('./helpers/app');
+const { startApp, sentEmails, clearEmails, deadlineBody } = require('./helpers/app');
 const { seed, IDS } = require('./helpers/seed');
 
 // CICD-36: invitations and reminders are sent one at a time, spaced out (the Mailtrap sandbox rejects
@@ -15,7 +15,7 @@ let server;
 let app;
 let ada;
 
-const send = (body = {}) => app.request('POST', `/api/courses/${IDS.courseAda}/evaluations/send`, { token: ada, body });
+const send = (body = deadlineBody()) => app.request('POST', `/api/courses/${IDS.courseAda}/evaluations/send`, { token: ada, body });
 const remind = (body = {}) => app.request('POST', `/api/courses/${IDS.courseAda}/evaluations/remind`, { token: ada, body });
 
 async function addStudents(count) {
@@ -87,18 +87,25 @@ test('TC-10-32: with no pacing there is no limit, so a big class is sent in full
 
 test('TC-10-33: sending to one team is limited the same way', async () => {
   await addStudents(5); // team Alpha now has 7
-  const big = await app.request('POST', `/api/courses/${IDS.courseAda}/teams/${IDS.teamAlpha}/evaluations/send`, { token: ada, body: {} });
+  const big = await app.request('POST', `/api/courses/${IDS.courseAda}/teams/${IDS.teamAlpha}/evaluations/send`, { token: ada, body: deadlineBody() });
   assert.equal(big.status, 400);
   assert.equal(big.body.error.code, 'TOO_MANY_RECIPIENTS');
   assert.match(big.body.error.message, /team members/);
   assert.doesNotMatch(big.body.error.message, /each team/i, 'a team send must not be told to send team by team');
-  const small = await app.request('POST', `/api/courses/${IDS.courseAda}/teams/${IDS.teamBeta}/evaluations/send`, { token: ada, body: {} });
+  const small = await app.request('POST', `/api/courses/${IDS.courseAda}/teams/${IDS.teamBeta}/evaluations/send`, { token: ada, body: deadlineBody() });
   assert.equal(small.status, 200);
   assert.equal(sentEmails.length, 2);
 });
 
 test('TC-12-30: reminders are limited by how many students would be reminded, and naming students gets under the limit', async () => {
   await addStudents(16);
+  // Reminders only go to students with an active link (CICD-67), so everyone gets one first.
+  const students = await Student.find({ course_id: IDS.courseAda });
+  for (const [i, student] of students.entries()) {
+    await Student.updateOne({ _id: student._id }, {
+      evaluation_token: String(i).padStart(64, 'a'), evaluation_token_expires_at: new Date(Date.now() + 86400000),
+    });
+  }
   const all = await remind();
   assert.equal(all.status, 400);
   assert.equal(all.body.error.code, 'TOO_MANY_RECIPIENTS');

@@ -1,5 +1,5 @@
 const { test, expect } = require('@playwright/test');
-const { resetData, capturedEmails, loginAsAda, courseAction, alertWith } = require('./support/app');
+const { resetData, capturedEmails, loginAsAda, courseAction, alertWith, sendWithDeadline } = require('./support/app');
 
 // The professor's team screens, opened with Manage Teams on the course row: the team list with its
 // search, Edit Team, Manage Students in a team, sending to one team, and Clear All Teams. (Create
@@ -88,6 +88,7 @@ test('E2E-28: sending to one team emails only that team\'s students', async ({ p
   await openTeams(page);
 
   await teamRow(page, 'Alpha').getByTitle('Send Evaluations to Team').click();
+  await sendWithDeadline(page);
 
   await expect(alertWith(page, 'Evaluation invitations sent to team "Alpha".')).toBeVisible();
   const sent = (await capturedEmails()).map((e) => e.to).sort();
