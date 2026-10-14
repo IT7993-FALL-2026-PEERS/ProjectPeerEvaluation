@@ -68,6 +68,13 @@ describe('DeadlineDialog', () => {
   });
 });
 
+test('DeadlineDialog: a new prefill while open keeps what the instructor typed', () => {
+  const { rerender } = render(<DeadlineDialog {...base} open initialValue="2999-02-02T08:00" />);
+  fireEvent.change(screen.getByLabelText('Deadline'), { target: { value: future } });
+  rerender(<DeadlineDialog {...base} open initialValue="2999-05-05T05:05" />);
+  expect(screen.getByLabelText('Deadline')).toHaveValue(future);
+});
+
 describe('DeadlineDialog across a daylight-saving change', () => {
   const zone = process.env.TZ;
   beforeEach(() => { process.env.TZ = 'America/New_York'; });

@@ -12,6 +12,7 @@ const StudentSchema = new mongoose.Schema({
 	evaluation_token_expires_at: { type: Date, default: null }, // Link stops working after this; see utils/evaluationToken.js
 	evaluation_deadline_zone: { type: String, default: null }, // Zone the deadline is written in for this student's emails (CICD-67)
 	evaluation_completed: { type: Boolean, default: false },
+	resubmission_allowed: { type: Boolean, default: false }, // The instructor allowed one more submission (CICD-68); the next submit clears it
 	created_at: { type: Date, default: Date.now }
 });
 

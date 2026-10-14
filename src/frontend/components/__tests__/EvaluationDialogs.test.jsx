@@ -143,4 +143,26 @@ describe('EvaluationStatusDialog', () => {
     expect(screen.getByText('Progress: 0/0 evaluations completed')).toBeInTheDocument();
     expect(within(screen.getByRole('dialog')).getAllByRole('progressbar')[0]).toHaveAttribute('aria-valuenow', '0');
   });
+  // CICD-68: more time for students who have not submitted, and a second try for one who has.
+  test('Extend Deadline and Allow resubmission report what was pressed; only finished students can resubmit', async () => {
+    const onExtend = vi.fn();
+    const onAllowResubmission = vi.fn();
+    const students = [
+      { id: 's1', student_id: '1001', name: 'Ann Archer', team: 'Alpha', completed: true, resubmission_allowed: false },
+      { id: 's2', student_id: '1002', name: 'Ben Baker', team: 'Alpha', completed: false },
+    ];
+    render(<EvaluationStatusDialog {...statusProps({ onExtend, onAllowResubmission, status: { evaluations_sent: true, completed_count: 1, total_count: 2, students } })} />);
+    await user.click(screen.getByRole('button', { name: 'Extend Deadline' }));
+    expect(onExtend).toHaveBeenCalledTimes(1);
+    await user.click(screen.getByRole('button', { name: 'Allow Ann Archer to resubmit' }));
+    expect(onAllowResubmission).toHaveBeenCalledWith(students[0]);
+    expect(screen.queryByRole('button', { name: 'Allow Ben Baker to resubmit' })).not.toBeInTheDocument();
+  });
+
+  test('a student allowed to resubmit is marked as such, with no second button', () => {
+    const students = [{ id: 's1', student_id: '1001', name: 'Ann Archer', team: 'Alpha', completed: true, resubmission_allowed: true }];
+    render(<EvaluationStatusDialog {...statusProps({ status: { evaluations_sent: true, completed_count: 1, total_count: 1, students } })} />);
+    expect(screen.getByText('Resubmission allowed')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Allow Ann Archer to resubmit' })).not.toBeInTheDocument();
+  });
 });

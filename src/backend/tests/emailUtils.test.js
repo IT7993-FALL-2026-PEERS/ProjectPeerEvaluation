@@ -53,6 +53,24 @@ test('email transport verifies certificates and uses configured SMTP settings', 
     assert.match(sendMail.mock.calls[0].arguments[0].html, /No deadline set/, 'the old call shape still works');
   });
 
+  // CICD-68: an extension or an approved resubmission sends a new link, and the email says why.
+  await t.test('TC-10-70: an extension or resubmission email says why it was sent, escaped', async () => {
+    const student = { name: 'Ann Archer', email: 'ann@example.edu' };
+    const course = { course_name: 'Capstone', course_number: 'CS 4850', course_section: '01', semester: 'Fall 2026' };
+    sendMail.mock.resetCalls();
+    await sendEvaluationInvitation(student, course, 'c'.repeat(64), 'https://frontend.example.test', new Date('2026-10-20T03:59:00Z'), 'America/New_York',
+      { intro: 'Your instructor extended your deadline. Use this new link; the old one no longer works.' });
+    const html = sendMail.mock.calls[0].arguments[0].html;
+    assert.match(html, /Peer Evaluation: New Link/);
+    assert.match(html, /Your instructor extended your deadline\. Use this new link; the old one no longer works\./);
+    sendMail.mock.resetCalls();
+    await sendEvaluationInvitation(student, course, 'c'.repeat(64), 'https://f.test', null, null, { intro: '<b>x</b>' });
+    assert.match(sendMail.mock.calls[0].arguments[0].html, /&lt;b&gt;x&lt;\/b&gt;/, 'escaped');
+    sendMail.mock.resetCalls();
+    await sendEvaluationInvitation(student, course, 'c'.repeat(64), 'https://f.test');
+    assert.match(sendMail.mock.calls[0].arguments[0].html, /Peer Evaluation Invitation/, 'no intro, the usual heading');
+  });
+
   await t.test('TC-10-60: the reminder shows when the evaluation is due', async () => {
     sendMail.mock.resetCalls();
     const student = { name: 'Ann Archer', email: 'ann@example.edu' };

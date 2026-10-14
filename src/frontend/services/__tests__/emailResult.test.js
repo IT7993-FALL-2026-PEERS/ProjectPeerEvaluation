@@ -1,4 +1,4 @@
-import { describeEmailResult, describeInvitationResult, describeReminderResult } from '../emailResult';
+import { describeEmailResult, describeExtendResult, describeInvitationResult, describeReminderResult } from '../emailResult';
 
 // The backend reports each failure as "Name (email): reason" in `failed`.
 describe('describeEmailResult', () => {
@@ -98,4 +98,23 @@ test('a link that could not be reset after a failed email is named in the alert'
   });
   expect(result.severity).toBe('error');
   expect(result.message).toBe('No emails were sent. Not sent to: Ann Archer. The link of Ann Archer could not be reset, so a new send will skip them until the deadline.');
+});
+
+// CICD-68: an extension names who got more time and why others did not.
+describe('describeExtendResult', () => {
+  test('names who was extended and counts who was skipped', () => {
+    expect(describeExtendResult({ extended: ['Ann Archer', 'Ben Baker'], failed: [], skipped: { submitted: 1, not_invited: 2, changed: 0 } }))
+      .toEqual({ severity: 'success', message: 'Deadline extended for Ann Archer, Ben Baker. 1 already submitted. 2 not invited yet.' });
+  });
+
+  test('a link that changed meanwhile and failed emails are reported', () => {
+    const result = describeExtendResult({ extended: [], failed: ['Ann Archer (ann@x.edu): SMTP down'], skipped: { submitted: 0, not_invited: 0, changed: 1 } });
+    expect(result.severity).toBe('error');
+    expect(result.message).toBe('Nobody was extended. Not sent to: Ann Archer. 1 changed while extending (submitted or extended elsewhere); their link was left as it was.');
+  });
+
+  test('extending nobody because everyone submitted is information', () => {
+    expect(describeExtendResult({ extended: [], failed: [], skipped: { submitted: 3, not_invited: 0, changed: 0 } }))
+      .toEqual({ severity: 'info', message: 'Nobody was extended. 3 already submitted.' });
+  });
 });

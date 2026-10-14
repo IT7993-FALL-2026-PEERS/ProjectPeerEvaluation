@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const Student = require('../models/Student');
 const Course = require('../models/Course');
 const Team = require('../models/Team');
@@ -8,6 +9,7 @@ const { createEmailPacer, getEmailIntervalMs, getRecipientLimit } = require('../
 const { generateEvaluationToken, isLinkActive, isTokenExpired } = require('../utils/evaluationToken');
 const { parseDeadline } = require('../utils/evaluationDeadline');
 const evaluationStore = require('../utils/saveEvaluations');
+const { rotateLink } = require('../utils/linkRotation');
 
 // The students an evaluator rates: the rest of their team, or the rest of the
 // course when they have no team. The form and the submission both use this, so
@@ -235,6 +237,144 @@ exports.sendEvaluations = async (req, res, next) => {
   }
 };
 
+const EXTEND_INTRO = 'Your instructor extended your deadline. Use this new link; the old one no longer works.';
+const EXTEND_SCOPES = ['student', 'team', 'unsubmitted'];
+
+// Who an extension covers (CICD-68): one student, one team, or everyone in the course. Ids are checked and
+// cast before they reach a query, and every lookup is limited to this course.
+async function studentsInScope(courseId, body) {
+  const scope = body.scope;
+  if (!EXTEND_SCOPES.includes(scope)) {
+    throw validationError('Choose who to extend: one student, one team, or everyone who has not submitted.');
+  }
+  if (scope === 'unsubmitted') return Student.find({ course_id: courseId });
+  const id = scope === 'student' ? body.student_id : body.team_id;
+  if (typeof id !== 'string' || !mongoose.Types.ObjectId.isValid(id)) {
+    throw validationError(scope === 'student' ? 'Choose the student to extend.' : 'Choose the team to extend.');
+  }
+  const objectId = new mongoose.Types.ObjectId(id);
+  const students = scope === 'student'
+    ? await Student.find({ _id: objectId, course_id: courseId })
+    : await Student.find({ team_id: objectId, course_id: courseId });
+  if (students.length === 0) {
+    throw notFound(scope === 'student' ? 'Student not found in this course.' : 'Team not found in this course, or it has no students.');
+  }
+  return students;
+}
+
+/**
+ * Extend the deadline with a new link (CICD-68): one student, one team, or everyone who has not submitted.
+ * Students who submitted are never touched; students never invited are skipped (they need a send). Each new
+ * link is emailed first and only then swapped in, so a failed email leaves the old link working.
+ */
+exports.extendEvaluations = async (req, res, next) => {
+  try {
+    const { course_id } = req.params;
+    const { deadline, zone } = parseDeadline(req.body);
+    const course = await Course.findById(course_id);
+    if (!course) return next(notFound('Course not found.'));
+    const students = await studentsInScope(course_id, req.body);
+
+    const submitted = new Set((await Evaluation.distinct('evaluator_id', { course_id })).map(String));
+    const skipped = { submitted: 0, not_invited: 0, changed: 0 };
+    const recipients = [];
+    for (const student of students) {
+      if (student.evaluation_completed || submitted.has(String(student._id))) skipped.submitted += 1;
+      else if (!student.evaluation_token) skipped.not_invited += 1;
+      else recipients.push(student);
+    }
+    const tooMany = checkRecipientLimit(recipients.length, 'students', 'Extend team by team instead.');
+    if (tooMany) return next(tooMany);
+
+    const waitTurn = createEmailPacer();
+    const extended = [];
+    const failed = [];
+    for (const student of recipients) {
+      await waitTurn();
+      const token = generateEvaluationToken();
+      try {
+        const result = await sendEvaluationInvitation(
+          student, course, token, process.env.FRONTEND_URL || 'http://localhost:3000', deadline, zone, { intro: EXTEND_INTRO }
+        );
+        if (!result.success) {
+          failed.push(`${student.name} (${student.email}): ${result.error}`);
+          continue;
+        }
+        const swapped = await rotateLink(student, token, deadline, zone, { filter: { evaluation_completed: { $ne: true } } });
+        if (swapped) extended.push(student.name);
+        else skipped.changed += 1;
+      } catch (error) {
+        failed.push(`${student.name} (${student.email}): ${error.message}`);
+      }
+    }
+    await rememberDeadline(course, { emailsSent: extended.length }, deadline, zone);
+    res.status(200).json({
+      message: extended.length ? 'Deadline extended.' : 'Nobody was extended.',
+      extended,
+      failed,
+      skipped,
+      deadline: deadline.toISOString()
+    });
+  } catch (err) {
+    console.error('Error extending evaluations:', err);
+    err.code = err.code || 'SERVER_ERROR';
+    err.status = err.status || 500;
+    next(err);
+  }
+};
+
+const RESUBMIT_INTRO = 'Your instructor has allowed you to submit your evaluation again. Use this new link; the old one no longer works. Your new answers will replace your earlier ones.';
+
+/**
+ * Allow one student who has submitted to submit again (CICD-68). A new link is emailed first and only then
+ * swapped in, with the approval; the old link dies. Their next submission replaces the earlier evaluations.
+ */
+exports.allowResubmission = async (req, res, next) => {
+  try {
+    const { course_id, student_id } = req.params;
+    const { deadline, zone } = parseDeadline(req.body);
+    if (!mongoose.Types.ObjectId.isValid(student_id)) return next(validationError('Invalid student id.'));
+    const course = await Course.findById(course_id);
+    if (!course) return next(notFound('Course not found.'));
+    const student = await Student.findOne({ _id: new mongoose.Types.ObjectId(student_id), course_id });
+    if (!student) return next(notFound('Student not found in this course.'));
+    const hasSubmitted = student.evaluation_completed || await Evaluation.exists({ course_id, evaluator_id: student._id });
+    if (!hasSubmitted) {
+      const err = new Error('This student has not submitted yet; send or extend instead.');
+      err.code = 'NOT_SUBMITTED';
+      err.status = 409;
+      return next(err);
+    }
+    const token = generateEvaluationToken();
+    const result = await sendEvaluationInvitation(
+      student, course, token, process.env.FRONTEND_URL || 'http://localhost:3000', deadline, zone, { intro: RESUBMIT_INTRO }
+    );
+    if (!result.success) {
+      const err = new Error(`The email to ${student.name} could not be sent (${result.error}). Nothing was changed.`);
+      err.code = 'EMAIL_FAILED';
+      err.status = 502;
+      return next(err);
+    }
+    // Only while they are still marked as submitted: a reset meanwhile clears that, and stops this swap
+    const swapped = await rotateLink(student, token, deadline, zone, {
+      filter: { evaluation_completed: true },
+      set: { resubmission_allowed: true }
+    });
+    if (!swapped) {
+      const err = new Error('The student\'s link changed while the email was going out. The new link was not activated; try again.');
+      err.code = 'LINK_CHANGED';
+      err.status = 409;
+      return next(err);
+    }
+    res.status(200).json({ message: `${student.name} can submit again until the new deadline.`, deadline: deadline.toISOString() });
+  } catch (err) {
+    console.error('Error allowing a resubmission:', err);
+    err.code = err.code || 'SERVER_ERROR';
+    err.status = err.status || 500;
+    next(err);
+  }
+};
+
 /**
  * Get evaluation status for a course
  */
@@ -301,6 +441,10 @@ exports.evaluationStatus = async (req, res, next) => {
         email: student.email || 'No Email',            // Fallback if email is missing
         team: student.group_assignment || 'No Team',  // Match frontend expectation
         completed: hasCompleted,         // Match frontend expectation
+        // CICD-68: the status dialog's Extend and Allow resubmission buttons need these
+        id: student._id.toString(),
+        team_id: student.team_id ? String(student.team_id._id || student.team_id) : null,
+        resubmission_allowed: Boolean(student.resubmission_allowed),
         evaluation_token: student.evaluation_token,
         last_activity: lastActivity              // Show actual submission date
       };
@@ -467,7 +611,7 @@ exports.getEvaluationForm = async (req, res, next) => {
       evaluator_id: student._id 
     });
 
-    if (existingEvaluation) {
+    if (existingEvaluation && !student.resubmission_allowed) {
       return res.status(200).json({
         message: 'Evaluation already completed.',
         completed: true,
@@ -535,7 +679,7 @@ exports.submitEvaluation = async (req, res, next) => {
       evaluator_id: student._id 
     });
 
-    if (existingEvaluation) {
+    if (existingEvaluation && !student.resubmission_allowed) {
       const err = new Error('Evaluation already completed.');
       err.code = 'ALREADY_COMPLETED';
       err.status = 409;
@@ -630,8 +774,16 @@ exports.submitEvaluation = async (req, res, next) => {
     // All or nothing, and once only: a second request at the same moment hits the unique
     // index and is told the evaluation is already complete.
     try {
-      await evaluationStore.saveEvaluations(newEvaluations, student._id);
+      // An approved resubmission replaces the earlier evaluations; otherwise one submission per student
+      const save = student.resubmission_allowed ? evaluationStore.replaceEvaluations : evaluationStore.saveEvaluations;
+      await save(newEvaluations, student._id, { token });
     } catch (saveError) {
+      if (saveError.code === 'LINK_CHANGED') {
+        const err = new Error('This link changed while you were submitting (a new link or deadline). Nothing was saved; use the latest link from your email.');
+        err.code = 'LINK_CHANGED';
+        err.status = 409;
+        return next(err);
+      }
       if (saveError.code !== 11000) throw saveError;
       const err = new Error('Evaluation already completed.');
       err.code = 'ALREADY_COMPLETED';
@@ -682,7 +834,7 @@ exports.evaluationTokenStatus = async (req, res, next) => {
 
     res.status(200).json({
       valid: true,
-      completed: !!completed,
+      completed: !!completed && !student.resubmission_allowed,
       student_name: student.name,
       course_name: student.course_id.course_name,
       deadline: new Date(student.evaluation_token_expires_at).toISOString()
