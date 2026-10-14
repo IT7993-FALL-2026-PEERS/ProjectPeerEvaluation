@@ -71,6 +71,10 @@ async function planInvitations(students, courseId, now = new Date()) {
 // sends at the same moment cannot both issue one. The email goes out with the claimed token; if it fails the
 // claim is given back (only if it is still this token), so a later send reaches the student again.
 async function claimLink(student, token, deadline, zone, now = new Date()) {
+  // parseDeadline already checked both; written out here so the values that reach the query are
+  // plainly a number and a string (CodeQL follows request data into queries)
+  const expiresAt = new Date(Number(deadline));
+  const zoneName = typeof zone === 'string' ? zone : 'UTC';
   const claimed = await Student.findOneAndUpdate(
     {
       _id: student._id,
@@ -80,7 +84,7 @@ async function claimLink(student, token, deadline, zone, now = new Date()) {
         { evaluation_token_expires_at: { $lte: now } }
       ]
     },
-    { evaluation_token: token, evaluation_token_expires_at: deadline, evaluation_deadline_zone: zone }
+    { evaluation_token: token, evaluation_token_expires_at: expiresAt, evaluation_deadline_zone: zoneName }
   );
   return Boolean(claimed);
 }
@@ -137,7 +141,10 @@ async function deliverInvitations(course, recipients, deadline, zone) {
 // Saved only after a send that emailed someone, to prefill the next send and to write reminders in the same zone.
 async function rememberDeadline(course, result, deadline, zone) {
   if (result.emailsSent === 0) return;
-  await Course.findByIdAndUpdate(course._id, { last_evaluation_deadline: deadline, last_evaluation_deadline_zone: zone });
+  await Course.findByIdAndUpdate(course._id, {
+    last_evaluation_deadline: new Date(Number(deadline)),
+    last_evaluation_deadline_zone: typeof zone === 'string' ? zone : 'UTC'
+  });
 }
 
 function sendAnswer(message, plan, result, deadline) {

@@ -138,7 +138,9 @@ test('TC-10-26: sending with no request body is refused with a clear 400, not a 
 
 test('TC-10-40: a missing, past, far-off or malformed deadline is refused and nothing is sent or stored', async () => {
   const bodies = [{}, { deadline: 'tomorrow' }, { deadline: new Date(Date.now() - DAY_MS).toISOString() },
-    { deadline: dueIn(400) }, { deadline: dueIn(1), deadline_zone: 'Nowhere/City' }];
+    { deadline: dueIn(400) }, { deadline: dueIn(1), deadline_zone: 'Nowhere/City' },
+    // CodeQL: operator objects in place of the deadline or the zone never reach a query
+    { deadline: { $gt: '' } }, { deadline: dueIn(1), deadline_zone: { $ne: null } }];
   for (const body of bodies) {
     for (const path of [sendPath(IDS.courseAda), teamSendPath(IDS.courseAda, IDS.teamBeta)]) {
       const res = await app.request('POST', path, { token: ada, body });
