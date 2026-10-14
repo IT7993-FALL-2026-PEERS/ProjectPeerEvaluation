@@ -10,11 +10,11 @@ const Course = require('../models/Course');
 const Evaluation = require('../models/Evaluation');
 const { uploadRoster } = require('../controllers/studentController');
 
-// API-3 (safe part): a roster upload used to clear every student's link token and
-// delete all submitted evaluations before it looked at the file, so an empty or
-// unusable CSV destroyed student work and then reported success. The file is now
-// checked first, and the destructive step runs last. No database: every model call
-// is stubbed and recorded, and the controller runs against a real temp CSV file.
+// API-3: a roster upload used to clear every student's link token and delete all submitted
+// evaluations, so an empty or unusable CSV destroyed student work and then reported success. The
+// file is now checked first, and since the sponsor's decision of 12 Oct 2026 an upload never
+// clears links or evaluations at all (the explicit reset-evaluation-state endpoint does that). No
+// database: every model call is stubbed and recorded, and the controller runs against a real temp CSV file.
 const courseId = String(new mongoose.Types.ObjectId());
 const HEADER = 'student_id,name,email,group_assignment\n';
 
@@ -24,17 +24,26 @@ function query(result) {
   return q;
 }
 
-function stubModels(t, { existing = [], findFails = false, insertFails = false } = {}) {
+function stubModels(t, { existing = [], findFails = false, insertFails = false, insertResult, insertThrowsAfterSaving = false, savedAfterInsert } = {}) {
   const calls = [];
   const record = (name, result) => async (...args) => { calls.push(name); return typeof result === 'function' ? result(...args) : result; };
   t.mock.method(Student, 'updateMany', record('clear-tokens', {}));
   t.mock.method(Evaluation, 'deleteMany', record('delete-evaluations', { deletedCount: 3 }));
+  let lookups = 0;
+  t.mock.method(Evaluation, 'distinct', async () => []);
+  t.mock.method(Evaluation, 'exists', async () => null);
+  t.mock.method(Team, 'find', () => query([]));
+  t.mock.method(Team, 'updateMany', record('pull-from-other-teams', {}));
   t.mock.method(Student, 'find', (filter) => {
     if (findFails) return query(Promise.reject(new Error('database down')));
-    return query(filter.student_id ? existing : []);
+    if (!filter.student_id) return query([]);
+    lookups += 1; // the first lookup finds who is already in the course; a second one re-reads what an insert saved
+    return query(lookups > 1 && savedAfterInsert ? savedAfterInsert : existing);
   });
   t.mock.method(Student, 'insertMany', record('insert-students', (docs) => {
     if (insertFails) throw new Error('database down');
+    if (insertThrowsAfterSaving) throw new Error('E11000 duplicate key');
+    if (insertResult) return insertResult;
     return docs.map((d) => ({ ...d, _id: new mongoose.Types.ObjectId() }));
   }));
   t.mock.method(Student, 'findByIdAndUpdate', record('link-student', {}));
@@ -118,20 +127,55 @@ test('TC-06-08: if no student can be saved, evaluations and links are left alone
   assertNothingDestroyed(calls);
 });
 
-test('TC-06-06: a valid roster is applied first, then evaluations and links are cleared', async (t) => {
+// Sponsor decision (12 Oct 2026): previously submitted evaluations must be saved, and professors must be able to
+// upload or update rosters without losing existing data. A valid upload therefore never clears links or evaluations.
+test('TC-06-06: a valid roster is applied, and evaluations and links are not touched', async (t) => {
   const { body, calls } = await upload(t, `${HEADER}S1,Alice,alice@example.com,Team A\nS2,Bob,bob@example.com,Team A\n`);
   assert.deepEqual(body.students.sort(), ['S1', 'S2']);
-  assert.equal(body.evaluation_state_reset, true);
-  assert.equal(body.evaluations_cleared, 3);
-  for (const name of DESTRUCTIVE) {
-    assert.ok(calls.includes(name), `${name} runs for a valid upload`);
-    assert.ok(calls.lastIndexOf('insert-students') < calls.indexOf(name), `${name} runs after the students are saved`);
-  }
+  assert.ok(calls.includes('insert-students'), 'the students are saved');
+  assertNothingDestroyed(calls);
+  assert.equal(body.evaluation_state_reset, undefined);
+  assert.equal(body.evaluations_cleared, undefined);
+  assert.doesNotMatch(body.message, /reset|fresh start|cleared/i);
+});
+
+test('TC-06-83: a roster of students who are all already in the course changes no evaluation or link either', async (t) => {
+  const existing = [{ _id: new mongoose.Types.ObjectId(), student_id: 'S1', name: 'Alice', email: 'alice@example.com' }];
+  const { body, calls } = await upload(t, `${HEADER}S1,Alice,alice@example.com,Team A\n`, { existing });
+  assert.deepEqual(body.students_updated, ['S1']);
+  assertNothingDestroyed(calls);
+});
+
+// Codex review (13 Oct): an insert that saves some rows and not others used to be reported as a plain success.
+test('TC-06-88: if the database saves only some of the new students, the ones it did not save are named', async (t) => {
+  const saved = [{ _id: new mongoose.Types.ObjectId(), student_id: 'S1', name: 'Alice', email: 'alice@example.com' }];
+  const csv = `${HEADER}S1,Alice,alice@example.com,\nS2,Bob,bob@example.com,\nS3,Carol,carol@example.com,\n`;
+  const { body } = await upload(t, csv, { insertResult: saved });
+  assert.deepEqual(body.students, ['S1']);
+  assert.deepEqual(body.students_failed.sort(), ['S2', 'S3']);
+  assert.match(body.errors.join(' | '), /S2/);
+  assert.match(body.errors.join(' | '), /S3/);
+  assert.doesNotMatch(body.message, /successfully/i, 'it is not reported as a plain success');
+});
+
+test('TC-06-89: if the insert throws after saving some students, the ones that were not saved are named', async (t) => {
+  const saved = [{ _id: new mongoose.Types.ObjectId(), student_id: 'S1', name: 'Alice', email: 'alice@example.com' }];
+  const csv = `${HEADER}S1,Alice,alice@example.com,\nS2,Bob,bob@example.com,\n`;
+  const { body, calls } = await upload(t, csv, { insertThrowsAfterSaving: true, savedAfterInsert: saved });
+  assert.deepEqual(body.students, ['S1']);
+  assert.deepEqual(body.students_failed, ['S2']);
+  assert.match(body.errors.join(' | '), /S2/);
+  assertNothingDestroyed(calls);
+});
+
+test('TC-06-90: when every new student is saved there is no failed list and the message is a plain success', async (t) => {
+  const { body } = await upload(t, `${HEADER}S1,Alice,alice@example.com,\nS2,Bob,bob@example.com,\n`);
+  assert.deepEqual(body.students_failed, []);
+  assert.match(body.message, /successfully/i);
 });
 
 // A bad row is reported (FR-07) and the rest are added; only a file with no usable
-// rows is rejected (FR-06). What a successful re-upload does to submitted
-// evaluations is still the sponsor's decision (CICD-39), so it is unchanged here.
+// rows is rejected (FR-06).
 test('TC-07-01: bad rows are reported and the good rows are still added', async (t) => {
   const csv = `${HEADER}S1,Alice,alice@example.com,Team A\nS2,Bob,,Team A\nS3,Carol,carol@example.com,\n`;
   const { body, error, calls } = await upload(t, csv);
@@ -139,7 +183,7 @@ test('TC-07-01: bad rows are reported and the good rows are still added', async 
   assert.deepEqual(body.students.sort(), ['S1', 'S3']);
   assert.equal(body.errors.length, 1);
   assert.match(body.errors[0], /Missing required fields/);
-  assert.ok(calls.includes('delete-evaluations'));
+  assertNothingDestroyed(calls);
 });
 
 // FR-07 (CICD-47): a row whose email is not in the form name@domain.tld is reported as an

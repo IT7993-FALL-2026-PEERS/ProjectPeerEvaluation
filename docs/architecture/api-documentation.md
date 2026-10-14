@@ -32,9 +32,16 @@ except the roster upload (multipart form) and the report download (CSV).
 Authorization: Bearer <access_token>
 ```
 
-Tokens are signed with `JWT_SECRET` (HS256) and expire after **1 hour**. There is no
-working refresh endpoint, so the user logs in again (see D-18 for the 30-minute
-requirement). When a logged-in request gets a 401 (not a login or password-reset call),
+Tokens are signed with `JWT_SECRET` (HS256) and expire after **60 minutes of inactivity**
+(`SESSION_IDLE_MINUTES`, FR-04). Any request made a minute or more after the token was issued
+is answered with a fresh token in the `X-Access-Token` response header (exposed through CORS),
+which the frontend stores, so a professor who keeps working stays logged in. Every authenticated answer also carries the server's time in `X-Server-Time` (milliseconds, also exposed through CORS), because the browser works out how long the login has left from the token's dates and its own clock can be minutes off. The browser places the stamp halfway through the request's round trip and ignores a sample whose round trip took longer than 5 seconds, because the server stamps the time when the request arrives, not when the answer does. A session is
+capped at 8 hours since login (`SESSION_MAX_HOURS`). The browser counts clicks, key presses,
+scrolling and touch as activity (not mouse movement) and, at most every 5 minutes, calls
+`POST /auth/refresh` so the login is extended even when the page makes no other request; with 2
+minutes left and no activity it asks "Stay logged in?" (it reads the expiry from the token; the
+server still decides whether the token is valid). The inherited requirement says 30 minutes (D-18, the
+sponsor still has to confirm). When a logged-in request gets a 401 (not a login or password-reset call),
 the app shows "Session timed out. Please log-in again!" with a Log in button that clears the
 stored login and opens the login page. Student endpoints under `/evaluate` use no login: the evaluation token in
 the URL is the only credential. It is 32 random bytes (64 hex characters) and expires
@@ -115,7 +122,7 @@ on 404 instead of this shape.
 | POST | `/auth/logout` | 🔒 | No-op; the client discards the token |
 | POST | `/auth/reset-password` | 🌐 | Email a password reset link |
 | POST | `/auth/update-password` | 🌐 | Set a new password with the reset token |
-| POST | `/auth/refresh` | 🌐 | **501** — not implemented |
+| POST | `/auth/refresh` | 🔒 | Keep-alive: extends the session while the professor is active |
 | POST | `/auth/verify-mfa` | 🌐 | **501** — not implemented (D-17) |
 | GET | `/professor/ai-words` | 🔒 | The professor's concerning-words list |
 | POST | `/professor/ai-words` | 🔒 | Add, edit or delete a word |
@@ -232,9 +239,17 @@ Body: `{ "token", "password" }`. **200** `{ "message": "Password updated success
 and the token is cleared, so it works once. **400** `VALIDATION_ERROR` missing field ·
 **400** `TOKEN_ERROR` unknown or expired token.
 
-### `POST /auth/refresh`, `POST /auth/verify-mfa`
+### `POST /auth/refresh`
 
-Both return **501** `NOT_IMPLEMENTED`.
+Keep-alive (FR-04). Needs a valid login token. **200** `{ "message": "Session extended.",
+"expires_in_seconds": 3600 }`; when the token is a minute or more old the response also carries a
+fresh token in `X-Access-Token` (see section 1). **401** without a valid token. The handler does
+nothing else: the renewal is done by the authentication middleware, which does it for every
+authenticated request.
+
+### `POST /auth/verify-mfa`
+
+Returns **501** `NOT_IMPLEMENTED`.
 
 ---
 
@@ -351,12 +366,24 @@ Multipart form with the CSV in the field `file` (format: [csv-upload-format.md](
 New students are created, existing ones (same university ID) are updated, and teams are
 created from the group column.
 
-> **Warning:** a roster upload that succeeds **deletes all submitted evaluations** for the
-> course and clears all evaluation tokens, even when students have already submitted. This
-> happens last, after the roster is applied. Whether it should is a sponsor decision (API-3).
+> A roster upload **never deletes submitted evaluations or clears evaluation links** (sponsor
+> decision of 12 Oct 2026, API-3). It adds the students who are new and applies the team names in
+> the file to students already in the course; students not in the file stay. A student who is moved
+> to another team is taken out of the old team (both lists and counts are updated). A student who has
+> **submitted or received evaluations keeps their team**, and the answer says so in `errors`, because a
+> move would leave the saved evaluations pointing at a team they are no longer in; their team can be
+> changed by hand. This is decided by the team the student is really in (their team id), not by
+> the name stored on the student, and it is checked a second time just before each move; an evaluation
+> saved in the few milliseconds between that check and the move is still a theoretical gap. Each
+> student is written first, then added to the new team's list, then taken out of every other team's
+> list, so a failed write leaves them somewhere consistent and uploading the file again finishes the
+> job; every team's count in the course is recalculated at the end. A student id that appears twice in the file is added once (the first row) and
+> reported. If the database saves only some of the new students, `students_failed` lists the ones it did
+> not save and the message says so. Clearing evaluations is a separate, explicit action
+> (`DELETE /courses/:course_id/evaluations/reset`).
 
 **200** `{ "message", "students": [ids added], "students_updated": [...], "teams_created",
-"team_names": [...], "evaluations_cleared", ... }`. Rows with problems come back in an
+"team_names": [...], "students_failed": [...], "errors": [...] }`. Rows with problems come back in an
 `errors` array, and the other rows are still added. **400** `VALIDATION_ERROR` when there
 is no file, or the file has no usable rows (empty, header only, wrong column names, or every
 row missing `student_id`, `name` or `email`); nothing is changed in that case, and the
@@ -540,7 +567,7 @@ is a **400** `VALIDATION_ERROR` (API-2).
 
 ## 12. Not implemented
 
-`/auth/refresh`, `/auth/verify-mfa`, `/courses/:course_id/teams/auto-assign` and the three
+`/auth/verify-mfa`, `/courses/:course_id/teams/auto-assign` and the three
 `/ai/*` endpoints are routed but return **501**. The frontend's AI-flagging feature does
 not use `/ai/*`; flags are computed inside the course report (section 10).
 
@@ -553,7 +580,7 @@ Found while writing this document. Defect IDs refer to the
 |---|---|---|
 | API-1 | **Fixed (CICD-17).** Tokens were generated with `Math.random()`, never expired, and were written to the request log | Tokens now come from `crypto.randomBytes(32)`, expire `EVALUATION_TOKEN_TTL_DAYS` after the latest email, and are redacted from logs. Links sent before the fix have no expiry and are refused until the professor re-sends |
 | API-2 | **Fixed (CICD-18).** `POST /evaluate/:token` did not check that each `student_id` is one of the evaluator's teammates, or that it appears only once | Submissions must now cover exactly the teammates the form lists, each once; anything else is a 400 and nothing is saved |
-| API-3 | Uploading a roster deletes every submitted evaluation in the course. **Partly fixed (CICD-19):** an empty or unusable file, or a database error while applying the roster, no longer deletes anything. A successful upload still does | Re-uploading a corrected roster mid-evaluation silently destroys student work; what a valid re-upload should do is a sponsor decision (CICD-39) |
+| API-3 | **Fixed (CICD-19, then CICD-66).** Uploading a roster deleted every submitted evaluation in the course. An empty or unusable file, or a database error, stopped deleting anything in CICD-19; a successful upload no longer deletes or clears anything either, following the sponsor's decision of 12 Oct 2026 | Re-uploading or updating a roster mid-evaluation keeps student work and the links already sent |
 | API-4 | **Fixed (CICD-45).** `PUT .../students/:student_id`, `PUT .../teams/:team_id` and `POST .../teams` saved the request body as sent, and the team list returned each member's evaluation token | They now read only the editable fields, teams are created empty (members go through the add-student endpoint, which checks the course), and the team list omits tokens. The team report is now looked up within the course (CICD-51) |
 | API-5 | **Fixed (CICD-34).** There was no rate limiting on `/auth/login`, `/auth/reset-password` or `/evaluate/*` | Limits are now in place (see the table in §1) and the API has a general limit. Per-address only, in memory |
 | API-6 | 500 responses include the raw internal error message | Can leak database or library details |

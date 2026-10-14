@@ -1,5 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const jwt = require('jsonwebtoken');
 const Professor = require('../models/Professor');
 const { startDatabase, stopDatabase, clearDatabase } = require('./helpers/db');
 const { startApp } = require('./helpers/app');
@@ -89,8 +90,56 @@ test('TC-01-25: the unique index on email rejects a duplicate that skips the con
   );
 });
 
-// Behaviour today, not decisions: logout does nothing on the server, refresh is a stub, and a
-// professor with MFA switched on cannot finish logging in (D-17). Replace these if they are built.
+// FR-04 against the real routers: a session that is still being used is renewed, a login is not.
+test('TC-04-26: login gives a token that lasts 60 minutes, and a request right after it is not renewed', async () => {
+  const login = await app.request('POST', '/api/auth/login', { body: { email: 'ada@example.edu', password: PASSWORDS.ada } });
+  const claims = jwt.verify(login.body.access_token, process.env.JWT_SECRET);
+  assert.equal(claims.exp - claims.iat, 60 * 60);
+  assert.equal(claims.auth_at, claims.iat);
+  const res = await app.request('GET', '/api/courses', { token: login.body.access_token });
+  assert.equal(res.status, 200);
+  assert.equal(res.headers.get('x-access-token'), null);
+});
+
+test('TC-04-27: a professor who is still working is handed a renewed token that works, and an idle one is refused', async () => {
+  const professor = await Professor.findOne({ email: 'ada@example.edu' });
+  const now = Math.floor(Date.now() / 1000);
+  const tenMinutesOld = jwt.sign(
+    { id: String(professor._id), email: professor.email, auth_at: now - 600, iat: now - 600 },
+    process.env.JWT_SECRET,
+    { expiresIn: '60m' }
+  );
+  const used = await app.request('GET', '/api/courses', { token: tenMinutesOld });
+  assert.equal(used.status, 200);
+  const renewed = used.headers.get('x-access-token');
+  assert.ok(renewed, 'a renewed token is returned');
+  assert.equal((await app.request('GET', '/api/courses', { token: renewed })).status, 200, 'the renewed token works');
+
+  const idle = jwt.sign(
+    { id: String(professor._id), email: professor.email, iat: now - 61 * 60 },
+    process.env.JWT_SECRET,
+    { expiresIn: '60m' }
+  );
+  const refused = await app.request('GET', '/api/courses', { token: idle });
+  assert.equal(refused.status, 401);
+  assert.equal(refused.headers.get('x-access-token'), null);
+});
+
+test('TC-04-35: a session past the 8-hour total limit is refused by protected routes and by the keep-alive', async () => {
+  const professor = await Professor.findOne({ email: 'ada@example.edu' });
+  const now = Math.floor(Date.now() / 1000);
+  const tooOld = jwt.sign(
+    { id: String(professor._id), email: professor.email, auth_at: now - 9 * 3600, iat: now - 600, exp: now + 3000 },
+    process.env.JWT_SECRET
+  );
+  assert.equal((await app.request('GET', '/api/courses', { token: tooOld })).status, 401);
+  const refresh = await app.request('POST', '/api/auth/refresh', { token: tooOld, body: {} });
+  assert.equal(refresh.status, 401);
+  assert.equal(refresh.headers.get('x-access-token'), null);
+});
+
+// Behaviour today, not decisions: logout does nothing on the server, and a professor with MFA
+// switched on cannot finish logging in (D-17). Replace these if they are built.
 test('TC-01-26: logout needs a valid token and answers 200, but the token keeps working (no server-side logout)', async () => {
   const login = await app.request('POST', '/api/auth/login', { body: { email: 'ada@example.edu', password: PASSWORDS.ada } });
   const token = login.body.access_token;
@@ -99,9 +148,20 @@ test('TC-01-26: logout needs a valid token and answers 200, but the token keeps 
   assert.equal((await app.request('GET', '/api/courses', { token })).status, 200, 'the token still works after logout');
 });
 
-test('TC-01-27: token refresh is not implemented (501)', async () => {
-  const res = await app.request('POST', '/api/auth/refresh', { body: {} });
-  assert.equal(res.status, 501);
+test('TC-01-27: the keep-alive needs a valid token; with one it answers 200 and a token that is a minute old gets renewed', async () => {
+  assert.equal((await app.request('POST', '/api/auth/refresh', { body: {} })).status, 401, 'no token');
+  assert.equal((await app.request('POST', '/api/auth/refresh', { token: 'not-a-token', body: {} })).status, 401);
+
+  const professor = await Professor.findOne({ email: 'ada@example.edu' });
+  const now = Math.floor(Date.now() / 1000);
+  const old = jwt.sign({ id: String(professor._id), email: professor.email, iat: now - 600 }, process.env.JWT_SECRET, { expiresIn: '60m' });
+  const res = await app.request('POST', '/api/auth/refresh', { token: old, body: {} });
+  assert.equal(res.status, 200);
+  assert.equal(res.body.expires_in_seconds, 3600);
+  const renewed = res.headers.get('x-access-token');
+  assert.ok(renewed, 'a renewed token is returned');
+  const claims = jwt.verify(renewed, process.env.JWT_SECRET);
+  assert.ok(claims.exp - now > 59 * 60, 'valid for a new full idle period');
 });
 
 test('TC-01-28: a professor with MFA on is told MFA is required and gets no token, and cannot complete it (D-17)', async () => {

@@ -90,6 +90,14 @@ test('the frontend gets Access-Control-Allow-Origin and credentials', async () =
   });
 });
 
+test('the frontend is allowed to read the renewed login token (X-Access-Token, FR-04)', async () => {
+  await withServer(STAGING, async (port) => {
+    const res = await request(port, 'GET', { Origin: STAGING.FRONTEND_URL });
+    assert.match(res.headers['access-control-expose-headers'], /X-Access-Token/);
+    assert.match(res.headers['access-control-expose-headers'], /X-Server-Time/);
+  });
+});
+
 test('another Render site gets no CORS headers, and no error', async () => {
   await withServer(STAGING, async (port) => {
     const res = await request(port, 'GET', { Origin: 'https://attacker.onrender.com' });

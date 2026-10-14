@@ -9,11 +9,13 @@ import ResetPassword from './pages/ResetPassword';
 import Settings from './pages/Settings';
 import ProtectedRoute from './components/ProtectedRoute';
 import SessionExpiredBanner from './components/SessionExpiredBanner';
+import SessionTimeoutWarning from './components/SessionTimeoutWarning';
 
 function App() {
     return (
         <Router>
             <SessionExpiredBanner />
+            <SessionTimeoutWarning />
             <Routes>
                 <Route path="/" element={<LoginPage />} />
                 <Route path="/course-management" element={<ProtectedRoute><CourseManagement /></ProtectedRoute>} />

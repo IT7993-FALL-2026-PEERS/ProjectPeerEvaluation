@@ -41,7 +41,8 @@ async function startApp() {
   });
   const baseUrl = `http://127.0.0.1:${server.address().port}`;
 
-  // JSON request helper. `token` adds a bearer header; `body` is sent as JSON.
+  // JSON request helper. `token` adds a bearer header; `body` is sent as JSON. `headers` is the
+  // response's Headers object (lower-case names, `get` returns null when absent).
   async function request(method, path, { token, body } = {}) {
     const res = await fetch(baseUrl + path, {
       method,
@@ -49,7 +50,7 @@ async function startApp() {
       body: body === undefined ? undefined : JSON.stringify(body),
     });
     const text = await res.text();
-    return { status: res.status, body: text ? JSON.parse(text) : null };
+    return { status: res.status, body: text ? JSON.parse(text) : null, headers: res.headers };
   }
 
   // Uploads CSV text as the multipart field "file", the way the roster dialog does.
