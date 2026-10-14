@@ -31,6 +31,7 @@ import EvaluationResetDialog from '../components/EvaluationResetDialog';
 import EvaluationStatusDialog from '../components/EvaluationStatusDialog';
 import TeamsDialog from '../components/TeamsDialog';
 import DeadlineDialog from '../components/DeadlineDialog';
+import ExtendDeadlineDialog from '../components/ExtendDeadlineDialog';
 import { EditTeamDialog, CreateTeamDialog } from '../components/TeamFormDialogs';
 import TeamStudentsDialog from '../components/TeamStudentsDialog';
 import StudentsDialog from '../components/StudentsDialog';
@@ -66,7 +67,7 @@ function CourseManagement() {
     createCourseDialog, editCourseDialog, deleteCourseDialog, rosterUploadDialog,
   } = useCourseDialogs({ setAlert, refreshCourses: fetchCoursesWithCounts });
   const {
-    sendingEvaluations, requestSend, sendDeadlineDialog, viewStatus, resetEvaluationState, evaluationStatusDialog,
+    sendingEvaluations, requestSend, sendDeadlineDialog, extendDialog, resubmitDialog, viewStatus, resetEvaluationState, evaluationStatusDialog,
   } = useEvaluations({ setAlert });
   const {
     openTeams, clearTeamsState,
@@ -185,6 +186,8 @@ function CourseManagement() {
 
       <EvaluationStatusDialog {...evaluationStatusDialog} />
       <DeadlineDialog {...sendDeadlineDialog} />
+      <ExtendDeadlineDialog {...extendDialog} />
+      <DeadlineDialog {...resubmitDialog} />
     </div>
   );
 }

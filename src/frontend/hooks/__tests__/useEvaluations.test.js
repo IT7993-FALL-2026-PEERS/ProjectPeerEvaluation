@@ -422,3 +422,70 @@ describe('useEvaluations: asking for a deadline before sending (CICD-67)', () =>
     expect(setAlert).toHaveBeenCalledWith({ severity: 'warning', message: 'Reminders sent Deadline passed (extend first): Pat Lee.' });
   });
 });
+
+describe('useEvaluations: extend and resubmit (CICD-68)', () => {
+  const ROWS = [
+    { id: 's1', name: 'Ann Archer', team: 'Alpha', team_id: 't1', completed: false },
+    { id: 's2', name: 'Ben Baker', team: 'Alpha', team_id: 't1', completed: true },
+    { id: 's3', name: 'Cy Cole', team: 'No Team', team_id: null, completed: false },
+  ];
+
+  test('the extend dialog offers the unfinished students and the teams from the status', async () => {
+    statusBody = { ...SENT, students: ROWS };
+    const view = await opened();
+    act(() => view.result.current.evaluationStatusDialog.onExtend());
+    const dialog = view.result.current.extendDialog;
+    expect(dialog.open).toBe(true);
+    expect(dialog.students).toEqual([{ id: 's1', name: 'Ann Archer' }, { id: 's3', name: 'Cy Cole' }]);
+    expect(dialog.teams).toEqual([{ id: 't1', name: 'Alpha' }]);
+  });
+
+  test('confirming posts the scope and the deadline, says who was extended, and refreshes the status', async () => {
+    api.post.mockResolvedValue({ data: { message: 'Deadline extended.', extended: ['Ann Archer'], failed: [], skipped: { submitted: 1, not_invited: 0, changed: 0 } } });
+    const view = await opened();
+    act(() => view.result.current.evaluationStatusDialog.onExtend());
+    api.get.mockClear();
+    await act(() => view.result.current.extendDialog.onConfirm({ scope: 'student', student_id: 's1', localValue: CHOSEN }));
+    expect(api.post).toHaveBeenCalledWith('/courses/c1/evaluations/extend', expect.objectContaining({
+      scope: 'student', student_id: 's1', deadline: new Date(CHOSEN).toISOString(), deadline_zone: expect.any(String),
+    }));
+    expect(setAlert).toHaveBeenCalledWith({ severity: 'success', message: 'Deadline extended for Ann Archer. 1 already submitted.' });
+    expect(api.get).toHaveBeenCalledWith('/courses/c1/evaluations/status');
+    expect(view.result.current.extendDialog.open).toBe(false);
+  });
+
+  test('a refused extension shows the server\'s reason', async () => {
+    api.post.mockRejectedValue({ response: { data: { error: { message: 'Choose the student to extend.' } } } });
+    const view = await opened();
+    act(() => view.result.current.evaluationStatusDialog.onExtend());
+    await act(() => view.result.current.extendDialog.onConfirm({ scope: 'student', localValue: CHOSEN }));
+    expect(setAlert).toHaveBeenCalledWith({ severity: 'error', message: 'Choose the student to extend.' });
+  });
+
+  test('Allow resubmission asks for a deadline for that student, then posts it and refreshes the status', async () => {
+    api.post.mockResolvedValue({ data: { message: 'Ann Archer can submit again until the new deadline.' } });
+    const view = await opened();
+    act(() => view.result.current.evaluationStatusDialog.onAllowResubmission({ id: 's1', name: 'Ann Archer' }));
+    expect(view.result.current.resubmitDialog.open).toBe(true);
+    expect(view.result.current.resubmitDialog.title).toMatch(/Ann Archer/);
+    api.get.mockClear();
+    await act(() => view.result.current.resubmitDialog.onConfirm(CHOSEN));
+    expect(api.post).toHaveBeenCalledWith('/courses/c1/students/s1/evaluations/resubmit', expect.objectContaining({ deadline: new Date(CHOSEN).toISOString() }));
+    expect(setAlert).toHaveBeenCalledWith({ severity: 'success', message: 'Ann Archer can submit again until the new deadline.' });
+    expect(api.get).toHaveBeenCalledWith('/courses/c1/evaluations/status');
+    expect(view.result.current.resubmitDialog.open).toBe(false);
+  });
+
+  test('a refused resubmission shows the server\'s reason, and cancelling sends nothing', async () => {
+    api.post.mockRejectedValue({ response: { data: { error: { message: 'This student has not submitted yet; send or extend instead.' } } } });
+    const view = await opened();
+    act(() => view.result.current.evaluationStatusDialog.onAllowResubmission({ id: 's1', name: 'Ann Archer' }));
+    await act(() => view.result.current.resubmitDialog.onConfirm(CHOSEN));
+    expect(setAlert).toHaveBeenCalledWith({ severity: 'error', message: 'This student has not submitted yet; send or extend instead.' });
+    api.post.mockClear();
+    act(() => view.result.current.evaluationStatusDialog.onAllowResubmission({ id: 's1', name: 'Ann Archer' }));
+    act(() => view.result.current.resubmitDialog.onClose());
+    expect(view.result.current.resubmitDialog.open).toBe(false);
+    expect(api.post).not.toHaveBeenCalled();
+  });
+});

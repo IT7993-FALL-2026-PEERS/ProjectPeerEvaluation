@@ -134,3 +134,15 @@ test('TC-12-25: a reset clears the links and the status goes back to "not sent"'
   assert.equal(reset.body.tokens_cleared, 4);
   assert.equal((await status(ada)).body.evaluations_sent, false);
 });
+
+// CICD-68: the status dialog's Extend and Allow resubmission buttons need these.
+test('TC-11-22: each status row carries the student id, team id and whether a resubmission is allowed', async () => {
+  await send();
+  await Student.findByIdAndUpdate(IDS.ann, { resubmission_allowed: true });
+  const { body } = await status(ada);
+  const ann = body.students.find((s) => s.name === 'Ann Archer');
+  assert.equal(ann.id, String(IDS.ann));
+  assert.equal(ann.team_id, String(IDS.teamAlpha));
+  assert.equal(ann.resubmission_allowed, true);
+  assert.equal(body.students.find((s) => s.name === 'Ben Baker').resubmission_allowed, false);
+});

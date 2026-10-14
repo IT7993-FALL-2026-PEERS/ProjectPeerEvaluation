@@ -81,6 +81,9 @@ takes the student's **university ID** string (for example `S0012345`).
 | 409 | `DUPLICATE` | Email or student ID already exists |
 | 410 | `EVALUATION_LINK_EXPIRED` | The evaluation deadline has passed: "The deadline for this evaluation has passed. Ask your instructor for an extension." |
 | 409 | `ALREADY_COMPLETED` | Student already submitted their evaluation |
+| 409 | `LINK_CHANGED` | The student's link was replaced, or its deadline passed, while the request ran; nothing was saved or activated |
+| 409 | `NOT_SUBMITTED` | A resubmission was asked for a student who has not submitted |
+| 502 | `EMAIL_FAILED` | The resubmission email could not be sent; nothing was changed |
 | 429 | `RATE_LIMITED` | Too many requests from this address; `details.retry_after_seconds` and the `Retry-After` header say how long to wait |
 
 **Rate limits** (per client IP address, kept in memory, so right for one server instance):
@@ -151,6 +154,8 @@ on 404 instead of this shape.
 | POST | `/courses/:course_id/teams/:team_id/evaluations/send` | 🔒 | Email invitations to one team |
 | GET | `/courses/:course_id/evaluations/status` | 🔒 | Who has and hasn't submitted |
 | POST | `/courses/:course_id/evaluations/remind` | 🔒 | Email reminders to students who haven't submitted |
+| POST | `/courses/:course_id/evaluations/extend` | 🔒 | Extend the deadline with a new link (one student, one team, or everyone not submitted) |
+| POST | `/courses/:course_id/students/:student_id/evaluations/resubmit` | 🔒 | Allow one student who has submitted to submit again |
 | DELETE | `/courses/:course_id/evaluations/reset` | 🔒 | Delete all evaluations and tokens |
 | GET | `/courses/:course_id/reports` | 🔒 | Course report with grades |
 | GET | `/courses/:course_id/reports/download` | 🔒 | Course report as CSV |
@@ -445,7 +450,8 @@ with a message saying so and `emails_sent: 0`. Partial failures still answer 200
 { "total_count": 3, "completed_count": 1, "pending_count": 2, "completion_rate": 33,
   "evaluations_sent": true,
   "students": [{ "student_id": "S001", "name": "Alice", "email": "...", "team": "Team A",
-                 "completed": true, "evaluation_token": "...", "last_activity": "..." }] }
+                 "completed": true, "evaluation_token": "...", "last_activity": "...",
+                 "id": "<ObjectId>", "team_id": "<ObjectId or null>", "resubmission_allowed": false }] }
 ```
 
 ### `POST .../evaluations/remind`
@@ -457,9 +463,34 @@ that invited the student. **200** `{ "message", "reminders_sent", "total_reminde
 "deadline_passed": ["<names>"], "not_invited": <count> }`: students whose deadline has passed need an
 extension first, and students never invited need a send. `reminders_sent: 0` when everyone is done.
 
+### `POST .../evaluations/extend`
+
+Gives more time with a new link (CICD-68). Body: `{ "deadline", "deadline_zone", "scope": "student" | "team" |
+"unsubmitted", "student_id" | "team_id" }` (the id the scope needs). The deadline is checked like a send's.
+Students in scope who were invited (active or expired link) and have not submitted are each emailed a new
+link; only after that email went out is the new link swapped in, and only if the student's link is still
+the one read before (compare-and-set), so a failed email leaves the old link working and two overlapping
+extensions cannot both win. The old link then answers **404**. Students who submitted are never changed;
+students never invited are skipped (they need a send). Pacing and the recipient limit apply.
+
+**200** `{ "message", "extended": ["<names>"], "failed": ["Name (email): reason"], "skipped": { "submitted",
+"not_invited", "changed" }, "deadline" }`: `changed` counts students whose link changed while their email
+went out (they submitted, or another extension won); their new link was not activated. **400**
+`VALIDATION_ERROR` for a bad deadline, scope or id; **404** for a student or team not in this course.
+
+### `POST /courses/:course_id/students/:student_id/evaluations/resubmit`
+
+Allows one student who has submitted to submit again (CICD-68). Body: `{ "deadline", "deadline_zone" }`.
+A new link is emailed first; then it is swapped in with `resubmission_allowed` set, and the old link dies.
+The student's form then opens normally and the token status reports `completed: false`. Their next
+submission replaces their earlier evaluations and clears the approval, all or nothing in a transaction
+(on a database without transactions, best effort: a failed save puts the earlier evaluations and the
+approval back); no copy of the earlier evaluations is kept. **200** `{ "message", "deadline" }` · **400** · **404** · **409**
+`NOT_SUBMITTED` · **409** `LINK_CHANGED` · **502** `EMAIL_FAILED`.
+
 ### `DELETE .../evaluations/reset`
 
-Deletes every evaluation in the course and clears all tokens and each student's submitted mark, so old links stop working and the next send reaches everyone again.
+Deletes every evaluation in the course and clears all tokens, each student's submitted mark and any approved resubmission, so old links stop working and the next send reaches everyone again.
 **200** `{ "message", "tokens_cleared", "evaluations_deleted" }`.
 
 ---
@@ -563,11 +594,14 @@ unique index on evaluator, student and course makes two requests at the same mom
 the second gets the 409 below. The `student_id`s must be exactly the
 teammates the form lists (the rest of the team, or the rest of the course without a team),
 each once: rating yourself, someone else, the same teammate twice, or leaving a teammate out
-is a **400** `VALIDATION_ERROR` (API-2).
+is a **400** `VALIDATION_ERROR` (API-2). The save also checks, inside the same all-or-nothing step, that
+the link is still the student's and still before its deadline; if an extension replaced it or the
+deadline passed meanwhile, nothing is saved and the answer is **409** `LINK_CHANGED`. With an approved
+resubmission the new evaluations replace the earlier ones (CICD-68).
 
 **201** `{ "message": "Evaluation submitted successfully.", "evaluations_count": 2,
 "submitted_at": "..." }` · **400** `VALIDATION_ERROR` · **404** `EVALUATION_CANCELLED` ·
-**409** `ALREADY_COMPLETED` · **410** `EVALUATION_LINK_EXPIRED`.
+**409** `ALREADY_COMPLETED` · **409** `LINK_CHANGED` · **410** `EVALUATION_LINK_EXPIRED`.
 
 ### `GET /evaluate/:token/status`
 

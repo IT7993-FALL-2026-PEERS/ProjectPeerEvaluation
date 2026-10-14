@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import api from '../services/api';
 import { getApiBaseUrl } from '../services/apiUrl';
-import { describeInvitationResult, describeReminderResult } from '../services/emailResult';
+import { describeExtendResult, describeInvitationResult, describeReminderResult } from '../services/emailResult';
 import { prefillDeadline, toDeadlinePayload } from '../services/deadline';
 import { getErrorMessage } from '../services/apiError';
 
@@ -33,6 +33,9 @@ export default function useEvaluations({ setAlert }) {
   // The deadline each course was last sent with in this session, to prefill the next send: the course
   // list is not reloaded after a send, so its copy of the last deadline would be out of date.
   const [lastDeadlines, setLastDeadlines] = useState({});
+  // CICD-68: the Extend Deadline dialog, and the student a resubmission is being allowed for
+  const [extendOpen, setExtendOpen] = useState(false);
+  const [resubmitStudent, setResubmitStudent] = useState(null);
 
   const handleSendInvitations = async (courseId, deadlinePayload) => {
     setSendingEvaluations(prev => ({ ...prev, [courseId]: true }));
@@ -170,8 +173,66 @@ export default function useEvaluations({ setAlert }) {
     await handleSendInvitations(course._id || course.id, payload);
   };
 
+  const courseIdOf = (course) => course && (course._id || course.id);
+  const refreshStatus = async (courseId) => {
+    const statusResponse = await api.get(`/courses/${courseId}/evaluations/status`);
+    setEvaluationStatus(statusResponse.data);
+  };
+  const confirmExtend = async ({ localValue, ...scope }) => {
+    const courseId = courseIdOf(selectedCourseForEval);
+    const payload = toDeadlinePayload(localValue, { keep: lastDeadlineFor(selectedCourseForEval) });
+    setExtendOpen(false);
+    if (!courseId || !payload) return;
+    try {
+      const response = await api.post(`/courses/${courseId}/evaluations/extend`, { ...scope, ...payload });
+      setAlert(describeExtendResult(response.data));
+      if (response.data.extended?.length && response.data.deadline) {
+        setLastDeadlines(prev => ({ ...prev, [courseId]: response.data.deadline }));
+      }
+      await refreshStatus(courseId);
+    } catch (error) {
+      setAlert({ severity: 'error', message: getErrorMessage(error, 'Failed to extend the deadline') });
+    }
+  };
+  const confirmResubmit = async (localValue) => {
+    const courseId = courseIdOf(selectedCourseForEval);
+    const student = resubmitStudent;
+    const payload = toDeadlinePayload(localValue);
+    setResubmitStudent(null);
+    if (!courseId || !student || !payload) return;
+    try {
+      const response = await api.post(`/courses/${courseId}/students/${student.id}/evaluations/resubmit`, payload);
+      setAlert({ severity: 'success', message: response.data.message });
+      await refreshStatus(courseId);
+    } catch (error) {
+      setAlert({ severity: 'error', message: getErrorMessage(error, 'Failed to allow a resubmission') });
+    }
+  };
+  const statusRows = evaluationStatus?.students || [];
+
   return {
     sendingEvaluations,
+    extendDialog: {
+      open: extendOpen,
+      students: statusRows.filter((row) => !row.completed && row.id).map((row) => ({ id: row.id, name: row.name })),
+      teams: Object.values(statusRows.reduce((found, row) => {
+        if (row.team_id) found[row.team_id] = { id: row.team_id, name: row.team };
+        return found;
+      }, {})),
+      initialValue: prefillDeadline(lastDeadlineFor(selectedCourseForEval)),
+      busy: false,
+      onConfirm: confirmExtend,
+      onClose: () => setExtendOpen(false),
+    },
+    resubmitDialog: {
+      open: resubmitStudent !== null,
+      title: `Allow ${resubmitStudent?.name || ''} to resubmit`,
+      description: 'They get a new link that works until this deadline, and their old link stops working. Their new answers replace the earlier ones.',
+      initialValue: '',
+      busy: false,
+      onConfirm: confirmResubmit,
+      onClose: () => setResubmitStudent(null),
+    },
     requestSend,
     sendDeadlineDialog: {
       open: sendRequest !== null,
@@ -196,6 +257,8 @@ export default function useEvaluations({ setAlert }) {
       onRemind: () => handleSendReminders(selectedCourseForEval._id || selectedCourseForEval.id),
       onReset: () => handleResetEvaluationState(selectedCourseForEval._id || selectedCourseForEval.id),
       onClose: () => setEvaluationStatusOpen(false),
+      onExtend: () => setExtendOpen(true),
+      onAllowResubmission: (student) => setResubmitStudent(student),
     },
   };
 }

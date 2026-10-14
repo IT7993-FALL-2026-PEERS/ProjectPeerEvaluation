@@ -51,6 +51,10 @@ router.post('/:course_id/evaluations/send', authenticateToken, evaluationControl
 router.post('/:course_id/teams/:team_id/evaluations/send', authenticateToken, evaluationController.sendTeamEvaluations);
 router.get('/:course_id/evaluations/status', authenticateToken, evaluationController.evaluationStatus);
 router.post('/:course_id/evaluations/remind', authenticateToken, evaluationController.remindEvaluations);
+// Extend the deadline with a new link (CICD-68)
+router.post('/:course_id/evaluations/extend', authenticateToken, evaluationController.extendEvaluations);
+// Allow one student who has submitted to submit again (CICD-68)
+router.post('/:course_id/students/:student_id/evaluations/resubmit', authenticateToken, evaluationController.allowResubmission);
 router.delete('/:course_id/evaluations/reset', authenticateToken, studentController.resetEvaluationState);
 // Team management endpoints (subroutes)
 router.get('/:course_id/teams', authenticateToken, teamController.listTeams);

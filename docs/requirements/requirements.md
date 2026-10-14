@@ -286,6 +286,14 @@ deadline, and students who already have a working link or have submitted are not
 has passed. Ask your instructor for an extension."), and a reminder neither reaches that student nor
 extends the link.
 
+**Extension (sponsor, 14 Oct 2026; CICD-68).** "Instructors can approve an extension and issue a new link.
+The previous link should become invalid."
+
+**Given** invited students who have not submitted,
+**when** the instructor extends one student, one team or everyone who has not submitted,
+**then** each gets a new link that works until the new deadline and their old link stops working; if the
+email fails the old link keeps working; students who have submitted are not changed.
+
 *Evidence.* `sendEvaluationInvitation` in `utils/emailUtils.js`; `parseDeadline` in
 `utils/evaluationDeadline.js`; the send, remind and student handlers in
 `controllers/evaluationController.js`.
@@ -404,6 +412,16 @@ teammate in the same round.
 *Closed 2 Oct (CICD-33).* The guard checked and then inserted, so two requests at the same moment
 could both pass. A unique index on evaluator, student and course now makes the second one fail with
 409, and the whole submission is saved in one transaction. Integration tests cover both.
+
+**Approved resubmission (sponsor, 14 Oct 2026; CICD-68).** "Only one submission per student should be
+allowed unless the instructor approves a resubmission."
+
+**Given** a student who has submitted,
+**when** the instructor allows a resubmission,
+**then** the student gets a new link (the old one stops working), the form opens again, and their next
+submission replaces their earlier evaluations once; after that, one submission per student holds again.
+Two submissions at the same moment save once, and a submission whose link was replaced or whose deadline
+passed while it ran saves nothing.
 
 *Revised 27 Sep — previously "Needs verification".*
 

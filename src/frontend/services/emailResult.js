@@ -49,3 +49,19 @@ export function describeReminderResult(data) {
   const severity = result.severity !== 'success' ? result.severity : (data.reminders_sent ? 'warning' : 'info');
   return { severity, message: `${result.message} ${extra}` };
 }
+
+// CICD-68: an extension names who got more time and why others did not.
+export function describeExtendResult(data) {
+  const extended = data.extended || [];
+  const failedNames = (data.failed || []).map((entry) => entry.split(' (')[0]);
+  const skipped = data.skipped || {};
+  const parts = [extended.length ? `Deadline extended for ${extended.join(', ')}.` : 'Nobody was extended.'];
+  if (failedNames.length) parts.push(`Not sent to: ${failedNames.join(', ')}.`);
+  if (skipped.submitted) parts.push(`${skipped.submitted} already submitted.`);
+  if (skipped.not_invited) parts.push(`${skipped.not_invited} not invited yet.`);
+  if (skipped.changed) parts.push(`${skipped.changed} changed while extending (submitted or extended elsewhere); their link was left as it was.`);
+  const trouble = failedNames.length > 0 || Boolean(skipped.changed);
+  let severity = extended.length ? 'success' : 'info';
+  if (trouble) severity = extended.length ? 'warning' : 'error';
+  return { severity, message: parts.join(' ') };
+}
