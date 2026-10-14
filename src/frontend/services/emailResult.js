@@ -10,3 +10,42 @@ export function describeEmailResult({ sent = 0, total = 0, failed = [] }, succes
   }
   return { severity: 'warning', message: `Sent ${sent} of ${total} emails. Not sent to: ${names}.` };
 }
+
+// CICD-67: a send reaches only students with no active link who have not submitted, so the alert says who
+// it skipped. Zero stays zero; a send that reached nobody is information, not a success.
+// `successText` replaces the default first sentence (the team dialog names the team).
+export function describeInvitationResult(data, successText) {
+  const sent = data.emails_sent || 0;
+  const skipped = [
+    data.already_invited ? `${data.already_invited} already had a link.` : '',
+    data.already_submitted ? `${data.already_submitted} already submitted.` : '',
+  ].filter(Boolean).join(' ');
+  if (!data.total_students) {
+    return { severity: 'info', message: [data.message, skipped].filter(Boolean).join(' ') };
+  }
+  const result = describeEmailResult(
+    { sent, total: data.total_students, failed: data.failed },
+    [successText || `✅ ${data.message} - Emails sent to ${sent} students.`, skipped].filter(Boolean).join(' ')
+  );
+  // The backend adds "the link could not be reset" when a failed student's link stayed claimed
+  const stuck = (data.failed || []).filter((entry) => entry.includes('could not be reset')).map((entry) => entry.split(' (')[0]);
+  if (stuck.length === 0) return result;
+  return { ...result, message: `${result.message} The link of ${stuck.join(', ')} could not be reset, so a new send will skip them until the deadline.` };
+}
+
+// A reminder only reaches students whose link still works; the others are named so the instructor
+// knows who needs an extension first.
+export function describeReminderResult(data) {
+  const passed = data.deadline_passed || [];
+  const extra = [
+    passed.length ? `Deadline passed (extend first): ${passed.join(', ')}.` : '',
+    data.not_invited ? `${data.not_invited} not invited yet.` : '',
+  ].filter(Boolean).join(' ');
+  const result = describeEmailResult(
+    { sent: data.reminders_sent, total: data.total_reminded, failed: data.failed },
+    data.message
+  );
+  if (!extra) return result;
+  const severity = result.severity !== 'success' ? result.severity : (data.reminders_sent ? 'warning' : 'info');
+  return { severity, message: `${result.message} ${extra}` };
+}

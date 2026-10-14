@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const Student = require('../models/Student');
 const Evaluation = require('../models/Evaluation');
 const { startDatabase, stopDatabase, clearDatabase } = require('./helpers/db');
-const { startApp, sentEmails, clearEmails } = require('./helpers/app');
+const { startApp, sentEmails, clearEmails, deadlineBody } = require('./helpers/app');
 const { seed, IDS } = require('./helpers/seed');
 const { STUDENT_RATINGS: RATINGS } = require('./helpers/evaluations');
 
@@ -41,7 +41,7 @@ test.beforeEach(async (t) => {
   await clearDatabase();
   await seed();
   clearEmails();
-  await app.request('POST', `/api/courses/${IDS.courseAda}/evaluations/send`, { token: ada, body: {} });
+  await app.request('POST', `/api/courses/${IDS.courseAda}/evaluations/send`, { token: ada, body: deadlineBody() });
 });
 
 test('TC-16-20: a student opens the link from the email and sees only their teammate and the rubric', async () => {
@@ -136,7 +136,7 @@ test('TC-16-26: a team of three needs a rating for each teammate, and a bad seco
     student_id: '1007', name: 'Fay Fox', email: 'fay@example.edu',
     course_id: IDS.courseAda, team_id: IDS.teamAlpha, group_assignment: 'Alpha',
   });
-  await app.request('POST', `/api/courses/${IDS.courseAda}/evaluations/send`, { token: ada, body: {} });
+  await app.request('POST', `/api/courses/${IDS.courseAda}/evaluations/send`, { token: ada, body: deadlineBody() });
   const token = (await Student.findById(IDS.ann)).evaluation_token;
 
   const onlyOne = await app.request('POST', `/api/evaluate/${token}`, { body: { evaluations: [rating(IDS.ben)] } });

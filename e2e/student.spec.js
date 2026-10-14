@@ -1,5 +1,5 @@
 const { test, expect } = require('@playwright/test');
-const { resetData, loginAsAda, courseAction, invitationPath } = require('./support/app');
+const { resetData, loginAsAda, courseAction, invitationPath, sendWithDeadline } = require('./support/app');
 
 // The student's workflow through the real UI (CW-06, CW-07): an invitation arrives, the student
 // opens the link without logging in, rates a teammate, submits, and the professor sees it.
@@ -25,6 +25,7 @@ async function rate(page, scores) {
 async function sendInvitationsAsAda(page) {
   await loginAsAda(page, passwords);
   await courseAction(page, 'Send Evaluations').click();
+  await sendWithDeadline(page);
   await expect(page.getByText('Progress: 0/4 evaluations completed')).toBeVisible();
   await page.getByRole('button', { name: 'Close' }).click();
 }
@@ -105,7 +106,7 @@ test('E2E-14: submitting without written feedback is refused and nothing is save
   await rate(student, [4, 5, 4, 3, 4, 3]);
   await student.getByRole('button', { name: /submit evaluation/i }).click();
 
-  await expect(student.getByRole('alert')).toBeVisible();
+  await expect(student.getByRole('alert').filter({ hasText: /feedback/i })).toBeVisible();
   await expect(student.getByText(/Thank you for completing/)).toHaveCount(0);
   await courseAction(page, 'Evaluation Status').click();
   await expect(page.getByText('Progress: 0/4 evaluations completed')).toBeVisible();

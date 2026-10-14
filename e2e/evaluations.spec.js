@@ -1,5 +1,5 @@
 const { test, expect } = require('@playwright/test');
-const { resetData, capturedEmails, loginAsAda, courseAction, alertWith } = require('./support/app');
+const { resetData, capturedEmails, loginAsAda, courseAction, alertWith, sendWithDeadline } = require('./support/app');
 
 // The professor's evaluation screens on the course row: the status dialog (before and after sending,
 // by team), reminders, resetting the evaluation state, and the "Evaluations Already Sent"
@@ -21,6 +21,7 @@ const top = (page) => page.getByRole('dialog').last();
 async function sendFromStatus(page) {
   await courseAction(page, 'Evaluation Status').click();
   await top(page).getByRole('button', { name: 'Send Evaluations Now' }).click();
+  await sendWithDeadline(page);
   await expect(top(page).getByText('Progress: 0/4 evaluations completed')).toBeVisible();
 }
 
@@ -30,6 +31,7 @@ test('E2E-21: before sending, the status says so; after sending, it shows every 
   await expect(top(page).getByRole('button', { name: 'Reset Evaluation State' })).toBeVisible();
 
   await top(page).getByRole('button', { name: 'Send Evaluations Now' }).click();
+  await sendWithDeadline(page);
 
   await expect(top(page).getByText('Progress: 0/4 evaluations completed')).toBeVisible();
   for (const name of ['Alpha', 'Beta']) await expect(top(page).getByText(name, { exact: true })).toBeVisible();

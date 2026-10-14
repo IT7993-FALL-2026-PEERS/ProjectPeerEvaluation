@@ -25,6 +25,7 @@ import {
 } from '@mui/material';
 import { CheckCircle as CheckIcon, Person as PersonIcon } from '@mui/icons-material';
 import api from '../services/api';
+import { formatDeadlineLocal } from '../services/deadline';
 
 function StudentEvaluation() {
   const { token } = useParams();
@@ -220,6 +221,12 @@ function StudentEvaluation() {
           </Typography>
         </Toolbar>
       </AppBar>
+      {/* CICD-67: the deadline, in the student's own time zone */}
+      {evaluationData?.deadline && (
+        <Alert severity="info" sx={{ mb: 3 }}>
+          <strong>Due:</strong> {formatDeadlineLocal(evaluationData.deadline)}
+        </Alert>
+      )}
       <Paper sx={{ p: 3, mb: 3, boxShadow: 3, borderRadius: 3 }}>
         <Typography variant="h6" color="primary" gutterBottom>
           {evaluationData?.rubric?.description}

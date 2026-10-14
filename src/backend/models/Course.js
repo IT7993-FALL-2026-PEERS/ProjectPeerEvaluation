@@ -16,6 +16,9 @@ const CourseSchema = new mongoose.Schema({
 	team_count: { type: Number, default: 0 }, // System generated  
 	course_status: { type: String, enum: ['Active', 'Inactive'], default: 'Active' },
 	evaluation_status: { type: EvaluationStatusSchema, default: () => ({}) },
+	// The deadline of the last send, to prefill the send dialog and to write reminders in the same zone (CICD-67)
+	last_evaluation_deadline: { type: Date, default: null },
+	last_evaluation_deadline_zone: { type: String, default: null },
 	created_at: { type: Date, default: Date.now }
 });
 

@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const Student = require('../models/Student');
 const { startDatabase, stopDatabase, clearDatabase } = require('./helpers/db');
-const { startApp, sentEmails, clearEmails } = require('./helpers/app');
+const { startApp, sentEmails, clearEmails, deadlineBody } = require('./helpers/app');
 const { seed, IDS } = require('./helpers/seed');
 const { ORDINARY_RATINGS: RATINGS } = require('./helpers/evaluations');
 
@@ -16,7 +16,7 @@ let bo;
 const FRONTEND = 'https://peers.example.test';
 const status = (token) => app.request('GET', `/api/courses/${IDS.courseAda}/evaluations/status`, { token });
 const remind = (token, body = {}) => app.request('POST', `/api/courses/${IDS.courseAda}/evaluations/remind`, { token, body });
-const send = () => app.request('POST', `/api/courses/${IDS.courseAda}/evaluations/send`, { token: ada, body: {} });
+const send = () => app.request('POST', `/api/courses/${IDS.courseAda}/evaluations/send`, { token: ada, body: deadlineBody() });
 
 // Ann submits her one rating, as a student would, with the link from her invitation.
 async function annSubmits() {
@@ -91,12 +91,16 @@ test('TC-12-21: naming students limits the reminder to them, and a student who a
   assert.deepEqual(sentEmails.map((e) => e.to), ['cy@example.edu']);
 });
 
-test('TC-12-22: a reminder for a student who never got an invitation issues them a working link', async () => {
+// CICD-67: a reminder never issues a link or gives more time; a student with no invitation needs a send.
+test('TC-12-22: a reminder for a student who never got an invitation sends nothing and says they were not invited', async () => {
   const res = await remind(ada, { student_ids: [String(IDS.ben)] });
   assert.equal(res.status, 200);
+  assert.equal(res.body.reminders_sent, 0);
+  assert.equal(res.body.not_invited, 1);
+  assert.equal(sentEmails.length, 0);
   const ben = await Student.findById(IDS.ben);
-  assert.match(ben.evaluation_token, /^[0-9a-f]{64}$/);
-  assert.ok(ben.evaluation_token_expires_at > new Date());
+  assert.equal(ben.evaluation_token, null);
+  assert.equal(ben.evaluation_token_expires_at, null);
 });
 
 test('TC-12-23: when everyone has submitted no reminder is sent', async () => {
