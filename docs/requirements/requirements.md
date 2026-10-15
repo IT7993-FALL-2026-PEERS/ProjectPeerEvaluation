@@ -314,6 +314,12 @@ runtime test. A wrong `FRONTEND_URL` produces links that look valid but do not w
 **when** the professor views the course,
 **then** each student's completion status is shown, and it updates once they submit.
 
+**Given** a student whose submitted mark is set but whose evaluations are gone (they were deleted with the
+people the student rated),
+**when** the professor views the status, sends evaluations or sends reminders (CICD-70),
+**then** all three treat the student as submitted, the status says there are no ratings on file, no reminder
+is sent to them, and the professor can allow a resubmission to collect their ratings again.
+
 *Evidence.* Completion state used by `controllers/evaluationController.js` to determine
 who still needs reminders.
 

@@ -33,20 +33,20 @@ export function describeInvitationResult(data, successText) {
   return { ...result, message: `${result.message} The link of ${stuck.join(', ')} could not be reset, so a new send will skip them until the deadline.` };
 }
 
-// A reminder only reaches students whose link still works; the others are named so the instructor
-// knows who needs an extension first.
+// A reminder only reaches students whose link still works. The alert says how many were reminded, and
+// names the next step for the others: Extend Deadline for students past their deadline, Send Evaluations for
+// students never invited (CICD-71; a reminder never creates or extends a link).
 export function describeReminderResult(data) {
+  const sent = data.reminders_sent || 0;
   const passed = data.deadline_passed || [];
   const extra = [
-    passed.length ? `Deadline passed (extend first): ${passed.join(', ')}.` : '',
-    data.not_invited ? `${data.not_invited} not invited yet.` : '',
+    passed.length ? `Deadline passed: ${passed.join(', ')}. Use Extend Deadline.` : '',
+    data.not_invited ? `${data.not_invited} not invited yet: use Send Evaluations.` : '',
   ].filter(Boolean).join(' ');
-  const result = describeEmailResult(
-    { sent: data.reminders_sent, total: data.total_reminded, failed: data.failed },
-    data.message
-  );
+  const base = sent > 0 ? `Reminders sent to ${sent} ${sent === 1 ? 'student' : 'students'}.` : data.message;
+  const result = describeEmailResult({ sent, total: data.total_reminded, failed: data.failed }, base);
   if (!extra) return result;
-  const severity = result.severity !== 'success' ? result.severity : (data.reminders_sent ? 'warning' : 'info');
+  const severity = result.severity !== 'success' ? result.severity : (sent ? 'warning' : 'info');
   return { severity, message: `${result.message} ${extra}` };
 }
 

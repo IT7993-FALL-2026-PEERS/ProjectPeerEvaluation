@@ -451,8 +451,16 @@ with a message saying so and `emails_sent: 0`. Partial failures still answer 200
   "evaluations_sent": true,
   "students": [{ "student_id": "S001", "name": "Alice", "email": "...", "team": "Team A",
                  "completed": true, "evaluation_token": "...", "last_activity": "...",
-                 "id": "<ObjectId>", "team_id": "<ObjectId or null>", "resubmission_allowed": false }] }
+                 "id": "<ObjectId>", "team_id": "<ObjectId or null>", "resubmission_allowed": false,
+                 "ratings_on_file": true }] }
 ```
+
+A student counts as submitted (`completed`) when their submitted mark is set or evaluations by them exist; send,
+reminders, extend and resubmit use the same rule (CICD-70). The mark survives the deletion of the evaluations a
+student wrote (which happens when the people they rated are deleted); only a reset clears it. `ratings_on_file`
+is `false` for a student who has the mark but no evaluations, and `last_activity` is then `null`. The counts are
+the enrolled students who submitted. For such a student **Allow resubmission** works, and the next submission
+fills in their ratings.
 
 ### `POST .../evaluations/remind`
 
@@ -461,7 +469,7 @@ hasn't submitted is considered. A reminder goes only to students whose link is s
 link, and never changes it or its deadline (CICD-67); the email shows the deadline in the zone of the send
 that invited the student. **200** `{ "message", "reminders_sent", "total_reminded", "failed": [...],
 "deadline_passed": ["<names>"], "not_invited": <count> }`: students whose deadline has passed need an
-extension first, and students never invited need a send. `reminders_sent: 0` when everyone is done.
+extension first, and students never invited need a send. A student marked as submitted is not reminded (CICD-70). `reminders_sent: 0` when everyone is done.
 
 ### `POST .../evaluations/extend`
 

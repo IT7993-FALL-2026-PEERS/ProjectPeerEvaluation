@@ -165,4 +165,17 @@ describe('EvaluationStatusDialog', () => {
     expect(screen.getByText('Resubmission allowed')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Allow Ann Archer to resubmit' })).not.toBeInTheDocument();
   });
+
+  // CICD-70: a student marked as submitted whose evaluations are gone says so, and can be given a resubmission.
+  test('a student marked submitted with no ratings on file says so and keeps the Allow resubmission button', async () => {
+    const onAllowResubmission = vi.fn();
+    const students = [
+      { id: 's1', student_id: '1001', name: 'Ann Archer', team: 'Alpha', completed: true, ratings_on_file: false, resubmission_allowed: false },
+      { id: 's2', student_id: '1002', name: 'Ben Baker', team: 'Alpha', completed: true, ratings_on_file: true, resubmission_allowed: false },
+    ];
+    render(<EvaluationStatusDialog {...statusProps({ onAllowResubmission, status: { evaluations_sent: true, completed_count: 2, total_count: 2, students } })} />);
+    expect(screen.getAllByText('Marked submitted, no ratings on file. Use Allow resubmission to send a new link.')).toHaveLength(1);
+    await user.click(screen.getByRole('button', { name: 'Allow Ann Archer to resubmit' }));
+    expect(onAllowResubmission).toHaveBeenCalledWith(students[0]);
+  });
 });

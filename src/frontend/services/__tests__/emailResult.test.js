@@ -73,7 +73,7 @@ describe('describeReminderResult', () => {
       message: 'Reminder emails sent successfully.', reminders_sent: 2, total_reminded: 2, failed: [], deadline_passed: ['Pat Lee', 'Nia Roe'], not_invited: 0,
     });
     expect(result.severity).toBe('warning');
-    expect(result.message).toBe('Reminder emails sent successfully. Deadline passed (extend first): Pat Lee, Nia Roe.');
+    expect(result.message).toBe('Reminders sent to 2 students. Deadline passed: Pat Lee, Nia Roe. Use Extend Deadline.');
   });
 
   test('counts students who were never invited', () => {
@@ -81,12 +81,29 @@ describe('describeReminderResult', () => {
       message: 'No reminders sent: no student with an unfinished evaluation has an active link.', reminders_sent: 0, total_reminded: 0, failed: [], deadline_passed: [], not_invited: 2,
     });
     expect(result.severity).toBe('info');
-    expect(result.message).toBe('No reminders sent: no student with an unfinished evaluation has an active link. 2 not invited yet.');
+    expect(result.message).toBe('No reminders sent: no student with an unfinished evaluation has an active link. 2 not invited yet: use Send Evaluations.');
   });
 
-  test('a plain successful reminder is unchanged', () => {
+  // CICD-71: found on staging, "Reminder emails sent successfully. 1 not invited yet." said neither how many
+  // reminders went out nor what to do about the student who was not invited.
+  test('says how many students were reminded, with 1 student in the singular', () => {
     expect(describeReminderResult({ message: 'Reminder emails sent successfully.', reminders_sent: 3, total_reminded: 3, failed: [] }))
-      .toEqual({ severity: 'success', message: 'Reminder emails sent successfully.' });
+      .toEqual({ severity: 'success', message: 'Reminders sent to 3 students.' });
+    expect(describeReminderResult({ message: 'Reminder emails sent successfully.', reminders_sent: 1, total_reminded: 1, failed: [] }))
+      .toEqual({ severity: 'success', message: 'Reminders sent to 1 student.' });
+  });
+
+  test('the screenshot case: some reminded and one student not invited says to use Send Evaluations', () => {
+    expect(describeReminderResult({ message: 'Reminder emails sent successfully.', reminders_sent: 2, total_reminded: 2, failed: [], deadline_passed: [], not_invited: 1 }))
+      .toEqual({ severity: 'warning', message: 'Reminders sent to 2 students. 1 not invited yet: use Send Evaluations.' });
+  });
+
+  test('a failed reminder is still named, and the next steps follow', () => {
+    const result = describeReminderResult({
+      message: 'Reminder emails sent successfully.', reminders_sent: 1, total_reminded: 2, failed: ['Bob Test (bob@example.com): refused'], deadline_passed: ['Pat Lee'], not_invited: 1,
+    });
+    expect(result.severity).toBe('warning');
+    expect(result.message).toBe('Sent 1 of 2 emails. Not sent to: Bob Test. Deadline passed: Pat Lee. Use Extend Deadline. 1 not invited yet: use Send Evaluations.');
   });
 });
 
