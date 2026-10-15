@@ -3,7 +3,7 @@
 **Owner:** Laeticia Neno Aloyem (M3) — Requirements, QA, security & documentation
 **Milestone:** 2 (5 Oct – 1 Nov 2026), review 26 Oct
 **Gantt task:** Dev Environment & Containerization — *"Write startup & environment documentation"*
-**Last updated:** 14 October 2026
+**Last updated:** 15 October 2026 (revised after M4's review on PR #216)
 
 ## What this page is for
 
@@ -47,19 +47,23 @@ safety net: `NODE_ENV=production` turns both cases into errors.
 
 ### Email
 
-Invitations and reminders need all five. Without them the app runs, but no student ever
-receives a link.
+None of these are strictly required — every one has a fallback, so the app starts and runs
+without them. What you lose is delivery: with the defaults, mail is attempted against
+`localhost` with placeholder credentials and no student ever receives a link.
 
-| Variable | What it does | Local | Staging |
-|---|---|---|---|
-| `SMTP_HOST` | Mail server hostname | `smtp.gmail.com`, or Mailtrap | Mailtrap sandbox only (`sync: false`) |
-| `SMTP_PORT` | Mail server port | `587` | `sync: false` |
-| `SMTP_USER` | Mail account username | your address | `sync: false` |
-| `SMTP_PASS` | Mail account password or app password | an app password, never your real one | `sync: false` |
-| `SMTP_FROM` | Address students see as the sender | your address | `sync: false` |
+| Variable | What it does | Default | Local | Staging |
+|---|---|---|---|---|
+| `SMTP_HOST` | Mail server hostname | `localhost` | `smtp.gmail.com`, or Mailtrap | Mailtrap sandbox only (`sync: false`) |
+| `SMTP_PORT` | Mail server port | `587` | `587` | `sync: false` |
+| `SMTP_USER` | Mail account username | `test@example.com` | your address | `sync: false` |
+| `SMTP_PASS` | Mail account password | `password` | an app password, never your real one | `sync: false` |
+| `SMTP_FROM` | Address students see as the sender | `noreply@peerevaluation.com` | your address | `sync: false` |
+| `SMTP_SERVICE` | A named provider (e.g. `gmail`) instead of host/port. **When set, `SMTP_HOST` and `SMTP_PORT` are ignored** | unset | optional | must stay unset — staging refuses it |
+| `SMTP_SECURE` | Forces TLS | `true` when `SMTP_PORT` is `465`, otherwise `false` | leave unset | leave unset |
 
-**Staging refuses any transport but the Mailtrap sandbox** (CICD-44). That is deliberate:
-staging must never be able to email a real student.
+**Staging refuses any transport but the Mailtrap sandbox** (CICD-44), and that includes
+`SMTP_SERVICE` — setting it on staging blocks the send outright, by design, so staging can
+never email a real student.
 
 ### Frontend and API addresses
 
@@ -70,8 +74,11 @@ staging must never be able to email a real student.
 | `REACT_APP_API_URL` *(Render)* | Same idea for the staging frontend | As above | n/a | `https://peers-backend-staging.onrender.com/api` |
 
 A wrong `FRONTEND_URL` is the single most common cause of "it deployed but nothing works":
-the emailed links and the CORS allow-list both come from it. Since CICD-37, CORS allows only
-this origin — no wildcard.
+the emailed links and the CORS allow-list both come from it. Since CICD-37 there is no
+wildcard — CORS allows this origin only. **Outside production** `http://localhost:3000` and
+`http://127.0.0.1:3000` are allowed as well, so `npm run dev` and the E2E tests work without
+anyone setting `FRONTEND_URL` first; under `NODE_ENV=production` those are dropped and only
+`FRONTEND_URL` remains.
 
 ### Optional, with defaults
 
@@ -120,12 +127,20 @@ cd ProjectPeerEvaluation
 npm run setup      # checks Node, creates both .env files with a random JWT_SECRET, installs
 ```
 
-**You also need MongoDB running** — `npm run dev` does not start one, and this step is easy
-to miss because the setup script does not mention it. Either install MongoDB locally, or:
+**You also need MongoDB running** — `npm run dev` does not start one. The README lists it
+under Prerequisites and `npm run setup` prints the command when it finishes. Either install
+MongoDB locally, or:
 
 ```
-docker run -d --name peers-dev-mongo -p 27017:27017 mongo:8
+docker run -d --name peers-dev-mongo -p 27017:27017 mongo:7
 ```
+
+After the first time, `docker start peers-dev-mongo`.
+
+Note the version: the README and `scripts/setup.js` both say `mongo:7`, while
+`docker-compose.yml` runs `mongo:8` and staging is on Atlas. Nothing breaks — the app does
+not depend on the difference — but it means a developer's local database and the Compose one
+are different major versions. Worth settling on one (see section 5).
 
 Then:
 
@@ -172,21 +187,24 @@ off. See [cd-pipeline.md](cd-pipeline.md) and
 
 ## 5. Known friction
 
-Recorded here rather than fixed silently, because each one is a decision for someone.
-
-**MongoDB is not in the setup path.** `npm run setup` prepares everything except a database.
-A new developer follows the README, runs `npm run dev`, and gets a connection error. Aaron's
-[dev-environment review](dev-environment-review.md) hit exactly this on a clean clone.
-Either the README's step 3 should include starting MongoDB, or `npm run setup` should offer
-to start the Compose `mongo` service.
-
-**Copying `.env.example` over an existing `.env` loses your settings.** The README's
-configure step says to copy the example file, which silently overwrites whatever you had.
-`npm run setup` is the safer path and should be the documented one.
+Recorded here rather than fixed silently, because each is a decision for someone.
 
 **Three `.env` files is genuinely confusing.** It is correct — `npm run dev` and Compose
-need different values for the same name — but it needs saying out loud, which is why it is
+need different values for the same names — but it needs saying out loud, which is why it is
 section 1 of this page.
+
+**MongoDB is two different major versions depending on how you start it.** The README's
+Prerequisites and `scripts/setup.js` both suggest `mongo:7`; `docker-compose.yml` runs
+`mongo:8`; staging is on Atlas. So a developer running `npm run dev` tests against 7 and the
+Compose smoke test runs against 8. Nothing currently depends on the difference, but it is an
+inconsistency waiting to produce a "works on my machine" report. Worth picking one.
+
+**Resolved since the first draft of this page**, and recorded so the history is clear:
+MongoDB now appears in the README's Prerequisites with a "Start MongoDB" step, `npm run setup`
+prints how to start it when it finishes, and README step 3 no longer tells you to copy
+`.env.example` over an existing `.env` — it says setup has already done it, only if the file
+was missing. The earlier versions of this page listed all three as open problems; they are
+not.
 
 ## Related
 
