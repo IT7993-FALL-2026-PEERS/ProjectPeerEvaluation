@@ -203,12 +203,15 @@ affect each other.
 `csv-parser` dependencies; format documented in `docs/csv-upload-format.md`.
 
 ### FR-07 — Roster validation and duplicate handling
-*Inherited: FR2.3* · **Status: Partial** · **Backlog: CICD-47**
+*Inherited: FR2.3* · **Status: Validated** · **Backlog: CICD-47 (done)**
 
 *Revised 7 Oct — previously Validated. The duplicate check and the required-field check are
 implemented and tested (TC-06-22, TC-06-24, TC-06-32, TC-06-33, TC-07-01). The second criterion
 below, an invalid email address reported as an error, is not: no code checks the format of the
 email, so a row with a bad address is accepted. CICD-47 adds the check and its test.*
+
+*Validated again 12 Oct — CICD-47 merged: a badly formed email is reported and the row is not saved, in
+the roster upload and when a student is added or edited (TC-07-04..10).*
 
 **Required functionality.** Uploaded roster data is validated, and students already on the
 course are not added twice.
