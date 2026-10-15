@@ -106,15 +106,17 @@ describe('StudentEvaluation', () => {
     expect(await screen.findByText('Failed to load evaluation form')).toBeInTheDocument();
   });
 
-  test('a link that was already used shows the completed page, and Return to Home goes home', async () => {
+  // A student has no home page in PEERS: "/" is the professor login, so the completed page offers no way
+  // there and says the window can be closed (found on staging, 14 Oct).
+  test('a link that was already used shows the completed page, which says it can be closed and leads nowhere else', async () => {
     api.get.mockResolvedValue({ data: { completed: true, submitted_at: '2026-10-01T15:00:00Z' } });
     renderForm();
     expect(await screen.findByRole('heading', { name: 'Evaluation Completed!' })).toBeInTheDocument();
     expect(screen.getByText(/Submitted:/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /submit evaluation/i })).not.toBeInTheDocument();
-
-    await user.click(screen.getByRole('button', { name: 'Return to Home' }));
-    expect(await screen.findByRole('heading', { name: 'Home page' })).toBeInTheDocument();
+    expect(screen.getByText('You can close this window now.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /return to home/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
   });
 
   test('counts the feedback characters as the student types', async () => {

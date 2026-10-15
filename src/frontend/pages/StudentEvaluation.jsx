@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import SchoolIcon from '@mui/icons-material/School';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import {
   Container,
   Paper,
@@ -29,7 +29,6 @@ import { formatDeadlineLocal } from '../services/deadline';
 
 function StudentEvaluation() {
   const { token } = useParams();
-  const navigate = useNavigate();
   
   // State
   const [loading, setLoading] = useState(true);
@@ -189,11 +188,10 @@ function StudentEvaluation() {
               Submitted: {new Date(evaluationData.submitted_at).toLocaleString()}
             </Typography>
           )}
-          <Box sx={{ mt: 3 }}>
-            <Button variant="outlined" onClick={() => navigate('/')}>
-              Return to Home
-            </Button>
-          </Box>
+          {/* A student has no home page here ("/" is the professor login), so nothing links away */}
+          <Typography variant="body1" sx={{ mt: 3 }}>
+            You can close this window now.
+          </Typography>
         </Paper>
       </Container>
     );
