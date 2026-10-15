@@ -214,7 +214,8 @@ export default function useEvaluations({ setAlert }) {
     sendingEvaluations,
     extendDialog: {
       open: extendOpen,
-      students: statusRows.filter((row) => !row.completed && row.id).map((row) => ({ id: row.id, name: row.name })),
+      // A student with nobody to rate is left out: an extension would skip them (CICD-72)
+      students: statusRows.filter((row) => !row.completed && !row.nobody_to_rate && row.id).map((row) => ({ id: row.id, name: row.name })),
       teams: Object.values(statusRows.reduce((found, row) => {
         if (row.team_id) found[row.team_id] = { id: row.team_id, name: row.team };
         return found;

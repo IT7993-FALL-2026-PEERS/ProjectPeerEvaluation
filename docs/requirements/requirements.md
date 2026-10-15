@@ -286,6 +286,12 @@ set by the instructor."
 **then** each student who has no working link and has not submitted gets a link that works until that
 deadline, and students who already have a working link or have submitted are not emailed again.
 
+**Given** a student who is the only member of their team (CICD-72),
+**when** the instructor sends evaluations or reminders, extends a deadline or allows a resubmission,
+**then** nobody is emailed for that student (they have nobody to rate, so the form would be empty and a submission
+could never be accepted), the instructor is told who was skipped, the student's own page says there is nobody to
+rate yet, and a submission is refused with that reason. The sponsor has not set a minimum team size (open question).
+
 **Given** a student's link,
 **when** its deadline has passed,
 **then** the form, the status check and the submission all refuse it ("The deadline for this evaluation
@@ -322,6 +328,11 @@ people the student rated),
 **when** the professor views the status, sends evaluations or sends reminders (CICD-70),
 **then** all three treat the student as submitted, the status says there are no ratings on file, no reminder
 is sent to them, and the professor can allow a resubmission to collect their ratings again.
+
+**Given** a student who has not submitted and has nobody to rate (alone on their team),
+**when** the professor views the status (CICD-72),
+**then** the student is listed with "No teammates to rate" and is left out of the counts, so the course can reach
+100% when everyone who can submit has.
 
 *Evidence.* Completion state used by `controllers/evaluationController.js` to determine
 who still needs reminders.

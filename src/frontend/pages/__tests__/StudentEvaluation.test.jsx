@@ -217,6 +217,13 @@ describe('StudentEvaluation: the deadline', () => {
     expect(screen.queryByText(/Due:/)).not.toBeInTheDocument();
   });
 
+  test('a student with nobody to rate is told so and has no form and no Submit button', async () => {
+    api.get.mockResolvedValue({ data: { ...FORM, teammates: [] } });
+    renderForm();
+    expect(await screen.findByText('You have no teammates to rate yet. Ask your instructor to check your team.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /submit evaluation/i })).not.toBeInTheDocument();
+  });
+
   test('a link past its deadline shows the server\'s message', async () => {
     api.get.mockRejectedValue({ response: { status: 410, data: { error: { code: 'EVALUATION_LINK_EXPIRED', message: 'The deadline for this evaluation has passed. Ask your instructor for an extension.' } } } });
     renderForm();

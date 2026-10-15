@@ -50,6 +50,12 @@ function linkHolder(expiresAt) {
   };
 }
 
+// A classmate who has already submitted. Alone in a course of one, a student has nobody to rate and is not
+// invited (CICD-72); this keeps the student under test from being that, without becoming a recipient.
+function classmate() {
+  return { ...linkHolder(null), _id: new mongoose.Types.ObjectId(), name: 'Sam', email: 'sam@example.com', evaluation_completed: true };
+}
+
 async function call(handler, req) {
   let error;
   let body;
@@ -147,7 +153,7 @@ test('a claim that another send won first sends nothing to that student', async 
   t.mock.method(Course, 'findById', async () => ({ _id: 'course-1', course_name: 'Capstone' }));
   t.mock.method(Course, 'findByIdAndUpdate', async () => {});
   t.mock.method(Evaluation, 'distinct', async () => []);
-  t.mock.method(Student, 'find', () => ({ populate: async () => [{ ...linkHolder(null), evaluation_token: null }] }));
+  t.mock.method(Student, 'find', () => ({ populate: async () => [{ ...linkHolder(null), evaluation_token: null }, classmate()] }));
   t.mock.method(Student, 'findOneAndUpdate', async () => null);
   t.mock.method(console, 'log', () => {});
 
@@ -165,7 +171,7 @@ test('sending to one team issues links the same way', async (t) => {
   t.mock.method(Course, 'findByIdAndUpdate', async () => {});
   t.mock.method(Team, 'findById', async () => ({ _id: 'team-1', course_id: 'course-1' }));
   t.mock.method(Evaluation, 'distinct', async () => []);
-  t.mock.method(Student, 'find', async () => [{ ...linkHolder(null), evaluation_token: null }]);
+  t.mock.method(Student, 'find', async () => [{ ...linkHolder(null), evaluation_token: null }, classmate()]);
   t.mock.method(Student, 'findOneAndUpdate', async (filter, update) => { claims.push(update); return { _id: filter._id }; });
   t.mock.method(console, 'log', () => {});
 
@@ -217,7 +223,7 @@ test('when nobody has an active link a reminder says so and sends nothing', asyn
   reminded.length = 0;
   t.mock.method(Course, 'findById', async () => ({ _id: 'course-1', course_name: 'Capstone' }));
   t.mock.method(Evaluation, 'find', () => ({ distinct: async () => [] }));
-  t.mock.method(Student, 'find', async () => [{ ...linkHolder(new Date(Date.now() - DAY_MS)), name: 'Pat' }]);
+  t.mock.method(Student, 'find', async () => [{ ...linkHolder(new Date(Date.now() - DAY_MS)), name: 'Pat' }, classmate()]);
   const { body } = await call(remindEvaluations, { params: { course_id: 'course-1' }, body: {} });
   assert.equal(body.reminders_sent, 0);
   assert.deepEqual(body.deadline_passed, ['Pat']);
@@ -235,7 +241,7 @@ test('when an email fails and giving its link back fails too, the answer says th
   t.mock.method(Course, 'findById', async () => ({ _id: 'course-1', course_name: 'Capstone' }));
   t.mock.method(Course, 'findByIdAndUpdate', async () => {});
   t.mock.method(Evaluation, 'distinct', async () => []);
-  t.mock.method(Student, 'find', () => ({ populate: async () => [{ ...linkHolder(null), evaluation_token: null }] }));
+  t.mock.method(Student, 'find', () => ({ populate: async () => [{ ...linkHolder(null), evaluation_token: null }, classmate()] }));
   t.mock.method(Student, 'findOneAndUpdate', async (filter) => ({ _id: filter._id }));
   t.mock.method(Student, 'updateOne', async (filter) => { releases.push(filter); throw new Error('db down'); });
   t.mock.method(console, 'log', () => {});
@@ -277,7 +283,7 @@ test('a claim that errors after it may have been saved is given back with the sa
   t.mock.method(Course, 'findById', async () => ({ _id: 'course-1', course_name: 'Capstone' }));
   t.mock.method(Course, 'findByIdAndUpdate', async () => {});
   t.mock.method(Evaluation, 'distinct', async () => []);
-  t.mock.method(Student, 'find', () => ({ populate: async () => [{ ...linkHolder(null), evaluation_token: null }] }));
+  t.mock.method(Student, 'find', () => ({ populate: async () => [{ ...linkHolder(null), evaluation_token: null }, classmate()] }));
   t.mock.method(Student, 'findOneAndUpdate', async (filter, update) => { claimed.push(update.evaluation_token); throw new Error('no acknowledgement'); });
   t.mock.method(Student, 'updateOne', async (filter) => { released.push(filter.evaluation_token); });
   t.mock.method(console, 'log', () => {});

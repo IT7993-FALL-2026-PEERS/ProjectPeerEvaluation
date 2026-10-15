@@ -40,6 +40,12 @@ function EvaluationStatusDialog({
                 <Typography variant="body1" sx={{ mb: 2 }}>
                   Send evaluations to students to begin tracking completion status.
                 </Typography>
+                {/* CICD-72: students alone on their team are never invited, so say so before the professor sends */}
+                {(status.no_teammates || []).length > 0 && (
+                  <Typography variant="body2" sx={{ mb: 2 }}>
+                    Alone on their team, so a send will not invite them: {status.no_teammates.join(', ')}.
+                  </Typography>
+                )}
                 <Button
                   variant="contained"
                   color="primary"
@@ -83,8 +89,10 @@ function EvaluationStatusDialog({
                 {/* Team-based view */}
                 <Grid container spacing={2}>
                   {groupStudentsByTeam(status.students).map(([teamName, teamStudents]) => {
-                    const completedCount = teamStudents.filter(s => s.completed).length;
-                    const totalCount = teamStudents.length;
+                    // CICD-72: a student with nobody to rate cannot submit, so the team's count leaves them out
+                    const countedStudents = teamStudents.filter(s => !s.nobody_to_rate);
+                    const completedCount = countedStudents.filter(s => s.completed).length;
+                    const totalCount = countedStudents.length;
                     const completionRate = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
 
                     return (
@@ -96,11 +104,13 @@ function EvaluationStatusDialog({
                                 <GroupIcon sx={{ mr: 1 }} />
                                 {teamName}
                               </Typography>
-                              <Chip
-                                label={`${completedCount}/${totalCount}`}
-                                color={completionRate === 100 ? 'success' : completionRate > 50 ? 'warning' : 'error'}
-                                size="small"
-                              />
+                              {totalCount > 0 && (
+                                <Chip
+                                  label={`${completedCount}/${totalCount}`}
+                                  color={completionRate === 100 ? 'success' : completionRate > 50 ? 'warning' : 'error'}
+                                  size="small"
+                                />
+                              )}
                             </Box>
 
                             <LinearProgress
@@ -135,14 +145,20 @@ function EvaluationStatusDialog({
                                   </Box>
                                   <Box sx={{ textAlign: 'right' }}>
                                     <Chip
-                                      label={student.completed ? 'Done' : 'Pending'}
-                                      color={student.completed ? 'success' : 'warning'}
+                                      label={student.nobody_to_rate ? 'No teammates' : student.completed ? 'Done' : 'Pending'}
+                                      color={student.nobody_to_rate ? 'default' : student.completed ? 'success' : 'warning'}
                                       size="small"
                                       sx={{ mb: 0.5 }}
                                     />
                                     <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
                                       {student.last_activity ? new Date(student.last_activity).toLocaleDateString() : 'Never'}
                                     </Typography>
+                                    {/* CICD-72: nobody to rate (alone on their team): say why there is no submission */}
+                                    {student.nobody_to_rate && (
+                                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                                        No teammates to rate. Add a teammate to their team, then send again.
+                                      </Typography>
+                                    )}
                                     {/* CICD-68: a student who has submitted can be allowed one more submission */}
                                     {/* CICD-70: marked as submitted but the evaluations are gone (they were deleted with the people they rated) */}
                                     {student.completed && student.ratings_on_file === false && (

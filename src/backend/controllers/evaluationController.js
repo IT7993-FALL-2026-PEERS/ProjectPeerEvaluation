@@ -11,6 +11,7 @@ const { parseDeadline } = require('../utils/evaluationDeadline');
 const evaluationStore = require('../utils/saveEvaluations');
 const { rotateLink } = require('../utils/linkRotation');
 const { loadSubmitters, hasSubmitted } = require('../utils/submitted');
+const { countPeers, hasNobodyToRate } = require('../utils/peers');
 
 // The students an evaluator rates: the rest of their team, or the rest of the
 // course when they have no team. The form and the submission both use this, so
@@ -55,17 +56,22 @@ function linkExpiredError() {
 
 // Who a send reaches (CICD-67): students with no active link who have not submitted. A student with an
 // active link keeps it, and its deadline, untouched; giving more time is a separate, deliberate action.
+// A student with nobody to rate (alone on their team, CICD-72) is not invited: the form would be empty and
+// could never be submitted. `students` is the whole course, or one whole team.
 async function planInvitations(students, courseId, now = new Date()) {
   const submitters = await loadSubmitters(courseId);
+  const peers = countPeers(students);
   const recipients = [];
+  const noTeammates = [];
   let alreadyInvited = 0;
   let alreadySubmitted = 0;
   for (const student of students) {
     if (hasSubmitted(student, submitters)) alreadySubmitted += 1;
+    else if (hasNobodyToRate(student, peers)) noTeammates.push(student.name);
     else if (isLinkActive(student, now)) alreadyInvited += 1;
     else recipients.push(student);
   }
-  return { recipients, alreadyInvited, alreadySubmitted };
+  return { recipients, alreadyInvited, alreadySubmitted, noTeammates };
 }
 
 // A link is claimed first with one conditional update that needs the student to have no active link, so two
@@ -156,11 +162,14 @@ function sendAnswer(message, plan, result, deadline) {
     failed: result.failed,
     deadline: deadline.toISOString(),
     already_invited: plan.alreadyInvited + result.lostRace,
-    already_submitted: plan.alreadySubmitted
+    already_submitted: plan.alreadySubmitted,
+    no_teammates: plan.noTeammates
   };
 }
 
 const NOBODY_MESSAGE = 'Nobody needs an invitation: every student already has an active link or has submitted.';
+const NO_ONE_TO_INVITE_MESSAGE = 'Nobody was invited: the students left have nobody to rate.';
+const nobodyMessage = (plan) => (plan.noTeammates.length ? NO_ONE_TO_INVITE_MESSAGE : NOBODY_MESSAGE);
 
 function notFound(message) {
   const err = new Error(message);
@@ -195,7 +204,7 @@ exports.sendTeamEvaluations = async (req, res, next) => {
     const result = await deliverInvitations(course, plan.recipients, deadline, zone);
     await rememberDeadline(course, result, deadline, zone);
     res.status(200).json(sendAnswer(
-      plan.recipients.length === 0 ? NOBODY_MESSAGE : 'Evaluation invitations sent to team successfully.',
+      plan.recipients.length === 0 ? nobodyMessage(plan) : 'Evaluation invitations sent to team successfully.',
       plan, result, deadline
     ));
   } catch (err) {
@@ -225,7 +234,7 @@ exports.sendEvaluations = async (req, res, next) => {
     const result = await deliverInvitations(course, plan.recipients, deadline, zone);
     await rememberDeadline(course, result, deadline, zone);
     res.status(200).json(sendAnswer(
-      plan.recipients.length === 0 ? NOBODY_MESSAGE : 'Evaluation invitations sent successfully.',
+      plan.recipients.length === 0 ? nobodyMessage(plan) : 'Evaluation invitations sent successfully.',
       plan, result, deadline
     ));
   } catch (err) {
@@ -275,10 +284,13 @@ exports.extendEvaluations = async (req, res, next) => {
     const students = await studentsInScope(course_id, req.body);
 
     const submitters = await loadSubmitters(course_id);
-    const skipped = { submitted: 0, not_invited: 0, changed: 0 };
+    // CICD-72: counted over the whole course, whatever the scope (one student alone in a list looks alone)
+    const peers = countPeers(await Student.find({ course_id }));
+    const skipped = { submitted: 0, not_invited: 0, changed: 0, no_teammates: 0 };
     const recipients = [];
     for (const student of students) {
       if (hasSubmitted(student, submitters)) skipped.submitted += 1;
+      else if (hasNobodyToRate(student, peers)) skipped.no_teammates += 1;
       else if (!student.evaluation_token) skipped.not_invited += 1;
       else recipients.push(student);
     }
@@ -343,6 +355,13 @@ exports.allowResubmission = async (req, res, next) => {
       err.status = 409;
       return next(err);
     }
+    // CICD-72: a new link would open a form with nobody to rate
+    if (hasNobodyToRate(student, countPeers(await Student.find({ course_id })))) {
+      const err = new Error('This student has no teammates to rate, so a new link would be of no use. Add a teammate to their team first.');
+      err.code = 'NO_TEAMMATES';
+      err.status = 409;
+      return next(err);
+    }
     const token = generateEvaluationToken();
     const result = await sendEvaluationInvitation(
       student, course, token, process.env.FRONTEND_URL || 'http://localhost:3000', deadline, zone, { intro: RESUBMIT_INTRO }
@@ -404,18 +423,24 @@ exports.evaluationStatus = async (req, res, next) => {
     
     // If students don't have tokens, evaluations haven't been sent
     if (!hasStudentsWithTokens) {
+      // CICD-72: say who a send cannot invite (alone on their team), so an all-skipped course is not a mystery
+      const notSentPeers = countPeers(students);
       return res.status(200).json({
         total_count: 0,
         completed_count: 0,
         pending_count: 0,
         completion_rate: 0,
         evaluations_sent: false,
+        no_teammates: students.filter((student) => hasNobodyToRate(student, notSentPeers)).map((student) => student.name),
         students: []
       });
     }
 
     // Who has submitted: the same rule as send and reminders (CICD-70), and the counts come from the rows, so
     // an evaluator who is no longer in the course cannot push the count above the number of students
+
+    // A student alone on their team has nobody to rate (CICD-72): listed, but not counted as pending
+    const peers = countPeers(students);
 
     // Get detailed student status
     const studentStatus = await Promise.all(students.map(async (student) => {
@@ -444,19 +469,24 @@ exports.evaluationStatus = async (req, res, next) => {
         id: student._id.toString(),
         team_id: student.team_id ? String(student.team_id._id || student.team_id) : null,
         resubmission_allowed: Boolean(student.resubmission_allowed),
+        // CICD-72: true only for a student who has not submitted and has nobody to rate
+        nobody_to_rate: !hasCompleted && hasNobodyToRate(student, peers),
         evaluation_token: student.evaluation_token,
         last_activity: lastActivity              // Show actual submission date
       };
     }));
 
-    const completed = studentStatus.filter((row) => row.completed).length;
-    const pending = total - completed;
+    // The counts are over the students who can submit, so the course can reach 100%
+    const counted = studentStatus.filter((row) => !row.nobody_to_rate);
+    const countedTotal = counted.length;
+    const completed = counted.filter((row) => row.completed).length;
+    const pending = countedTotal - completed;
 
     res.status(200).json({
-      total_count: total,              // Match frontend expectation
+      total_count: countedTotal,       // Match frontend expectation
       completed_count: completed,      // Match frontend expectation
       pending_count: pending,
-      completion_rate: total > 0 ? Math.round((completed / total) * 100) : 0,
+      completion_rate: countedTotal > 0 ? Math.round((completed / countedTotal) * 100) : 0,
       evaluations_sent: true,         // Evaluations have been sent
       students: studentStatus
     });
@@ -509,10 +539,19 @@ exports.remindEvaluations = async (req, res, next) => {
     const submitters = new Set(completedEvaluations.map(String));
     studentsToRemind = studentsToRemind.filter((student) => !hasSubmitted(student, submitters));
 
+    // A student with nobody to rate (alone on their team, CICD-72) cannot submit, so a reminder cannot help;
+    // they are named instead, and are not counted as "not invited" (Send cannot invite them either).
+    const peers = countPeers(await Student.find({ course_id }));
+    const noTeammates = studentsToRemind.filter((student) => hasNobodyToRate(student, peers)).map((student) => student.name);
+    studentsToRemind = studentsToRemind.filter((student) => !hasNobodyToRate(student, peers));
+
     if (studentsToRemind.length === 0) {
       return res.status(200).json({
-        message: 'No students need reminders - all evaluations completed.',
-        reminders_sent: 0
+        message: noTeammates.length
+          ? 'No reminders sent: nobody with an unfinished evaluation can be reminded.'
+          : 'No students need reminders - all evaluations completed.',
+        reminders_sent: 0,
+        no_teammates: noTeammates
       });
     }
 
@@ -533,7 +572,8 @@ exports.remindEvaluations = async (req, res, next) => {
         total_reminded: 0,
         failed: [],
         deadline_passed: deadlinePassed,
-        not_invited: notInvited
+        not_invited: notInvited,
+        no_teammates: noTeammates
       });
     }
 
@@ -579,7 +619,8 @@ exports.remindEvaluations = async (req, res, next) => {
       total_reminded: active.length,
       failed: failedReminders,
       deadline_passed: deadlinePassed,
-      not_invited: notInvited
+      not_invited: notInvited,
+      no_teammates: noTeammates
     });
 
   } catch (err) {
@@ -688,6 +729,14 @@ exports.submitEvaluation = async (req, res, next) => {
     if (existingEvaluation && !student.resubmission_allowed) {
       const err = new Error('Evaluation already completed.');
       err.code = 'ALREADY_COMPLETED';
+      err.status = 409;
+      return next(err);
+    }
+
+    // CICD-72: nobody to rate (alone on a team): the form was empty, so say so instead of "array is required"
+    if ((await findTeammates(student)).length === 0) {
+      const err = new Error('You have no teammates to rate yet. Ask your instructor to check your team.');
+      err.code = 'NO_TEAMMATES';
       err.status = 409;
       return next(err);
     }
