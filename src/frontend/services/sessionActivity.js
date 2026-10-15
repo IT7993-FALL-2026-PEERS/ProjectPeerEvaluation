@@ -12,7 +12,7 @@ export const ACTIVITY_EVENTS = ['click', 'keydown', 'scroll', 'touchstart'];
 export const KEEPALIVE_AFTER_SECONDS = 5 * 60;
 
 // With this much time left and no activity, the professor is asked whether to stay logged in.
-export const WARN_BEFORE_SECONDS = 2 * 60;
+export const WARN_BEFORE_SECONDS = 5 * 60;
 
 // The token's dates come from the server's clock; the browser's can be minutes off. Every authenticated
 // answer carries the server's time (X-Server-Time), and the difference is remembered here so the time left
@@ -59,6 +59,12 @@ function readClaims(token) {
   } catch {
     return null;
   }
+}
+
+// The professor id the login token was issued for, or null when there is no readable login.
+export function getTokenProfessorId(token = readSessionToken()) {
+  const claims = token ? readClaims(token) : null;
+  return claims && claims.id !== undefined ? String(claims.id) : null;
 }
 
 // { issuedAt, expiresAt } in milliseconds, or null when there is no login or the token is unreadable.

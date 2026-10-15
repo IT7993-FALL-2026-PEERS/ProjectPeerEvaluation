@@ -20,7 +20,7 @@ const clock = (seconds) => `${Math.floor(seconds / 60)}:${String(seconds % 60).p
 
 // FR-04: a professor's session ends after a period of inactivity. While the professor clicks, types,
 // scrolls or touches the page, this asks the server to extend the login (at most every 5 minutes; the
-// request layer stores the renewed token). With 2 minutes left and no activity it asks whether to stay
+// request layer stores the renewed token). With 5 minutes left and no activity it asks whether to stay
 // logged in, and when the time is up it says so through the same banner a rejected request uses.
 // Does nothing for a visitor with no login (the login page, a student's evaluation link).
 function SessionTimeoutWarning() {

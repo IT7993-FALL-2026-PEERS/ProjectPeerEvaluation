@@ -4,6 +4,7 @@ import {
   WARN_BEFORE_SECONDS,
   MAX_CLOCK_SAMPLE_MS,
   clockNow,
+  getTokenProfessorId,
   getTokenTimes,
   learnServerTime,
   resetServerClock,
@@ -117,13 +118,23 @@ describe('sessionActivity: what counts as activity', () => {
     expect(ACTIVITY_EVENTS).not.toContain('mousemove');
   });
 
-  test('the keep-alive is sent at most every 5 minutes, and the warning shows 2 minutes before the end', () => {
+  test('the keep-alive is sent at most every 5 minutes, and the warning shows 5 minutes before the end', () => {
     expect(KEEPALIVE_AFTER_SECONDS).toBe(5 * 60);
-    expect(WARN_BEFORE_SECONDS).toBe(2 * 60);
+    expect(WARN_BEFORE_SECONDS).toBe(5 * 60);
   });
 });
 
 describe('sessionActivity: reading the login token', () => {
+  test('reads the professor id the login was issued for, and null when there is none to read', () => {
+    expect(getTokenProfessorId()).toBeNull();
+    localStorage.setItem('peer_eval_token', fakeToken({ id: 'p1', iat: seconds(NOW), exp: seconds(NOW) + 3600 }));
+    expect(getTokenProfessorId()).toBe('p1');
+    localStorage.setItem('peer_eval_token', fakeToken({ iat: seconds(NOW), exp: seconds(NOW) + 3600 }));
+    expect(getTokenProfessorId()).toBeNull();
+    localStorage.setItem('peer_eval_token', 'not-a-token');
+    expect(getTokenProfessorId()).toBeNull();
+  });
+
   test('no login means no times', () => {
     expect(getTokenTimes()).toBeNull();
     expect(secondsLeft(NOW)).toBeNull();

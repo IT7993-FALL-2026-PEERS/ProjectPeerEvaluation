@@ -38,12 +38,15 @@ is answered with a fresh token in the `X-Access-Token` response header (exposed 
 which the frontend stores, so a professor who keeps working stays logged in. Every authenticated answer also carries the server's time in `X-Server-Time` (milliseconds, also exposed through CORS), because the browser works out how long the login has left from the token's dates and its own clock can be minutes off. The browser places the stamp halfway through the request's round trip and ignores a sample whose round trip took longer than 5 seconds, because the server stamps the time when the request arrives, not when the answer does. A session is
 capped at 8 hours since login (`SESSION_MAX_HOURS`). The browser counts clicks, key presses,
 scrolling and touch as activity (not mouse movement) and, at most every 5 minutes, calls
-`POST /auth/refresh` so the login is extended even when the page makes no other request; with 2
+`POST /auth/refresh` so the login is extended even when the page makes no other request; with 5
 minutes left and no activity it asks "Stay logged in?" (it reads the expiry from the token; the
 server still decides whether the token is valid). The inherited requirement says 30 minutes (D-18, the
 sponsor still has to confirm). When a logged-in request gets a 401 (not a login or password-reset call),
-the app shows "Session timed out. Please log-in again!" with a Log in button that clears the
-stored login and opens the login page. Student endpoints under `/evaluate` use no login: the evaluation token in
+the app shows "Session timed out. Log in again to keep your work." with a Log in button. The page behind it is left
+as it was; Log in asks for the password of the professor who was logged in and, on success, stores the new token
+where the old one was (the same `POST /auth/login`; no new endpoint), so open forms keep what was typed (with a form open the dialog opens by itself above it; an attempt that is
+given up or whose stored login changed meanwhile stores nothing). "Use the
+login page" clears the stored login and opens the login page. Student endpoints under `/evaluate` use no login: the evaluation token in
 the URL is the only credential. It is 32 random bytes (64 hex characters) and expires at the
 **evaluation deadline** the instructor chose when sending (CICD-67); after it every student endpoint
 answers **410** `EVALUATION_LINK_EXPIRED`. The request log redacts it.
