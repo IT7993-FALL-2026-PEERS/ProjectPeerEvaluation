@@ -203,10 +203,26 @@ function registerAtomicSubmissionTests({ standalone }) {
     return tokenOf(IDS.ann);
   }
 
-  test(`TC-16-64 (${kind}): two resubmissions at the same moment save once; the other is refused and the approval is used up`, async () => {
+  test(`TC-16-64 (${kind}): two resubmissions at the same moment save once; the other is refused and the approval is used up`, async (t) => {
     const second = await approvedResubmission();
+    // Both submissions are held where they use the approval until both have got that far, so they really
+    // overlap; otherwise the second could start after the first finished and be refused for another reason.
+    const updateOne = Student.updateOne;
+    const atApproval = [];
+    t.mock.method(Student, 'updateOne', async function (filter, ...rest) {
+      if (filter && filter.resubmission_allowed === true && atApproval.length < 2) {
+        await new Promise((resolve) => {
+          atApproval.push(resolve);
+          if (atApproval.length === 2) atApproval.forEach((release) => release());
+          setTimeout(resolve, 5000);
+        });
+      }
+      return updateOne.call(this, filter, ...rest);
+    });
     const [a, b] = await Promise.all(['Version A of the second try.', 'Version B of the second try.'].map((feedback) =>
       app.request('POST', `/api/evaluate/${second}`, { body: { evaluations: [{ ...rating(IDS.ben), overall_feedback: feedback }] } })));
+    t.mock.restoreAll();
+    assert.equal(atApproval.length, 2, 'both submissions reached the approval together');
     assert.deepEqual([a.status, b.status].sort(), [201, 409]);
     assert.equal(await Evaluation.countDocuments({ evaluator_id: IDS.ann }), 1);
     assert.equal((await Student.findById(IDS.ann)).resubmission_allowed, false);
