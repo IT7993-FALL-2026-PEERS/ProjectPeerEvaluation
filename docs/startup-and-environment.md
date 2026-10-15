@@ -87,7 +87,6 @@ All of these work unset. The default is what the code uses.
 | Variable | Default | What it does | When to change it |
 |---|---|---|---|
 | `EMAIL_SEND_INTERVAL_MS` | `0` | Pause between emails in a batch | Mailtrap's free sandbox allows one email per 10 seconds — staging uses `11000` |
-| `EVALUATION_TOKEN_TTL_DAYS` | `14` | How long a student's link works after the latest invitation or reminder | Shorten for a tight evaluation window |
 | `SESSION_IDLE_MINUTES` | `60` | Professor session ends after this long with no request; activity renews it | Sponsor decision on FR-04 |
 | `SESSION_MAX_HOURS` | `8` | Hard ceiling on a session since login, regardless of activity | As above |
 | `TRUST_PROXY` | `2` | How many proxies sit in front of the app, so rate limits see the real client | `0` when running with no proxy. Leave unset on Render — it has two (Cloudflare and its load balancer) |
