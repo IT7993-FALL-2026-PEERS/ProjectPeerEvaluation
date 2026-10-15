@@ -134,14 +134,31 @@ test('TC-10-75: if the student submits while the extension email is going out, t
   assert.equal((await Student.findById(IDS.ann)).evaluation_token, ann.evaluation_token, 'not swapped');
 });
 
-test('TC-10-76: two extensions for one student at the same moment leave exactly one new link active, and it is one that was emailed', async () => {
+test('TC-10-76: two extensions for one student at the same moment leave exactly one new link active, and it is one that was emailed', async (t) => {
   await send();
   clearEmails();
+  // Both requests are held at the swap until both have read the student and sent their email, so they really
+  // overlap. Without this the first can finish before the second starts, which is two extensions one after
+  // the other (both rightly win) and made this test flaky on CI.
+  const findOneAndUpdate = Student.findOneAndUpdate;
+  const atSwap = [];
+  t.mock.method(Student, 'findOneAndUpdate', async function (filter, update, ...rest) {
+    if (update && update.evaluation_token) {
+      await new Promise((resolve) => {
+        atSwap.push(resolve);
+        if (atSwap.length === 2) atSwap.forEach((release) => release());
+        setTimeout(resolve, 5000);
+      });
+    }
+    return findOneAndUpdate.call(this, filter, update, ...rest);
+  });
   const body = { ...deadlineBody(9), scope: 'student', student_id: String(IDS.ann) };
   const [a, b] = await Promise.all([
     app.request('POST', extendPath(IDS.courseAda), { token: ada, body }),
     app.request('POST', extendPath(IDS.courseAda), { token: ada, body }),
   ]);
+  t.mock.restoreAll();
+  assert.equal(atSwap.length, 2, 'both requests reached the swap together');
   assert.equal(a.body.extended.length + b.body.extended.length, 1);
   assert.equal(a.body.skipped.changed + b.body.skipped.changed, 1);
   const { evaluation_token: current } = await Student.findById(IDS.ann);
