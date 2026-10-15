@@ -205,11 +205,27 @@ test('TC-10-45: students who have submitted are skipped even when their link has
   assert.equal(sentEmails.length, 0);
 });
 
-test('TC-10-47: two sends at the same moment issue one link per student, and each student is emailed once', async () => {
+test('TC-10-47: two sends at the same moment issue one link per student, and each student is emailed once', async (t) => {
+  // Both sends are held at their first link claim until both have planned their recipients, so they really
+  // overlap; otherwise the second could start after the first finished and pass without testing the claim.
+  const findOneAndUpdate = Student.findOneAndUpdate;
+  const atClaim = [];
+  t.mock.method(Student, 'findOneAndUpdate', async function (filter, update, ...rest) {
+    if (update && update.evaluation_token && atClaim.length < 2) {
+      await new Promise((resolve) => {
+        atClaim.push(resolve);
+        if (atClaim.length === 2) atClaim.forEach((release) => release());
+        setTimeout(resolve, 5000);
+      });
+    }
+    return findOneAndUpdate.call(this, filter, update, ...rest);
+  });
   const [a, b] = await Promise.all([
     app.request('POST', sendPath(IDS.courseAda), { token: ada, body: sendBody() }),
     app.request('POST', sendPath(IDS.courseAda), { token: ada, body: sendBody() }),
   ]);
+  t.mock.restoreAll();
+  assert.equal(atClaim.length, 2, 'both sends reached a claim together');
   assert.equal(a.status, 200);
   assert.equal(b.status, 200);
   assert.equal(a.body.emails_sent + b.body.emails_sent, 4, 'four students, four emails in total');
