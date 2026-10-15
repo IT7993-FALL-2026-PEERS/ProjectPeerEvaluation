@@ -144,6 +144,12 @@ function EvaluationStatusDialog({
                                       {student.last_activity ? new Date(student.last_activity).toLocaleDateString() : 'Never'}
                                     </Typography>
                                     {/* CICD-68: a student who has submitted can be allowed one more submission */}
+                                    {/* CICD-70: marked as submitted but the evaluations are gone (they were deleted with the people they rated) */}
+                                    {student.completed && student.ratings_on_file === false && (
+                                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                                        Marked submitted, no ratings on file. Use Allow resubmission to send a new link.
+                                      </Typography>
+                                    )}
                                     {student.resubmission_allowed && (
                                       <Chip label="Resubmission allowed" color="info" size="small" sx={{ mt: 0.5 }} />
                                     )}

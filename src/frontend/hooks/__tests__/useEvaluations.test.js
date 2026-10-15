@@ -219,7 +219,7 @@ describe('useEvaluations: sending reminders', () => {
     await remind(view);
 
     expect(api.post).toHaveBeenCalledWith('/courses/c1/evaluations/remind');
-    expect(setAlert).toHaveBeenCalledWith({ severity: 'success', message: 'Reminders sent' });
+    expect(setAlert).toHaveBeenCalledWith({ severity: 'success', message: 'Reminders sent to 2 students.' });
   });
 
   test('names the students who did not get a reminder', async () => {
@@ -419,7 +419,7 @@ describe('useEvaluations: asking for a deadline before sending (CICD-67)', () =>
     const view = await opened();
     api.post.mockResolvedValue({ data: { message: 'Reminders sent', reminders_sent: 1, total_reminded: 1, failed: [], deadline_passed: ['Pat Lee'], not_invited: 0 } });
     await act(() => view.result.current.evaluationStatusDialog.onRemind());
-    expect(setAlert).toHaveBeenCalledWith({ severity: 'warning', message: 'Reminders sent Deadline passed (extend first): Pat Lee.' });
+    expect(setAlert).toHaveBeenCalledWith({ severity: 'warning', message: 'Reminders sent to 1 student. Deadline passed: Pat Lee. Use Extend Deadline.' });
   });
 });
 

@@ -10,6 +10,7 @@ const { generateEvaluationToken, isLinkActive, isTokenExpired } = require('../ut
 const { parseDeadline } = require('../utils/evaluationDeadline');
 const evaluationStore = require('../utils/saveEvaluations');
 const { rotateLink } = require('../utils/linkRotation');
+const { loadSubmitters, hasSubmitted } = require('../utils/submitted');
 
 // The students an evaluator rates: the rest of their team, or the rest of the
 // course when they have no team. The form and the submission both use this, so
@@ -55,14 +56,12 @@ function linkExpiredError() {
 // Who a send reaches (CICD-67): students with no active link who have not submitted. A student with an
 // active link keeps it, and its deadline, untouched; giving more time is a separate, deliberate action.
 async function planInvitations(students, courseId, now = new Date()) {
-  const submitted = new Set((await Evaluation.distinct('evaluator_id', { course_id: courseId })).map(String));
+  const submitters = await loadSubmitters(courseId);
   const recipients = [];
   let alreadyInvited = 0;
   let alreadySubmitted = 0;
   for (const student of students) {
-    // evaluation_completed is set by the submission and kept if the evaluations it wrote are later deleted
-    // with the students they rated; only a reset clears it
-    if (student.evaluation_completed || submitted.has(String(student._id))) alreadySubmitted += 1;
+    if (hasSubmitted(student, submitters)) alreadySubmitted += 1;
     else if (isLinkActive(student, now)) alreadyInvited += 1;
     else recipients.push(student);
   }
@@ -275,11 +274,11 @@ exports.extendEvaluations = async (req, res, next) => {
     if (!course) return next(notFound('Course not found.'));
     const students = await studentsInScope(course_id, req.body);
 
-    const submitted = new Set((await Evaluation.distinct('evaluator_id', { course_id })).map(String));
+    const submitters = await loadSubmitters(course_id);
     const skipped = { submitted: 0, not_invited: 0, changed: 0 };
     const recipients = [];
     for (const student of students) {
-      if (student.evaluation_completed || submitted.has(String(student._id))) skipped.submitted += 1;
+      if (hasSubmitted(student, submitters)) skipped.submitted += 1;
       else if (!student.evaluation_token) skipped.not_invited += 1;
       else recipients.push(student);
     }
@@ -338,8 +337,7 @@ exports.allowResubmission = async (req, res, next) => {
     if (!course) return next(notFound('Course not found.'));
     const student = await Student.findOne({ _id: new mongoose.Types.ObjectId(student_id), course_id });
     if (!student) return next(notFound('Student not found in this course.'));
-    const hasSubmitted = student.evaluation_completed || await Evaluation.exists({ course_id, evaluator_id: student._id });
-    if (!hasSubmitted) {
+    if (!hasSubmitted(student, await loadSubmitters(course_id))) {
       const err = new Error('This student has not submitted yet; send or extend instead.');
       err.code = 'NOT_SUBMITTED';
       err.status = 409;
@@ -388,7 +386,9 @@ exports.evaluationStatus = async (req, res, next) => {
 
     // Check if evaluations have been sent by looking for students with evaluation tokens
     // (tokens are only generated when evaluations are actually sent)
-    const hasStudentsWithTokens = students.length > 0 && students.some(s => s.evaluation_token);
+    // A round has been sent when a student holds a link, or is marked as submitted (a reset clears both): a course whose students all carry a stale mark but no link must still list them (CICD-70)
+    const submitters = await loadSubmitters(course_id);
+    const hasStudentsWithTokens = students.length > 0 && students.some((s) => s.evaluation_token || hasSubmitted(s, submitters));
     
     // If no students exist, return empty state
     if (total === 0) {
@@ -414,20 +414,17 @@ exports.evaluationStatus = async (req, res, next) => {
       });
     }
 
-    // Get completed evaluations
-    const completedEvaluations = await Evaluation.find({ course_id }).distinct('evaluator_id');
-    const completed = completedEvaluations.length;
-    const pending = total - completed;
+    // Who has submitted: the same rule as send and reminders (CICD-70), and the counts come from the rows, so
+    // an evaluator who is no longer in the course cannot push the count above the number of students
 
     // Get detailed student status
     const studentStatus = await Promise.all(students.map(async (student) => {
-      // Convert both to strings for proper comparison
-      const studentIdStr = student._id.toString();
-      const hasCompleted = completedEvaluations.some(evalId => evalId.toString() === studentIdStr);
-      
+      const hasCompleted = hasSubmitted(student, submitters);
+      const ratingsOnFile = submitters.has(student._id.toString());
+
       // Get the actual submission date if completed
       let lastActivity = null;
-      if (hasCompleted) {
+      if (ratingsOnFile) {
         const evaluation = await Evaluation.findOne({ 
           course_id, 
           evaluator_id: student._id 
@@ -441,6 +438,8 @@ exports.evaluationStatus = async (req, res, next) => {
         email: student.email || 'No Email',            // Fallback if email is missing
         team: student.group_assignment || 'No Team',  // Match frontend expectation
         completed: hasCompleted,         // Match frontend expectation
+        // false for a student marked as submitted whose evaluations are gone (CICD-70)
+        ratings_on_file: hasCompleted ? ratingsOnFile : true,
         // CICD-68: the status dialog's Extend and Allow resubmission buttons need these
         id: student._id.toString(),
         team_id: student.team_id ? String(student.team_id._id || student.team_id) : null,
@@ -449,6 +448,9 @@ exports.evaluationStatus = async (req, res, next) => {
         last_activity: lastActivity              // Show actual submission date
       };
     }));
+
+    const completed = studentStatus.filter((row) => row.completed).length;
+    const pending = total - completed;
 
     res.status(200).json({
       total_count: total,              // Match frontend expectation
@@ -502,6 +504,10 @@ exports.remindEvaluations = async (req, res, next) => {
         _id: { $nin: completedEvaluations }
       });
     }
+
+    // A student marked as submitted is not reminded even when their evaluations are gone (CICD-70)
+    const submitters = new Set(completedEvaluations.map(String));
+    studentsToRemind = studentsToRemind.filter((student) => !hasSubmitted(student, submitters));
 
     if (studentsToRemind.length === 0) {
       return res.status(200).json({
