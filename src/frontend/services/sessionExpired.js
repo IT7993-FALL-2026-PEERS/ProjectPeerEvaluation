@@ -4,6 +4,8 @@
 // turn that into its own generic message ("Failed to fetch courses"), so the professor could not tell
 // what had happened. The request layer calls this once for every failure, and the banner at the top of
 // the app (components/SessionExpiredBanner.jsx) says it.
+import { readSessionToken } from './sessionActivity';
+
 export const SESSION_EXPIRED_EVENT = 'peers:session-expired';
 
 // Login and password-reset calls also answer 401 (wrong password, bad link). That is not a timed-out session.
@@ -16,6 +18,13 @@ export function isSessionExpired(error) {
   const config = error.config || {};
   if (String(config.url || '').includes(AUTH_PATH)) return false;
   return Boolean(config.headers && config.headers.Authorization);
+}
+
+// A 401 for a request sent with a login that has since been replaced (the professor logged in again
+// while it was on its way) says nothing about the current login.
+export function sentWithCurrentLogin(error) {
+  const sent = String(error?.config?.headers?.Authorization || '').replace(/^Bearer /, '');
+  return Boolean(sent) && sent === readSessionToken();
 }
 
 export function notifySessionExpired() {

@@ -145,9 +145,12 @@ removed or permanently disabled so the login path cannot reach a dead end.
 answered with a fresh one in the `X-Access-Token` header, which the frontend stores. The browser
 counts clicks, key presses, scrolling and touch as activity (not mouse movement) and calls
 `POST /auth/refresh` at most every 5 minutes, so a professor who is working but making no other request
-stays logged in; with 2 minutes left and no activity a "Stay logged in" warning appears. The time left is worked out against
+stays logged in; with 5 minutes left and no activity a "Stay logged in" warning appears. The time left is worked out against
 the server's clock (`X-Server-Time`), and a login that only looks expired is checked with the server before
-the timeout message is shown. A session
+the timeout message is shown. When the time runs out the page stays as it is and a Log in dialog signs the
+same professor back in on that page (the same login request; the new token replaces the old one), so what was typed in
+an open form is kept (with a form open, whose dialog traps the keyboard, the Log in dialog opens by itself above it);
+"Use the login page" leaves instead. A log-in that is given up, or whose stored login changed meanwhile, stores nothing (CICD-69). A session
 is capped at 8 hours since login (`SESSION_MAX_HOURS`). Before this change the expiry was
 absolute, one hour after login. **Still open for the sponsor:** the inherited requirement says
 30 minutes, the app uses 60, and the 8-hour cap is the team's own choice.

@@ -173,7 +173,7 @@ test('E2E-15: if the team list cannot be refreshed after a delete, the delete st
   await expect(page.getByRole('cell', { name: 'Gamma', exact: true })).toHaveCount(0);
 });
 
-test('E2E-41: when the login has expired the page says so, and Log in goes back to the login page', async ({ page }) => {
+test('E2E-41: when the login has expired the page says so, and Use the login page goes back to the login page', async ({ page }) => {
   await loginAsAda(page, passwords);
   await expect(page).toHaveURL(/course-management/);
 
@@ -181,14 +181,54 @@ test('E2E-41: when the login has expired the page says so, and Log in goes back 
   await page.evaluate(() => localStorage.setItem('peer_eval_token', 'an-expired-token'));
   await page.reload();
 
-  await expect(page.getByText('Session timed out. Please log-in again!')).toBeVisible();
+  await expect(page.getByText('Session timed out. Log in again to keep your work.')).toBeVisible();
   await expect(page).toHaveURL(/course-management/);
 
   await page.getByRole('button', { name: 'Log in', exact: true }).click();
+  await page.getByRole('button', { name: 'Use the login page' }).click();
   await expect(page).toHaveURL('/');
   await expect(page.getByRole('heading', { name: 'Professor Login' })).toBeVisible();
-  await expect(page.getByText('Session timed out. Please log-in again!')).toHaveCount(0);
+  await expect(page.getByText('Session timed out. Log in again to keep your work.')).toHaveCount(0);
   expect(await page.evaluate(() => localStorage.getItem('peer_eval_token'))).toBeNull();
+});
+
+// CICD-69: a timed-out professor logs in again on the same page and keeps what was typed.
+test('E2E-46: after the login expires, logging in again keeps the half-filled Create Course form, and saving works', async ({ page }) => {
+  await loginAsAda(page, passwords);
+  await page.getByRole('button', { name: 'Create Course' }).click();
+  // A plain locator that keeps pointing at this form once the log-in dialog opens above it.
+  const form = page.locator('[role=dialog]').filter({ hasText: 'Create New Course' });
+  await form.getByLabel('Course Name').fill('Databases');
+  await form.getByLabel('Course Number').fill('IT 3100');
+  await form.getByLabel('Course Section').fill('02');
+  await form.getByLabel('Semester').fill('Fall 2026');
+
+  // The login runs out while the form is open; saving is refused with a 401.
+  await page.evaluate(() => localStorage.setItem('peer_eval_token', 'an-expired-token'));
+  await form.getByRole('button', { name: 'Create', exact: true }).click();
+
+  // A plain locator: the open form hides the banner from role queries, though the banner sits above it.
+  const banner = alertWith(page, 'Session timed out');
+  await expect(banner).toContainText('Session timed out. Log in again to keep your work.');
+  await expect(form.getByLabel('Course Name')).toHaveValue('Databases');
+  await expect(page).toHaveURL(/course-management/);
+
+  // The form traps the keyboard, so the log-in dialog opens by itself above it (the form stays underneath).
+  const relogin = page.getByRole('dialog', { name: 'Log in again' });
+  await expect(relogin).toContainText('ada@example.edu');
+  await relogin.getByLabel('Password').fill('not-the-password');
+  await relogin.getByRole('button', { name: 'Log in', exact: true }).click();
+  await expect(relogin.getByText(/invalid email or password/i)).toBeVisible();
+  await expect(form.getByLabel('Course Name')).toHaveValue('Databases');
+
+  await relogin.getByLabel('Password').fill(passwords.ada);
+  await relogin.getByRole('button', { name: 'Log in', exact: true }).click();
+  await expect(banner).toHaveCount(0);
+  await expect(page).toHaveURL(/course-management/);
+  await expect(form.getByLabel('Course Name')).toHaveValue('Databases');
+
+  await form.getByRole('button', { name: 'Create', exact: true }).click();
+  await expect(page.getByRole('cell', { name: 'IT 3100' })).toBeVisible();
 });
 
 // CICD-67: the instructor sets the deadline with each send, and the student sees it.

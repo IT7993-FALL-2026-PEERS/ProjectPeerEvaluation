@@ -11,7 +11,7 @@ vi.mock('../../services/api', () => ({ default: { post: vi.fn() } }));
 
 // FR-04: the session ends after a period of inactivity. While the professor clicks, types, scrolls or
 // touches the page, the browser asks the server to extend the login (at most every 5 minutes); with
-// 2 minutes left and no activity it asks whether to stay logged in.
+// 5 minutes left and no activity it asks whether to stay logged in.
 const b64url = (value) => btoa(JSON.stringify(value)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 const NOW = Date.UTC(2026, 9, 13, 12, 0, 0);
 const sec = (ms) => Math.floor(ms / 1000);
@@ -152,40 +152,40 @@ describe('SessionTimeoutWarning: activity keeps the login alive', () => {
 });
 
 describe('SessionTimeoutWarning: the warning before the login ends', () => {
-  test('nothing is shown while there is more than 2 minutes left', async () => {
-    setLogin({ leftSeconds: 125 });
+  test('nothing is shown while there is more than 5 minutes left', async () => {
+    setLogin({ leftSeconds: 305 });
     renderWarning();
     await advance(1000);
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
-  test('the warning starts at exactly 2 minutes left', async () => {
-    setLogin({ leftSeconds: 122 });
+  test('the warning starts at exactly 5 minutes left', async () => {
+    setLogin({ leftSeconds: 302 });
     renderWarning();
     await advance(1000);
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     await advance(1000);
     expect(screen.getByRole('dialog')).toBeInTheDocument();
-    expect(screen.getByText(/2:00/)).toBeInTheDocument();
+    expect(screen.getByText(/5:00/)).toBeInTheDocument();
   });
 
-  test('with 2 minutes or less left it asks whether to stay logged in, with a countdown', async () => {
-    setLogin({ leftSeconds: 119 });
+  test('with 5 minutes or less left it asks whether to stay logged in, with a countdown', async () => {
+    setLogin({ leftSeconds: 299 });
     renderWarning();
     await advance(1000);
     expect(screen.getByRole('dialog')).toBeInTheDocument();
     expect(screen.getByText('Your session is about to expire')).toBeInTheDocument();
-    expect(screen.getByText(/1:58/)).toBeInTheDocument();
+    expect(screen.getByText(/4:58/)).toBeInTheDocument();
     await advance(10 * 1000);
-    expect(screen.getByText(/1:48/)).toBeInTheDocument();
+    expect(screen.getByText(/4:48/)).toBeInTheDocument();
   });
 
   test('the warning appears when the time runs down while the professor does nothing', async () => {
-    setLogin({ leftSeconds: 300 });
+    setLogin({ leftSeconds: 600 });
     renderWarning();
     await advance(60 * 1000);
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    await advance(3 * 60 * 1000);
+    await advance(5 * 60 * 1000);
     expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
 
@@ -262,7 +262,7 @@ describe('SessionTimeoutWarning: a browser clock that is wrong', () => {
     expect(api.post).not.toHaveBeenCalled();
   });
 
-  test('with the server time known, the warning appears when the server clock says 2 minutes are left', async () => {
+  test('with the server time known, the warning appears when the server clock says 5 minutes or less are left', async () => {
     // 100 seconds left by the server's clock; the browser is 5 minutes ahead, so by its own clock the login ran
     // out 200 seconds ago.
     setLogin({ ageSeconds: 3800, leftSeconds: -200 });

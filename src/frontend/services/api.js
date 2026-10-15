@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { getApiBaseUrl } from './apiUrl';
-import { isSessionExpired, notifySessionExpired } from './sessionExpired';
+import { isSessionExpired, notifySessionExpired, sentWithCurrentLogin } from './sessionExpired';
 import { learnServerTime } from './sessionActivity';
 
 const API_BASE_URL = getApiBaseUrl();
@@ -91,7 +91,7 @@ api.interceptors.response.use(
     }
     
     // An expired login token: say so once, whatever page the request came from.
-    if (isSessionExpired(error)) notifySessionExpired();
+    if (isSessionExpired(error) && sentWithCurrentLogin(error)) notifySessionExpired();
 
     return Promise.reject(error);
   }

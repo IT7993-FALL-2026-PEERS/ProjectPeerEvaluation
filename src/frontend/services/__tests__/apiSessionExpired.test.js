@@ -49,6 +49,24 @@ describe('api: an expired login', () => {
     expect(heard).toBe(0);
   });
 
+  test('stays quiet when the login was replaced after the request was sent', async () => {
+    localStorage.setItem('peer_eval_token', 'old-token');
+    api.defaults.adapter = (config) => {
+      // the professor logs in again while this request is on its way
+      localStorage.setItem('peer_eval_token', 'new-token');
+      return answer401()(config);
+    };
+    await expect(api.get('/courses')).rejects.toBeTruthy();
+    expect(heard).toBe(0);
+  });
+
+  test('still tells the app when the login that failed is the stored one', async () => {
+    localStorage.setItem('peer_eval_token', 'same-token');
+    api.defaults.adapter = answer401();
+    await expect(api.get('/courses')).rejects.toBeTruthy();
+    expect(heard).toBe(1);
+  });
+
   test('stays quiet for other failures', async () => {
     localStorage.setItem('peer_eval_token', 'good-token');
     api.defaults.adapter = (config) => Promise.reject(Object.assign(new Error('500'), { config, response: { status: 500, data: {}, headers: {}, config } }));

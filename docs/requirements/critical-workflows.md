@@ -38,8 +38,9 @@ so the two are never confused.
   of inactivity (renewed while the professor works), not the fixed 1 hour after login it was
   before; FR1.4 says 30 minutes, which the sponsor still has to confirm (**D-18**). The browser
   counts clicks, key presses, scrolling and touch as activity (not mouse movement), asks the server
-  to extend the login at most every 5 minutes, and shows a "Stay logged in" warning 2 minutes before
-  it ends (`SessionTimeoutWarning.jsx`).
+  to extend the login at most every 5 minutes, and shows a "Stay logged in" warning 5 minutes before
+  it ends (`SessionTimeoutWarning.jsx`). When the time runs out the page stays as it is and a Log in dialog
+  (`SessionExpiredBanner.jsx`) signs the same professor back in on that page, so unsaved input in an open form is kept; if a form is open the dialog opens above it by itself.
 
 ## CW-02: Password Reset
 - **Actor:** Professor
