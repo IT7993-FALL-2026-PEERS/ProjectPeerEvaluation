@@ -106,15 +106,17 @@ describe('StudentEvaluation', () => {
     expect(await screen.findByText('Failed to load evaluation form')).toBeInTheDocument();
   });
 
-  test('a link that was already used shows the completed page, and Return to Home goes home', async () => {
+  // A student has no home page in PEERS: "/" is the professor login, so the completed page offers no way
+  // there and says the window can be closed (found on staging, 14 Oct).
+  test('a link that was already used shows the completed page, which says it can be closed and leads nowhere else', async () => {
     api.get.mockResolvedValue({ data: { completed: true, submitted_at: '2026-10-01T15:00:00Z' } });
     renderForm();
     expect(await screen.findByRole('heading', { name: 'Evaluation Completed!' })).toBeInTheDocument();
     expect(screen.getByText(/Submitted:/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /submit evaluation/i })).not.toBeInTheDocument();
-
-    await user.click(screen.getByRole('button', { name: 'Return to Home' }));
-    expect(await screen.findByRole('heading', { name: 'Home page' })).toBeInTheDocument();
+    expect(screen.getByText('You can close this window now.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /return to home/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
   });
 
   test('counts the feedback characters as the student types', async () => {
@@ -192,5 +194,32 @@ describe('StudentEvaluation', () => {
     expect(await screen.findByText('You can only rate your current teammates. Reload the page and try again.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /submit evaluation/i })).toBeEnabled();
     expect(screen.queryByRole('heading', { name: 'Evaluation Completed!' })).not.toBeInTheDocument();
+  });
+});
+
+// CICD-67: the student sees when the evaluation is due, in their own time zone.
+describe('StudentEvaluation: the deadline', () => {
+  test('shows when the evaluation is due, with the zone named', async () => {
+    const deadline = new Date(2999, 0, 1, 10, 0);
+    api.get.mockResolvedValue({ data: { ...FORM, deadline: deadline.toISOString() } });
+    renderForm();
+    await screen.findByText(/Due:/);
+    const zoneName = new Intl.DateTimeFormat(undefined, { timeZoneName: 'short' })
+      .formatToParts(deadline).find((part) => part.type === 'timeZoneName').value;
+    expect(screen.getByRole('alert')).toHaveTextContent('2999');
+    expect(screen.getByRole('alert')).toHaveTextContent(zoneName);
+  });
+
+  test('shows no due line when the form carries no deadline', async () => {
+    api.get.mockResolvedValue({ data: FORM });
+    renderForm();
+    await screen.findByText('Course Information');
+    expect(screen.queryByText(/Due:/)).not.toBeInTheDocument();
+  });
+
+  test('a link past its deadline shows the server\'s message', async () => {
+    api.get.mockRejectedValue({ response: { status: 410, data: { error: { code: 'EVALUATION_LINK_EXPIRED', message: 'The deadline for this evaluation has passed. Ask your instructor for an extension.' } } } });
+    renderForm();
+    expect(await screen.findByText('The deadline for this evaluation has passed. Ask your instructor for an extension.')).toBeInTheDocument();
   });
 });

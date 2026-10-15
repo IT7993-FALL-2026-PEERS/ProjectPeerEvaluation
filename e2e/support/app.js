@@ -48,7 +48,22 @@ async function loginAsAda(page, passwords) {
 // while a dialog is open the banner sits behind it, and role queries skip content a modal hides.
 const alertWith = (page, text) => page.locator('[role=alert]').filter({ hasText: text });
 
+// Every send asks for the evaluation deadline first (CICD-67). Fills the dialog with a time `days`
+// from now, in the browser's own time, and presses Send.
+const pad2 = (n) => String(n).padStart(2, '0');
+async function sendWithDeadline(page, { days = 7 } = {}) {
+  const when = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+  const value = `${when.getFullYear()}-${pad2(when.getMonth() + 1)}-${pad2(when.getDate())}T${pad2(when.getHours())}:${pad2(when.getMinutes())}`;
+  const dialog = page.getByRole('dialog').filter({ has: page.getByLabel('Deadline') });
+  await dialog.getByLabel('Deadline').fill(value);
+  await dialog.getByRole('button', { name: 'Send', exact: true }).click();
+  await expect(dialog).toBeHidden();
+}
+
 // A button in the course row, found by its tooltip (the row has icon buttons only).
 const courseAction = (page, title) => page.getByTitle(title).first();
 
-module.exports = { resetData, capturedEmails, invitationPath, loginAs, loginAsAda, courseAction, alertWith, ROSTER_CSV, HEADER_ONLY_CSV };
+module.exports = {
+  resetData, capturedEmails, invitationPath, loginAs, loginAsAda, courseAction, alertWith, sendWithDeadline,
+  ROSTER_CSV, HEADER_ONLY_CSV,
+};

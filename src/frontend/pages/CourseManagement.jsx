@@ -30,6 +30,8 @@ import DeleteAllStudentsDialog from '../components/DeleteAllStudentsDialog';
 import EvaluationResetDialog from '../components/EvaluationResetDialog';
 import EvaluationStatusDialog from '../components/EvaluationStatusDialog';
 import TeamsDialog from '../components/TeamsDialog';
+import DeadlineDialog from '../components/DeadlineDialog';
+import ExtendDeadlineDialog from '../components/ExtendDeadlineDialog';
 import { EditTeamDialog, CreateTeamDialog } from '../components/TeamFormDialogs';
 import TeamStudentsDialog from '../components/TeamStudentsDialog';
 import StudentsDialog from '../components/StudentsDialog';
@@ -65,11 +67,11 @@ function CourseManagement() {
     createCourseDialog, editCourseDialog, deleteCourseDialog, rosterUploadDialog,
   } = useCourseDialogs({ setAlert, refreshCourses: fetchCoursesWithCounts });
   const {
-    sendingEvaluations, sendInvitations, viewStatus, resetEvaluationState, evaluationStatusDialog,
+    sendingEvaluations, requestSend, sendDeadlineDialog, extendDialog, resubmitDialog, viewStatus, resetEvaluationState, evaluationStatusDialog,
   } = useEvaluations({ setAlert });
   const {
     openTeams, clearTeamsState,
-    teamsDialog, editTeamDialog, createTeamDialog, teamStudentsDialog, evaluationResetDialog,
+    teamsDialog, teamSendDialog, editTeamDialog, createTeamDialog, teamStudentsDialog, evaluationResetDialog,
   } = useTeams({
     setAlert,
     refreshCourses: fetchCoursesWithCounts,
@@ -103,6 +105,7 @@ function CourseManagement() {
       <CsvUploadDialog {...csvUploadDialog} />
       <DeleteAllStudentsDialog {...deleteAllStudentsDialog} />
       <TeamsDialog {...teamsDialog} />
+      <DeadlineDialog {...teamSendDialog} />
       <EditTeamDialog {...editTeamDialog} />
       <CreateTeamDialog {...createTeamDialog} />
       <StudentsDialog {...studentsDialog} />
@@ -174,7 +177,7 @@ function CourseManagement() {
         onUploadRoster={startRosterUpload}
         onManageStudents={openStudents}
         onManageTeams={openTeams}
-        onSendEvaluations={(course) => sendInvitations(course._id || course.id)}
+        onSendEvaluations={(course) => requestSend(course)}
         onEvaluationStatus={viewStatus}
         onViewReports={(course) => navigate(`/reports?course=${course._id || course.id}`)}
         onDelete={startDelete}
@@ -182,6 +185,9 @@ function CourseManagement() {
       />
 
       <EvaluationStatusDialog {...evaluationStatusDialog} />
+      <DeadlineDialog {...sendDeadlineDialog} />
+      <ExtendDeadlineDialog {...extendDialog} />
+      <DeadlineDialog {...resubmitDialog} />
     </div>
   );
 }

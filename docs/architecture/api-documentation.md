@@ -44,9 +44,9 @@ server still decides whether the token is valid). The inherited requirement says
 sponsor still has to confirm). When a logged-in request gets a 401 (not a login or password-reset call),
 the app shows "Session timed out. Please log-in again!" with a Log in button that clears the
 stored login and opens the login page. Student endpoints under `/evaluate` use no login: the evaluation token in
-the URL is the only credential. It is 32 random bytes (64 hex characters) and expires
-`EVALUATION_TOKEN_TTL_DAYS` (default 14) after the latest invitation or reminder. The
-request log redacts it.
+the URL is the only credential. It is 32 random bytes (64 hex characters) and expires at the
+**evaluation deadline** the instructor chose when sending (CICD-67); after it every student endpoint
+answers **410** `EVALUATION_LINK_EXPIRED`. The request log redacts it.
 
 **Course ownership.** Every `/courses/:course_id/...` endpoint first checks that the
 course belongs to the logged-in professor (`middleware/courseOwner.js`). Another
@@ -79,8 +79,11 @@ takes the student's **university ID** string (for example `S0012345`).
 | 404 | `NOT_FOUND` | Resource missing, or a course owned by someone else |
 | 404 | `EVALUATION_CANCELLED` / `INVALID_TOKEN` | Student evaluation token no longer valid |
 | 409 | `DUPLICATE` | Email or student ID already exists |
-| 410 | `EVALUATION_LINK_EXPIRED` | Student evaluation link has expired; the professor re-sends it |
+| 410 | `EVALUATION_LINK_EXPIRED` | The evaluation deadline has passed: "The deadline for this evaluation has passed. Ask your instructor for an extension." |
 | 409 | `ALREADY_COMPLETED` | Student already submitted their evaluation |
+| 409 | `LINK_CHANGED` | The student's link was replaced, or its deadline passed, while the request ran; nothing was saved or activated |
+| 409 | `NOT_SUBMITTED` | A resubmission was asked for a student who has not submitted |
+| 502 | `EMAIL_FAILED` | The resubmission email could not be sent; nothing was changed |
 | 429 | `RATE_LIMITED` | Too many requests from this address; `details.retry_after_seconds` and the `Retry-After` header say how long to wait |
 
 **Rate limits** (per client IP address, kept in memory, so right for one server instance):
@@ -151,6 +154,8 @@ on 404 instead of this shape.
 | POST | `/courses/:course_id/teams/:team_id/evaluations/send` | 🔒 | Email invitations to one team |
 | GET | `/courses/:course_id/evaluations/status` | 🔒 | Who has and hasn't submitted |
 | POST | `/courses/:course_id/evaluations/remind` | 🔒 | Email reminders to students who haven't submitted |
+| POST | `/courses/:course_id/evaluations/extend` | 🔒 | Extend the deadline with a new link (one student, one team, or everyone not submitted) |
+| POST | `/courses/:course_id/students/:student_id/evaluations/resubmit` | 🔒 | Allow one student who has submitted to submit again |
 | DELETE | `/courses/:course_id/evaluations/reset` | 🔒 | Delete all evaluations and tokens |
 | GET | `/courses/:course_id/reports` | 🔒 | Course report with grades |
 | GET | `/courses/:course_id/reports/download` | 🔒 | Course report as CSV |
@@ -417,19 +422,26 @@ is issued or email sent. With no interval (`EMAIL_SEND_INTERVAL_MS` unset or 0) 
 
 ### `POST .../evaluations/send` and `POST /courses/:course_id/teams/:team_id/evaluations/send`
 
-Body (optional): `{ "deadline": "2026-10-10", "custom_message": "..." }`. Each student
-gets a working link first: a valid token is kept, a missing or expired one is replaced,
-and the expiry restarts at `EVALUATION_TOKEN_TTL_DAYS`. Then each receives an email with
-`FRONTEND_URL/evaluate/<token>`. The `deadline` only appears in the email text; it doesn't
-set the link's expiry (D-23).
+Body (required): `{ "deadline": "2026-10-17T03:59:00.000Z", "deadline_zone": "America/New_York" }`.
+`deadline` is an exact moment: an ISO date and time with `Z` or an offset, in the future, at most 366 days
+ahead. `deadline_zone` is optional (default `UTC`); it must be an IANA zone and is used only to write the
+deadline in emails. Anything else is **400** `VALIDATION_ERROR`, and nothing is sent or stored (CICD-67).
+
+The send reaches only students who have **no active link and have not submitted**. Students with a
+working link keep it and its deadline, and get no new email; students who have submitted are skipped.
+Each recipient's link is claimed with one conditional update before its email goes out, so two sends at
+the same moment cannot both issue one; if the email fails, the link is given back, so a later send
+reaches that student. The link's expiry is the deadline. After a send that emailed someone, the course
+keeps `last_evaluation_deadline` and `last_evaluation_deadline_zone`, which prefill the next send.
 
 **200**
 ```json
 { "message": "Evaluation invitations sent successfully.", "emails_sent": 2,
   "total_students": 3, "failed": ["Carol (carol@example.com): <error message>"],
-  "deadline": "2026-10-10" }
+  "deadline": "2026-10-17T03:59:00.000Z", "already_invited": 1, "already_submitted": 0 }
 ```
-Partial failures still answer 200: check `failed`, a list of `"Name (email): error"` strings. **404** no students in the course or team.
+`total_students` counts the recipients. When nobody needs an invitation the answer is still **200**,
+with a message saying so and `emails_sent: 0`. Partial failures still answer 200: check `failed`, a list of `"Name (email): error"` strings. **404** no students in the course or team.
 
 ### `GET .../evaluations/status`
 
@@ -438,19 +450,47 @@ Partial failures still answer 200: check `failed`, a list of `"Name (email): err
 { "total_count": 3, "completed_count": 1, "pending_count": 2, "completion_rate": 33,
   "evaluations_sent": true,
   "students": [{ "student_id": "S001", "name": "Alice", "email": "...", "team": "Team A",
-                 "completed": true, "evaluation_token": "...", "last_activity": "..." }] }
+                 "completed": true, "evaluation_token": "...", "last_activity": "...",
+                 "id": "<ObjectId>", "team_id": "<ObjectId or null>", "resubmission_allowed": false }] }
 ```
 
 ### `POST .../evaluations/remind`
 
-Body (optional): `{ "student_ids": [...] }` is meant to remind only some students, but it
-is currently ignored (API-8), so everyone who hasn't submitted is reminded. Links are
-refreshed the same way as for invitations, so a reminder never carries an expired link. **200** `{ "message", "reminders_sent", "total_reminded",
-"failed": [...] }`, or `reminders_sent: 0` when everyone is done.
+Body (optional): `{ "student_ids": [...] }` reminds only those students; without it everyone who
+hasn't submitted is considered. A reminder goes only to students whose link is still active, reuses that
+link, and never changes it or its deadline (CICD-67); the email shows the deadline in the zone of the send
+that invited the student. **200** `{ "message", "reminders_sent", "total_reminded", "failed": [...],
+"deadline_passed": ["<names>"], "not_invited": <count> }`: students whose deadline has passed need an
+extension first, and students never invited need a send. `reminders_sent: 0` when everyone is done.
+
+### `POST .../evaluations/extend`
+
+Gives more time with a new link (CICD-68). Body: `{ "deadline", "deadline_zone", "scope": "student" | "team" |
+"unsubmitted", "student_id" | "team_id" }` (the id the scope needs). The deadline is checked like a send's.
+Students in scope who were invited (active or expired link) and have not submitted are each emailed a new
+link; only after that email went out is the new link swapped in, and only if the student's link is still
+the one read before (compare-and-set), so a failed email leaves the old link working and two overlapping
+extensions cannot both win. The old link then answers **404**. Students who submitted are never changed;
+students never invited are skipped (they need a send). Pacing and the recipient limit apply.
+
+**200** `{ "message", "extended": ["<names>"], "failed": ["Name (email): reason"], "skipped": { "submitted",
+"not_invited", "changed" }, "deadline" }`: `changed` counts students whose link changed while their email
+went out (they submitted, or another extension won); their new link was not activated. **400**
+`VALIDATION_ERROR` for a bad deadline, scope or id; **404** for a student or team not in this course.
+
+### `POST /courses/:course_id/students/:student_id/evaluations/resubmit`
+
+Allows one student who has submitted to submit again (CICD-68). Body: `{ "deadline", "deadline_zone" }`.
+A new link is emailed first; then it is swapped in with `resubmission_allowed` set, and the old link dies.
+The student's form then opens normally and the token status reports `completed: false`. Their next
+submission replaces their earlier evaluations and clears the approval, all or nothing in a transaction
+(on a database without transactions, best effort: a failed save puts the earlier evaluations and the
+approval back); no copy of the earlier evaluations is kept. **200** `{ "message", "deadline" }` · **400** · **404** · **409**
+`NOT_SUBMITTED` · **409** `LINK_CHANGED` · **502** `EMAIL_FAILED`.
 
 ### `DELETE .../evaluations/reset`
 
-Deletes every evaluation in the course and clears all tokens, so old links stop working.
+Deletes every evaluation in the course and clears all tokens, each student's submitted mark and any approved resubmission, so old links stop working and the next send reaches everyone again.
 **200** `{ "message", "tokens_cleared", "evaluations_deleted" }`.
 
 ---
@@ -523,14 +563,16 @@ These are the only endpoints students use. The token comes from the invitation e
   "course": { "name": "...", "number": "...", "section": "...", "semester": "..." },
   "teammates": [{ "_id": "<ObjectId>", "name": "Bob", "student_id": "S002" }],
   "rubric": { "title": "...", "criteria": [ ... ] },
-  "token": "<token>"
+  "token": "<token>",
+  "deadline": "2026-10-17T03:59:00.000Z"
 }
 ```
 Teammates are the other members of the student's team, or everyone else in the course if
 they have no team. If already submitted: **200** `{ "message": "Evaluation already
-completed.", "completed": true, "submitted_at": "..." }`. **404**
+completed.", "completed": true, "submitted_at": "...", "deadline": "..." }`. **404**
 `EVALUATION_CANCELLED` for an unknown or reset token. **410** `EVALUATION_LINK_EXPIRED`
-once the link has expired.
+("The deadline for this evaluation has passed. Ask your instructor for an extension.") once the deadline has passed; the token status (`GET /evaluate/:token/status`) and the
+submission answer the same, and the status also carries `deadline`.
 
 ### `POST /evaluate/:token`
 
@@ -552,11 +594,14 @@ unique index on evaluator, student and course makes two requests at the same mom
 the second gets the 409 below. The `student_id`s must be exactly the
 teammates the form lists (the rest of the team, or the rest of the course without a team),
 each once: rating yourself, someone else, the same teammate twice, or leaving a teammate out
-is a **400** `VALIDATION_ERROR` (API-2).
+is a **400** `VALIDATION_ERROR` (API-2). The save also checks, inside the same all-or-nothing step, that
+the link is still the student's and still before its deadline; if an extension replaced it or the
+deadline passed meanwhile, nothing is saved and the answer is **409** `LINK_CHANGED`. With an approved
+resubmission the new evaluations replace the earlier ones (CICD-68).
 
 **201** `{ "message": "Evaluation submitted successfully.", "evaluations_count": 2,
 "submitted_at": "..." }` · **400** `VALIDATION_ERROR` · **404** `EVALUATION_CANCELLED` ·
-**409** `ALREADY_COMPLETED` · **410** `EVALUATION_LINK_EXPIRED`.
+**409** `ALREADY_COMPLETED` · **409** `LINK_CHANGED` · **410** `EVALUATION_LINK_EXPIRED`.
 
 ### `GET /evaluate/:token/status`
 
@@ -578,7 +623,7 @@ Found while writing this document. Defect IDs refer to the
 
 | # | Issue | Risk |
 |---|---|---|
-| API-1 | **Fixed (CICD-17).** Tokens were generated with `Math.random()`, never expired, and were written to the request log | Tokens now come from `crypto.randomBytes(32)`, expire `EVALUATION_TOKEN_TTL_DAYS` after the latest email, and are redacted from logs. Links sent before the fix have no expiry and are refused until the professor re-sends |
+| API-1 | **Fixed (CICD-17).** Tokens were generated with `Math.random()`, never expired, and were written to the request log | Tokens now come from `crypto.randomBytes(32)`, expire at the evaluation deadline the instructor sets with each send (CICD-67), and are redacted from logs. Links sent before the fix have no expiry and are refused until the professor sends again |
 | API-2 | **Fixed (CICD-18).** `POST /evaluate/:token` did not check that each `student_id` is one of the evaluator's teammates, or that it appears only once | Submissions must now cover exactly the teammates the form lists, each once; anything else is a 400 and nothing is saved |
 | API-3 | **Fixed (CICD-19, then CICD-66).** Uploading a roster deleted every submitted evaluation in the course. An empty or unusable file, or a database error, stopped deleting anything in CICD-19; a successful upload no longer deletes or clears anything either, following the sponsor's decision of 12 Oct 2026 | Re-uploading or updating a roster mid-evaluation keeps student work and the links already sent |
 | API-4 | **Fixed (CICD-45).** `PUT .../students/:student_id`, `PUT .../teams/:team_id` and `POST .../teams` saved the request body as sent, and the team list returned each member's evaluation token | They now read only the editable fields, teams are created empty (members go through the add-student endpoint, which checks the course), and the team list omits tokens. The team report is now looked up within the course (CICD-51) |

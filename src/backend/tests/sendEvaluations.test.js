@@ -13,6 +13,7 @@ test.mock.method(emailUtils, 'sendEvaluationInvitation', async () => {
 
 const Course = require('../models/Course');
 const Student = require('../models/Student');
+const Evaluation = require('../models/Evaluation');
 const { sendEvaluations } = require('../controllers/evaluationController');
 
 const INTERVAL_MS = 40;
@@ -31,12 +32,16 @@ test('course invitations are spaced out by EMAIL_SEND_INTERVAL_MS', async (t) =>
     evaluation_token: `token-${name}`,
   }));
   t.mock.method(Course, 'findById', async () => ({ _id: 'course-1', course_name: 'Capstone' }));
+  t.mock.method(Course, 'findByIdAndUpdate', async () => {});
+  t.mock.method(Evaluation, 'distinct', async () => []);
+  t.mock.method(Student, 'findOneAndUpdate', async (filter) => ({ _id: filter._id }));
   t.mock.method(Student, 'find', () => ({ populate: async () => students }));
   t.mock.method(Student, 'findByIdAndUpdate', async () => {});
 
   let body;
   const res = { status() { return this; }, json(data) { body = data; } };
-  await sendEvaluations({ params: { course_id: 'course-1' }, body: {} }, res, (err) => { throw err; });
+  const deadline = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+  await sendEvaluations({ params: { course_id: 'course-1' }, body: { deadline } }, res, (err) => { throw err; });
 
   assert.equal(body.emails_sent, 3);
   assert.equal(sentAt.length, 3);

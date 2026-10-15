@@ -1,4 +1,10 @@
 const nodemailer = require('nodemailer');
+const { formatDeadline } = require('./evaluationDeadline');
+
+// Text written into an email's HTML as plain text.
+function escapeHtml(text) {
+  return String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
 const { checkTransport } = require('./emailGuard');
 
 // Email configuration
@@ -36,8 +42,10 @@ async function deliver(mailOptions) {
  * @param {String} evaluationToken - Unique token for the student's evaluation
  * @param {String} frontendUrl - Base URL of the frontend application
  * @param {Date} deadline - Evaluation deadline
+ * @param {String} zone - IANA zone the deadline is written in (the instructor's)
+ * @param {Object} options - { intro }: why a new link is being sent (an extension or an approved resubmission, CICD-68)
  */
-async function sendEvaluationInvitation(student, course, evaluationToken, frontendUrl = 'http://localhost:3000', deadline) {
+async function sendEvaluationInvitation(student, course, evaluationToken, frontendUrl = 'http://localhost:3000', deadline, zone, { intro } = {}) {
   const evaluationUrl = `${frontendUrl}/evaluate/${evaluationToken}`;
   
   const subject = `Peer Evaluation for ${course.course_name} - ${course.course_number}`;
@@ -46,10 +54,10 @@ async function sendEvaluationInvitation(student, course, evaluationToken, fronte
     <html>
       <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
         <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-          <h2 style="color: #2c5aa0;">Peer Evaluation Invitation</h2>
+          <h2 style="color: #2c5aa0;">${intro ? 'Peer Evaluation: New Link' : 'Peer Evaluation Invitation'}</h2>
           
           <p>Dear ${student.name},</p>
-          
+          ${intro ? `<p><strong>${escapeHtml(intro)}</strong></p>` : ''}
           <p>You have been invited to complete a peer evaluation for your teammates in:</p>
           
           <div style="background-color: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0;">
@@ -59,7 +67,7 @@ async function sendEvaluationInvitation(student, course, evaluationToken, fronte
             <strong>Semester:</strong> ${course.semester}
           </div>
           
-          <p><strong>Deadline:</strong> ${deadline ? new Date(deadline).toLocaleDateString() : 'No deadline set'}</p>
+          <p><strong>Deadline:</strong> ${deadline ? formatDeadline(deadline, zone) : 'No deadline set'}</p>
           
           <p>Please click the link below to access your personalized evaluation form:</p>
           
@@ -112,8 +120,10 @@ async function sendEvaluationInvitation(student, course, evaluationToken, fronte
 
 /**
  * Send reminder email to a student
+ * @param {Date} deadline - The student's evaluation deadline (their link's expiry)
+ * @param {String} zone - IANA zone the deadline is written in (the instructor's)
  */
-async function sendEvaluationReminder(student, course, evaluationToken, frontendUrl = 'http://localhost:3000') {
+async function sendEvaluationReminder(student, course, evaluationToken, frontendUrl = 'http://localhost:3000', deadline, zone) {
   const evaluationUrl = `${frontendUrl}/evaluate/${evaluationToken}`;
   const subject = `Reminder: Peer Evaluation Due for ${course.course_name}`;
   
@@ -124,6 +134,7 @@ async function sendEvaluationReminder(student, course, evaluationToken, frontend
           <h2 style="color: #d9534f;">Peer Evaluation Reminder</h2>
           <p>Dear ${student.name},</p>
           <p><strong>This is a reminder</strong> that you have not yet completed your peer evaluation.</p>
+          ${deadline ? `<p><strong>Due:</strong> ${formatDeadline(deadline, zone)}</p>` : ''}
           <div style="text-align: center; margin: 30px 0;">
             <a href="${evaluationUrl}" 
                style="background-color: #d9534f; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import SchoolIcon from '@mui/icons-material/School';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import {
   Container,
   Paper,
@@ -25,10 +25,10 @@ import {
 } from '@mui/material';
 import { CheckCircle as CheckIcon, Person as PersonIcon } from '@mui/icons-material';
 import api from '../services/api';
+import { formatDeadlineLocal } from '../services/deadline';
 
 function StudentEvaluation() {
   const { token } = useParams();
-  const navigate = useNavigate();
   
   // State
   const [loading, setLoading] = useState(true);
@@ -188,11 +188,10 @@ function StudentEvaluation() {
               Submitted: {new Date(evaluationData.submitted_at).toLocaleString()}
             </Typography>
           )}
-          <Box sx={{ mt: 3 }}>
-            <Button variant="outlined" onClick={() => navigate('/')}>
-              Return to Home
-            </Button>
-          </Box>
+          {/* A student has no home page here ("/" is the professor login), so nothing links away */}
+          <Typography variant="body1" sx={{ mt: 3 }}>
+            You can close this window now.
+          </Typography>
         </Paper>
       </Container>
     );
@@ -220,6 +219,12 @@ function StudentEvaluation() {
           </Typography>
         </Toolbar>
       </AppBar>
+      {/* CICD-67: the deadline, in the student's own time zone */}
+      {evaluationData?.deadline && (
+        <Alert severity="info" sx={{ mb: 3 }}>
+          <strong>Due:</strong> {formatDeadlineLocal(evaluationData.deadline)}
+        </Alert>
+      )}
       <Paper sx={{ p: 3, mb: 3, boxShadow: 3, borderRadius: 3 }}>
         <Typography variant="h6" color="primary" gutterBottom>
           {evaluationData?.rubric?.description}

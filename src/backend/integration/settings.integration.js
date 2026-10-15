@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const Professor = require('../models/Professor');
 const Student = require('../models/Student');
 const { startDatabase, stopDatabase, clearDatabase } = require('./helpers/db');
-const { startApp } = require('./helpers/app');
+const { startApp, deadlineBody } = require('./helpers/app');
 const { seed, IDS } = require('./helpers/seed');
 
 // CW-10 AI features, FR-22 flag list, and CW-12 the rubric.
@@ -77,7 +77,7 @@ test('TC-22-32: one professor\'s word list does not change another\'s', async ()
 });
 
 test('TC-13-20: the form\'s rubric is the one fixed rubric: five criteria scored 1-5, participation 1-4, and written feedback', async () => {
-  const send = await app.request('POST', `/api/courses/${IDS.courseAda}/evaluations/send`, { token: ada, body: {} });
+  const send = await app.request('POST', `/api/courses/${IDS.courseAda}/evaluations/send`, { token: ada, body: deadlineBody() });
   assert.equal(send.status, 200);
   const { evaluation_token: token } = await Student.findById(IDS.ann);
 

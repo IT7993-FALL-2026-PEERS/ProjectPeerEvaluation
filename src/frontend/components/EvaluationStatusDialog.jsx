@@ -11,7 +11,9 @@ import { groupStudentsByTeam } from '../services/evaluationStatus';
 // The Evaluation Status dialog on the course row, moved out of CourseManagement.js (CICD-57, step 3).
 // The page owns the status, the requests and the sending and resetting flags; this shows them, one
 // card per team, and reports what the professor presses.
-function EvaluationStatusDialog({ open, course, status, loading, sending, resetting, onSend, onRemind, onReset, onClose }) {
+function EvaluationStatusDialog({
+  open, course, status, loading, sending, resetting, onSend, onRemind, onReset, onClose, onExtend, onAllowResubmission,
+}) {
   return (
     <Dialog
       open={open}
@@ -55,15 +57,21 @@ function EvaluationStatusDialog({ open, course, status, loading, sending, resett
                   <Typography variant="h6">
                     Progress: {status.completed_count}/{status.total_count} evaluations completed
                   </Typography>
-                  <Button
-                    variant="contained"
-                    color="primary"
-                    startIcon={<SendIcon />}
-                    onClick={onRemind}
-                    disabled={status.completed_count === status.total_count}
-                  >
-                    Send Reminders
-                  </Button>
+                  <Box>
+                    {/* CICD-68: more time, with a new link, for students who have not submitted */}
+                    <Button variant="outlined" onClick={onExtend} sx={{ mr: 1 }}>
+                      Extend Deadline
+                    </Button>
+                    <Button
+                      variant="contained"
+                      color="primary"
+                      startIcon={<SendIcon />}
+                      onClick={onRemind}
+                      disabled={status.completed_count === status.total_count}
+                    >
+                      Send Reminders
+                    </Button>
+                  </Box>
                 </Box>
 
                 <LinearProgress
@@ -135,6 +143,15 @@ function EvaluationStatusDialog({ open, course, status, loading, sending, resett
                                     <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
                                       {student.last_activity ? new Date(student.last_activity).toLocaleDateString() : 'Never'}
                                     </Typography>
+                                    {/* CICD-68: a student who has submitted can be allowed one more submission */}
+                                    {student.resubmission_allowed && (
+                                      <Chip label="Resubmission allowed" color="info" size="small" sx={{ mt: 0.5 }} />
+                                    )}
+                                    {student.completed && !student.resubmission_allowed && (
+                                      <Button size="small" onClick={() => onAllowResubmission(student)} aria-label={`Allow ${student.name} to resubmit`}>
+                                        Allow resubmission
+                                      </Button>
+                                    )}
                                   </Box>
                                 </Box>
                               ))}

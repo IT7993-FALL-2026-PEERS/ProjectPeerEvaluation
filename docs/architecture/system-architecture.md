@@ -113,7 +113,7 @@ flowchart TB
 | `models/` | `Professor`, `Course`, `Student`, `Team`, `Evaluation`, `Report` (defined but unused). See [database-schema.md](database-schema.md) |
 | `middleware/` | `auth.js`, `courseOwner.js`, `errorHandler.js`, `requestLogger.js` (redacts evaluation tokens) |
 | `config/` | `env.js` (checks `JWT_SECRET` at startup), `health.js`, `serverTimeouts.js` (120-second keep-alive for Render's proxy), `rateLimit.js` (per-address limits and the proxy hops to trust), `rubric.js` (the hardcoded rubric, D-09) |
-| `utils/` | `emailUtils.js` (Nodemailer transport and email templates), `emailPacer.js` (spaces emails `EMAIL_SEND_INTERVAL_MS` apart), `csv.js` (safe CSV output), `evaluationToken.js` (random tokens with a 14-day expiry), `inputGuards.js` (rejects non-text input), `saveEvaluations.js` (all-or-nothing submission), `ensureIndexes.js` (builds the unique evaluation index at startup) |
+| `utils/` | `emailUtils.js` (Nodemailer transport and email templates), `emailPacer.js` (spaces emails `EMAIL_SEND_INTERVAL_MS` apart), `csv.js` (safe CSV output), `evaluationToken.js` (random tokens that expire at the evaluation deadline), `evaluationDeadline.js` (checks the deadline a send carries and writes it for emails), `inputGuards.js` (rejects non-text input), `saveEvaluations.js` (all-or-nothing submission), `ensureIndexes.js` (builds the unique evaluation index at startup) |
 | `scripts/`, `migrations/` | Manual seed and inspection scripts, one old migration (D-14). Not part of the running app |
 | `tests/`, `integration/` | `node:test` unit tests (`npm test`) and integration tests against a real MongoDB (`npm run test:integration`), both run in CI |
 
@@ -215,7 +215,7 @@ the new bcrypt hash and clears the token so the link works once.
 | Professor passwords | bcrypt, cost 10 | No strength rule. Login, register, reset and the student links are rate limited per client address (API-5) |
 | Professor sessions | Stateless JWT (HS256, `JWT_SECRET`), 60 minutes of inactivity (renewed through the `X-Access-Token` header while the professor works; 8-hour cap), stored in `localStorage` | Inherited requirement says 30 minutes (D-18, to be confirmed); no server-side logout; `localStorage` is readable by any script on the page |
 | Authorization | Every professor endpoint needs a JWT; every course-scoped endpoint checks course ownership | Student and team updates change only whitelisted fields, and IDs in a payload are checked against the course (API-4) |
-| Student access | A per-student token in the link, the only credential | Random (`crypto.randomBytes`) and valid for 14 days (API-1); a submission must rate exactly the evaluator's teammates, once each, with whole-number ratings (API-2) |
+| Student access | A per-student token in the link, the only credential | Random (`crypto.randomBytes`) and valid until the evaluation deadline the instructor sets (API-1, CICD-67); a submission must rate exactly the evaluator's teammates, once each, with whole-number ratings (API-2) |
 | MFA | Model field and login branch exist | Verification returns 501, so MFA can't be used (D-17) |
 | Transport | HTTPS on Render; SMTP over STARTTLS with certificate checking | — |
 | Staging email | With `DEPLOY_ENV=staging` (or a `*-staging` Render service) the mailer sends only through the Mailtrap sandbox and refuses any other transport (`utils/emailGuard.js`) | — (CICD-44) |

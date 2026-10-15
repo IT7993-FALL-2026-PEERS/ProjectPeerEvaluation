@@ -2,6 +2,7 @@ import { renderHook, act } from '@testing-library/react';
 import api from '../../services/api';
 import { getApiBaseUrl } from '../../services/apiUrl';
 import useEvaluations from '../useEvaluations';
+import { toLocalInputValue } from '../../services/deadline';
 
 vi.mock('../../services/api', () => ({
   __esModule: true,
@@ -15,6 +16,9 @@ const COURSE = { _id: 'c1', course_name: 'Capstone' };
 const NOT_SENT = { evaluations_sent: false };
 const SENT = { evaluations_sent: true, total_students: 4 };
 const ROOT = getApiBaseUrl().replace(/\/api$/, '/');
+// CICD-67: what the deadline dialog hands the send endpoint.
+const PAYLOAD = { deadline: '2999-01-01T10:00:00.000Z', deadline_zone: 'UTC' };
+const CHOSEN = '2999-01-01T10:00';
 
 let setAlert;
 let statusBody;
@@ -103,7 +107,7 @@ describe('useEvaluations: the status dialog', () => {
 });
 
 describe('useEvaluations: sending the invitations', () => {
-  const send = (view, id = 'c1') => act(() => view.result.current.sendInvitations(id));
+  const send = (view, id = 'c1') => act(() => view.result.current.sendInvitations(id, PAYLOAD));
 
   test('checks the backend is reachable first, then sends, then says how many went out', async () => {
     const view = render();
@@ -112,17 +116,18 @@ describe('useEvaluations: sending the invitations', () => {
     await send(view);
 
     expect(global.fetch).toHaveBeenCalledWith(ROOT);
-    expect(api.post).toHaveBeenCalledWith('/courses/c1/evaluations/send');
-    expect(setAlert).toHaveBeenCalledWith({ severity: 'success', message: '✅ Evaluations sent - Emails sent to 4 students' });
+    expect(api.post).toHaveBeenCalledWith('/courses/c1/evaluations/send', PAYLOAD);
+    expect(setAlert).toHaveBeenCalledWith({ severity: 'success', message: '✅ Evaluations sent - Emails sent to 4 students.' });
   });
 
-  test('says "all" when the server gives no count', async () => {
+  // Codex review: "all" was shown when none were sent; zero stays zero.
+  test('says 0, not "all", when the server gives no count', async () => {
     const view = render();
     api.post.mockResolvedValue({ data: { message: 'Evaluations sent', total_students: 4, failed: [] } });
 
     await send(view);
 
-    expect(setAlert).toHaveBeenCalledWith({ severity: 'success', message: '✅ Evaluations sent - Emails sent to all students' });
+    expect(setAlert).toHaveBeenCalledWith({ severity: 'success', message: '✅ Evaluations sent - Emails sent to 0 students.' });
   });
 
   test('names the students who did not get one', async () => {
@@ -140,7 +145,7 @@ describe('useEvaluations: sending the invitations', () => {
     api.post.mockReturnValue(new Promise((resolve) => { release = resolve; }));
 
     let sending;
-    act(() => { sending = view.result.current.sendInvitations('c1'); });
+    act(() => { sending = view.result.current.sendInvitations('c1', PAYLOAD); });
     await act(async () => { await Promise.resolve(); });
     expect(view.result.current.sendingEvaluations).toEqual({ c1: true });
 
@@ -308,8 +313,9 @@ describe('useEvaluations: what the dialog sends', () => {
     const view = await opened({ id: 'plain', course_name: 'Legacy' });
     api.post.mockResolvedValue({ data: { message: 'm', emails_sent: 1, total_students: 1, failed: [] } });
 
-    await act(() => view.result.current.evaluationStatusDialog.onSend());
-    expect(api.post).toHaveBeenLastCalledWith('/courses/plain/evaluations/send');
+    act(() => view.result.current.evaluationStatusDialog.onSend());
+    await act(() => view.result.current.sendDeadlineDialog.onConfirm(CHOSEN));
+    expect(api.post).toHaveBeenLastCalledWith('/courses/plain/evaluations/send', expect.objectContaining({ deadline: expect.any(String) }));
 
     await act(() => view.result.current.evaluationStatusDialog.onReset());
     expect(api.delete).toHaveBeenCalledWith('/courses/plain/evaluations/reset');
@@ -324,7 +330,9 @@ describe('useEvaluations: what the dialog sends', () => {
     api.post.mockReturnValue(new Promise((resolve) => { release = resolve; }));
 
     let sending;
-    act(() => { sending = view.result.current.evaluationStatusDialog.onSend(); });
+    act(() => view.result.current.evaluationStatusDialog.onSend());
+    // The promise is kept, not awaited: the post is held open until release() below
+    act(() => { sending = view.result.current.sendDeadlineDialog.onConfirm(CHOSEN); });
     await act(async () => { await Promise.resolve(); });
     expect(view.result.current.evaluationStatusDialog.sending).toBe(true);
 
@@ -339,15 +347,145 @@ describe('useEvaluations: what the dialog sends', () => {
     expect(view.result.current.evaluationStatusDialog.sending).toBe(false);
 
     let sending;
-    act(() => { sending = view.result.current.sendInvitations('other'); });
+    act(() => { sending = view.result.current.sendInvitations('other', PAYLOAD); });
     await act(async () => { await Promise.resolve(); });
     expect(view.result.current.evaluationStatusDialog.sending).toBe(false);
     await act(async () => { release({ data: { message: 'm', emails_sent: 1, total_students: 1, failed: [] } }); await sending; });
 
     api.post.mockReturnValue(new Promise((resolve) => { release = resolve; }));
-    act(() => { sending = view.result.current.sendInvitations('c1'); });
+    act(() => { sending = view.result.current.sendInvitations('c1', PAYLOAD); });
     await act(async () => { await Promise.resolve(); });
     expect(view.result.current.evaluationStatusDialog.sending).toBe(true);
     await act(async () => { release({ data: { message: 'm', emails_sent: 1, total_students: 1, failed: [] } }); await sending; });
+  });
+});
+
+describe('useEvaluations: asking for a deadline before sending (CICD-67)', () => {
+  test('requestSend opens the deadline dialog for the course, prefilled from its last deadline, and sends nothing yet', () => {
+    const view = render();
+    const last = new Date(Date.now() + 5 * 86400000);
+    act(() => view.result.current.requestSend({ _id: 'c1', last_evaluation_deadline: last.toISOString() }));
+    const dialog = view.result.current.sendDeadlineDialog;
+    expect(dialog.open).toBe(true);
+    expect(dialog.initialValue).toBe(toLocalInputValue(last));
+    expect(api.post).not.toHaveBeenCalled();
+  });
+
+  test('confirming posts the deadline and the zone to the course send endpoint, and closes the dialog', async () => {
+    api.post.mockResolvedValue({ data: { message: 'sent', emails_sent: 2, total_students: 2, failed: [] } });
+    const view = render();
+    act(() => view.result.current.requestSend({ _id: 'c1' }));
+    await act(() => view.result.current.sendDeadlineDialog.onConfirm(CHOSEN));
+    expect(api.post).toHaveBeenCalledWith('/courses/c1/evaluations/send', {
+      deadline: new Date(CHOSEN).toISOString(), deadline_zone: expect.any(String),
+    });
+    expect(view.result.current.sendDeadlineDialog.open).toBe(false);
+  });
+
+  test('cancelling closes the dialog and sends nothing', () => {
+    const view = render();
+    act(() => view.result.current.requestSend({ _id: 'c1' }));
+    act(() => view.result.current.sendDeadlineDialog.onClose());
+    expect(view.result.current.sendDeadlineDialog.open).toBe(false);
+    expect(api.post).not.toHaveBeenCalled();
+  });
+
+  test('the status dialog\'s send asks for a deadline for the course it shows', async () => {
+    const view = await opened();
+    act(() => view.result.current.evaluationStatusDialog.onSend());
+    expect(view.result.current.sendDeadlineDialog.open).toBe(true);
+    expect(api.post).not.toHaveBeenCalled();
+  });
+
+  // Codex review: the course list is not reloaded after a send, so the hook remembers the deadline itself.
+  test('after a send that emailed someone, the next send is prefilled with that deadline', async () => {
+    const used = new Date(Date.now() + 3 * 86400000);
+    api.post.mockResolvedValue({ data: { message: 'sent', emails_sent: 1, total_students: 1, failed: [], deadline: used.toISOString() } });
+    const view = render();
+    act(() => view.result.current.requestSend(COURSE));
+    await act(() => view.result.current.sendDeadlineDialog.onConfirm(toLocalInputValue(used)));
+    act(() => view.result.current.requestSend(COURSE));
+    expect(view.result.current.sendDeadlineDialog.initialValue).toBe(toLocalInputValue(used));
+  });
+
+  test('the alert says who already had a link or had submitted', async () => {
+    api.post.mockResolvedValue({ data: { message: 'Sent.', emails_sent: 1, total_students: 1, failed: [], already_invited: 2, already_submitted: 1 } });
+    const view = render();
+    await act(() => view.result.current.sendInvitations('c1', PAYLOAD));
+    expect(setAlert).toHaveBeenCalledWith({ severity: 'success', message: '✅ Sent. - Emails sent to 1 students. 2 already had a link. 1 already submitted.' });
+  });
+
+  test('a reminder names the students whose deadline has passed', async () => {
+    const view = await opened();
+    api.post.mockResolvedValue({ data: { message: 'Reminders sent', reminders_sent: 1, total_reminded: 1, failed: [], deadline_passed: ['Pat Lee'], not_invited: 0 } });
+    await act(() => view.result.current.evaluationStatusDialog.onRemind());
+    expect(setAlert).toHaveBeenCalledWith({ severity: 'warning', message: 'Reminders sent Deadline passed (extend first): Pat Lee.' });
+  });
+});
+
+describe('useEvaluations: extend and resubmit (CICD-68)', () => {
+  const ROWS = [
+    { id: 's1', name: 'Ann Archer', team: 'Alpha', team_id: 't1', completed: false },
+    { id: 's2', name: 'Ben Baker', team: 'Alpha', team_id: 't1', completed: true },
+    { id: 's3', name: 'Cy Cole', team: 'No Team', team_id: null, completed: false },
+  ];
+
+  test('the extend dialog offers the unfinished students and the teams from the status', async () => {
+    statusBody = { ...SENT, students: ROWS };
+    const view = await opened();
+    act(() => view.result.current.evaluationStatusDialog.onExtend());
+    const dialog = view.result.current.extendDialog;
+    expect(dialog.open).toBe(true);
+    expect(dialog.students).toEqual([{ id: 's1', name: 'Ann Archer' }, { id: 's3', name: 'Cy Cole' }]);
+    expect(dialog.teams).toEqual([{ id: 't1', name: 'Alpha' }]);
+  });
+
+  test('confirming posts the scope and the deadline, says who was extended, and refreshes the status', async () => {
+    api.post.mockResolvedValue({ data: { message: 'Deadline extended.', extended: ['Ann Archer'], failed: [], skipped: { submitted: 1, not_invited: 0, changed: 0 } } });
+    const view = await opened();
+    act(() => view.result.current.evaluationStatusDialog.onExtend());
+    api.get.mockClear();
+    await act(() => view.result.current.extendDialog.onConfirm({ scope: 'student', student_id: 's1', localValue: CHOSEN }));
+    expect(api.post).toHaveBeenCalledWith('/courses/c1/evaluations/extend', expect.objectContaining({
+      scope: 'student', student_id: 's1', deadline: new Date(CHOSEN).toISOString(), deadline_zone: expect.any(String),
+    }));
+    expect(setAlert).toHaveBeenCalledWith({ severity: 'success', message: 'Deadline extended for Ann Archer. 1 already submitted.' });
+    expect(api.get).toHaveBeenCalledWith('/courses/c1/evaluations/status');
+    expect(view.result.current.extendDialog.open).toBe(false);
+  });
+
+  test('a refused extension shows the server\'s reason', async () => {
+    api.post.mockRejectedValue({ response: { data: { error: { message: 'Choose the student to extend.' } } } });
+    const view = await opened();
+    act(() => view.result.current.evaluationStatusDialog.onExtend());
+    await act(() => view.result.current.extendDialog.onConfirm({ scope: 'student', localValue: CHOSEN }));
+    expect(setAlert).toHaveBeenCalledWith({ severity: 'error', message: 'Choose the student to extend.' });
+  });
+
+  test('Allow resubmission asks for a deadline for that student, then posts it and refreshes the status', async () => {
+    api.post.mockResolvedValue({ data: { message: 'Ann Archer can submit again until the new deadline.' } });
+    const view = await opened();
+    act(() => view.result.current.evaluationStatusDialog.onAllowResubmission({ id: 's1', name: 'Ann Archer' }));
+    expect(view.result.current.resubmitDialog.open).toBe(true);
+    expect(view.result.current.resubmitDialog.title).toMatch(/Ann Archer/);
+    api.get.mockClear();
+    await act(() => view.result.current.resubmitDialog.onConfirm(CHOSEN));
+    expect(api.post).toHaveBeenCalledWith('/courses/c1/students/s1/evaluations/resubmit', expect.objectContaining({ deadline: new Date(CHOSEN).toISOString() }));
+    expect(setAlert).toHaveBeenCalledWith({ severity: 'success', message: 'Ann Archer can submit again until the new deadline.' });
+    expect(api.get).toHaveBeenCalledWith('/courses/c1/evaluations/status');
+    expect(view.result.current.resubmitDialog.open).toBe(false);
+  });
+
+  test('a refused resubmission shows the server\'s reason, and cancelling sends nothing', async () => {
+    api.post.mockRejectedValue({ response: { data: { error: { message: 'This student has not submitted yet; send or extend instead.' } } } });
+    const view = await opened();
+    act(() => view.result.current.evaluationStatusDialog.onAllowResubmission({ id: 's1', name: 'Ann Archer' }));
+    await act(() => view.result.current.resubmitDialog.onConfirm(CHOSEN));
+    expect(setAlert).toHaveBeenCalledWith({ severity: 'error', message: 'This student has not submitted yet; send or extend instead.' });
+    api.post.mockClear();
+    act(() => view.result.current.evaluationStatusDialog.onAllowResubmission({ id: 's1', name: 'Ann Archer' }));
+    act(() => view.result.current.resubmitDialog.onClose());
+    expect(view.result.current.resubmitDialog.open).toBe(false);
+    expect(api.post).not.toHaveBeenCalled();
   });
 });

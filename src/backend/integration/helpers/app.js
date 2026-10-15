@@ -13,17 +13,31 @@ const errorHandler = require('../../middleware/errorHandler');
 // Nodemailer's JSON transport accepts it, and the options (to, subject, html) are kept here.
 // This must run before emailUtils is loaded, which happens when the routers are required below.
 const sentEmails = [];
+// failNextEmails(n) makes the next n sends fail, the way a mail server that is down would.
+let failuresLeft = 0;
+function failNextEmails(count) {
+  failuresLeft = count;
+}
 const createTransport = nodemailer.createTransport;
 nodemailer.createTransport = () => {
   const transport = createTransport({ jsonTransport: true });
   const sendMail = transport.sendMail.bind(transport);
   transport.sendMail = async (options) => {
+    if (failuresLeft > 0) {
+      failuresLeft -= 1;
+      throw new Error('SMTP down');
+    }
     const info = await sendMail(options);
     sentEmails.push(options);
     return info;
   };
   return transport;
 };
+
+// Every send needs a deadline (CICD-67): one a week ahead, unless the test says otherwise.
+function deadlineBody(days = 7) {
+  return { deadline: new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString(), deadline_zone: 'America/New_York' };
+}
 
 async function startApp() {
   const app = express();
@@ -72,4 +86,10 @@ async function startApp() {
   return { baseUrl, request, uploadCsv, tokenFor, close: () => new Promise((resolve) => server.close(resolve)) };
 }
 
-module.exports = { startApp, sentEmails, clearEmails: () => { sentEmails.length = 0; } };
+module.exports = {
+  startApp,
+  sentEmails,
+  failNextEmails,
+  deadlineBody,
+  clearEmails: () => { sentEmails.length = 0; failuresLeft = 0; },
+};
