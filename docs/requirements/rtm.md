@@ -74,7 +74,7 @@ security) and to fixed defects. IDs here may use a backlog number or `SEC` inste
 | Input validation against injection (operator objects, regex characters, non-text values) | `injectionGuards.test.js` · `inputGuards.test.js`: TC-SEC-10..12 | Account-takeover fix (#100), CICD-45 |
 | Browser origins allowed to call the API | `corsConfig.test.js` · E2E `staging.spec.js` (the four `@staging` tests, against staging) | CICD-37, CICD-27 |
 | Staging mail never reaches a real inbox | `emailGuard.test.js` | CICD-44 |
-| Deployment health check | `health.test.js` · `deploymentStatus.test.js`: TC-29-40..48 | `/api/health` used by Render and CD |
+| Deployment health check | `health.test.js`: TC-29-50..52 (the image reports the commit it was built from) · `deploymentStatus.test.js`: TC-29-40..48 | `/api/health` used by Render and CD |
 | Deploy and release scripts | `renderDeploy.test.js` · `releaseRecord.test.js` | CICD-28, CICD-58 |
 | Configuration safety | `env.test.js` (production refuses a missing or short `JWT_SECRET`) | D-03, PR #16 |
 | Server behind Render's load balancer | `serverTimeouts.test.js` | PR #30 |

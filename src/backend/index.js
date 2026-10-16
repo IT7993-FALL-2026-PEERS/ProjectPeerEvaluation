@@ -76,9 +76,10 @@ app.use(errorHandler);
 
 // Start Server
 const PORT = process.env.PORT || 5000;
-// The deployed commit in the startup line, so Render's log shows which version started (Render sets
-// RENDER_GIT_COMMIT; it's also in /api/health).
-const commit = process.env.RENDER_GIT_COMMIT ? ` (commit ${process.env.RENDER_GIT_COMMIT.slice(0, 7)})` : '';
+// The deployed commit in the startup line, so Render's log shows which version started (an image carries
+// GIT_COMMIT, Render sets RENDER_GIT_COMMIT for a git build; it's also in /api/health).
+const deployedCommit = process.env.GIT_COMMIT || process.env.RENDER_GIT_COMMIT;
+const commit = deployedCommit ? ` (commit ${deployedCommit.slice(0, 7)})` : '';
 // Express 5 passes a failed bind (such as EADDRINUSE) to this callback instead of throwing, and the
 // open MongoDB connection would keep a listener-less process alive, so stop here.
 applyServerTimeouts(app.listen(PORT, (err) => {

@@ -41,3 +41,22 @@ test('commit is null when not running on Render', () => {
   const h = getHealth({ readyState: 1 }, {});
   assert.equal(h.commit, null);
 });
+
+// CICD-73: the Docker image carries the commit it was built from, because Render sets RENDER_GIT_COMMIT
+// only for git builds. CD waits for /api/health to report the commit it deployed.
+const SHA = 'a'.repeat(40);
+const OTHER = 'b'.repeat(40);
+
+test('TC-29-50: an image reports the commit it was built from (GIT_COMMIT)', () => {
+  assert.equal(getHealth({ readyState: 1 }, { GIT_COMMIT: SHA }).commit, SHA);
+});
+
+test('TC-29-51: the commit baked into an image wins over a Render variable, so a stale setting cannot misreport the artifact', () => {
+  assert.equal(getHealth({ readyState: 1 }, { RENDER_GIT_COMMIT: OTHER, GIT_COMMIT: SHA }).commit, SHA);
+  assert.equal(getHealth({ readyState: 1 }, { RENDER_GIT_COMMIT: OTHER }).commit, OTHER);
+});
+
+test('TC-29-52: with neither variable the commit is null, and an empty GIT_COMMIT (a local build) counts as none', () => {
+  assert.equal(getHealth({ readyState: 1 }, {}).commit, null);
+  assert.equal(getHealth({ readyState: 1 }, { GIT_COMMIT: '' }).commit, null);
+});
