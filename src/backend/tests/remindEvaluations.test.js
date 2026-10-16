@@ -18,7 +18,8 @@ async function remind(t, body) {
   let filter;
   t.mock.method(Course, 'findById', async () => ({ _id: 'course-1', course_name: 'Capstone' }));
   t.mock.method(Evaluation, 'find', () => ({ distinct: async () => completed }));
-  t.mock.method(Student, 'find', async (f) => { filter = f; return []; });
+  // The first query is the one under test; the controller then loads the whole course (CICD-72)
+  t.mock.method(Student, 'find', async (f) => { filter = filter || f; return []; });
   await remindEvaluations(
     { params: { course_id: 'course-1' }, body },
     { status() { return this; }, json() {} },

@@ -134,3 +134,36 @@ test('E2E-30: with two courses, Manage Teams opens one dialog, not one per cours
   // hide exactly the duplicates this test is looking for.
   await expect(page.locator('[role=dialog]')).toHaveCount(1);
 });
+
+// CICD-72: a student alone on a team has nobody to rate, so no invitation is sent to them and the
+// instructor is told; the status screen lists them without counting them as unfinished.
+test('E2E-47: a student alone on a team is skipped by Send Evaluations and shown as having no teammates', async ({ page }) => {
+  await openTeams(page);
+
+  // Ben moves to Beta, so Ann is alone on Alpha
+  await teamRow(page, 'Beta').getByTitle('Manage Students').click();
+  // the row is a plain box: the innermost one that holds Ben's name and an Add button
+  await top(page).locator('div', { hasText: 'Ben Baker' }).filter({ has: page.getByTitle('Add to team') }).last().getByTitle('Add to team').click();
+  await expect(alertWith(page, 'Student added to Beta')).toBeVisible();
+  await top(page).getByRole('button', { name: 'Close' }).click();
+
+  // Sending to Alpha reaches nobody and says why
+  await teamRow(page, 'Alpha').getByTitle('Send Evaluations to Team').click();
+  await sendWithDeadline(page);
+  await expect(alertWith(page, 'Alone on their team (add a teammate, then send again): Ann Archer.')).toBeVisible();
+  expect(await capturedEmails()).toHaveLength(0);
+
+  // Sending to the whole course reaches the other three
+  await top(page).getByRole('button', { name: 'Close' }).click();
+  await expect(page.locator('[role=dialog]')).toHaveCount(0);
+  await page.getByTitle('Send Evaluations', { exact: true }).click();
+  await sendWithDeadline(page);
+  await expect(alertWith(page, 'Alone on their team (add a teammate, then send again): Ann Archer.')).toBeVisible();
+  // the first alert may still be on screen, so wait for the emails themselves
+  await expect.poll(async () => (await capturedEmails()).map((e) => e.to).sort()).toEqual(['ben@example.edu', 'cy@example.edu', 'di@example.edu']);
+
+  // The status screen lists Ann with the reason and counts only the three who can submit
+  await courseAction(page, 'Evaluation Status').click();
+  await expect(top(page).getByText('Progress: 0/3 evaluations completed')).toBeVisible();
+  await expect(top(page).getByText('No teammates to rate. Add a teammate to their team, then send again.')).toBeVisible();
+});

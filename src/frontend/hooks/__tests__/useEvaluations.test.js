@@ -440,6 +440,13 @@ describe('useEvaluations: extend and resubmit (CICD-68)', () => {
     expect(dialog.teams).toEqual([{ id: 't1', name: 'Alpha' }]);
   });
 
+  test('the extend dialog does not offer a student with nobody to rate (CICD-72: an extension would skip them)', async () => {
+    statusBody = { ...SENT, students: [...ROWS, { id: 's4', name: 'Di Diaz', team: 'Beta', team_id: 't2', completed: false, nobody_to_rate: true }] };
+    const view = await opened();
+    act(() => view.result.current.evaluationStatusDialog.onExtend());
+    expect(view.result.current.extendDialog.students.map((student) => student.name)).toEqual(['Ann Archer', 'Cy Cole']);
+  });
+
   test('confirming posts the scope and the deadline, says who was extended, and refreshes the status', async () => {
     api.post.mockResolvedValue({ data: { message: 'Deadline extended.', extended: ['Ann Archer'], failed: [], skipped: { submitted: 1, not_invited: 0, changed: 0 } } });
     const view = await opened();

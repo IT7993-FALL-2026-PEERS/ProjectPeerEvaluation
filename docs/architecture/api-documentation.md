@@ -86,6 +86,7 @@ takes the student's **university ID** string (for example `S0012345`).
 | 409 | `ALREADY_COMPLETED` | Student already submitted their evaluation |
 | 409 | `LINK_CHANGED` | The student's link was replaced, or its deadline passed, while the request ran; nothing was saved or activated |
 | 409 | `NOT_SUBMITTED` | A resubmission was asked for a student who has not submitted |
+| 409 | `NO_TEAMMATES` | A submission or a resubmission for a student with nobody to rate (alone on their team): "You have no teammates to rate yet. Ask your instructor to check your team." |
 | 502 | `EMAIL_FAILED` | The resubmission email could not be sent; nothing was changed |
 | 429 | `RATE_LIMITED` | Too many requests from this address; `details.retry_after_seconds` and the `Retry-After` header say how long to wait |
 
@@ -431,7 +432,10 @@ ahead. `deadline_zone` is optional (default `UTC`); it must be an IANA zone and 
 deadline in emails. Anything else is **400** `VALIDATION_ERROR`, and nothing is sent or stored (CICD-67).
 
 The send reaches only students who have **no active link and have not submitted**. Students with a
-working link keep it and its deadline, and get no new email; students who have submitted are skipped.
+working link keep it and its deadline, and get no new email; students who have submitted are skipped. A student with
+nobody to rate (alone on their team, or the only student of the course when they have no team: the form would be empty
+and a submission could never be accepted) is not invited either and is named in `no_teammates` (CICD-72). When nobody is left to invite and `no_teammates` is not
+empty, the message is "Nobody was invited: the students left have nobody to rate." instead of "Nobody needs an invitation".
 Each recipient's link is claimed with one conditional update before its email goes out, so two sends at
 the same moment cannot both issue one; if the email fails, the link is given back, so a later send
 reaches that student. The link's expiry is the deadline. After a send that emailed someone, the course
@@ -441,7 +445,8 @@ keeps `last_evaluation_deadline` and `last_evaluation_deadline_zone`, which pref
 ```json
 { "message": "Evaluation invitations sent successfully.", "emails_sent": 2,
   "total_students": 3, "failed": ["Carol (carol@example.com): <error message>"],
-  "deadline": "2026-10-17T03:59:00.000Z", "already_invited": 1, "already_submitted": 0 }
+  "deadline": "2026-10-17T03:59:00.000Z", "already_invited": 1, "already_submitted": 0,
+  "no_teammates": [] }
 ```
 `total_students` counts the recipients. When nobody needs an invitation the answer is still **200**,
 with a message saying so and `emails_sent: 0`. Partial failures still answer 200: check `failed`, a list of `"Name (email): error"` strings. **404** no students in the course or team.
@@ -463,7 +468,11 @@ reminders, extend and resubmit use the same rule (CICD-70). The mark survives th
 student wrote (which happens when the people they rated are deleted); only a reset clears it. `ratings_on_file`
 is `false` for a student who has the mark but no evaluations, and `last_activity` is then `null`. The counts are
 the enrolled students who submitted. For such a student **Allow resubmission** works, and the next submission
-fills in their ratings.
+fills in their ratings. A student who has not submitted and has nobody to rate (alone on their team) has
+`nobody_to_rate: true` on their row and is left out of `total_count`, `completed_count`, `pending_count` and the
+rate, so the course can reach 100% (CICD-72); one who submitted before their team shrank still counts. Before anything
+is sent the answer has `evaluations_sent: false`, no rows, and `no_teammates: ["<names>"]` naming the students a send
+cannot invite.
 
 ### `POST .../evaluations/remind`
 
@@ -471,8 +480,9 @@ Body (optional): `{ "student_ids": [...] }` reminds only those students; without
 hasn't submitted is considered. A reminder goes only to students whose link is still active, reuses that
 link, and never changes it or its deadline (CICD-67); the email shows the deadline in the zone of the send
 that invited the student. **200** `{ "message", "reminders_sent", "total_reminded", "failed": [...],
-"deadline_passed": ["<names>"], "not_invited": <count> }`: students whose deadline has passed need an
-extension first, and students never invited need a send. A student marked as submitted is not reminded (CICD-70). `reminders_sent: 0` when everyone is done.
+"deadline_passed": ["<names>"], "not_invited": <count>, "no_teammates": ["<names>"] }`: students whose deadline
+has passed need an extension first, students never invited need a send, and students with nobody to rate (alone on
+their team) are named and never reminded or counted as not invited (CICD-72). A student marked as submitted is not reminded (CICD-70). `reminders_sent: 0` when everyone is done.
 
 ### `POST .../evaluations/extend`
 
@@ -482,10 +492,11 @@ Students in scope who were invited (active or expired link) and have not submitt
 link; only after that email went out is the new link swapped in, and only if the student's link is still
 the one read before (compare-and-set), so a failed email leaves the old link working and two overlapping
 extensions cannot both win. The old link then answers **404**. Students who submitted are never changed;
-students never invited are skipped (they need a send). Pacing and the recipient limit apply.
+students never invited are skipped (they need a send), and so are students with nobody to rate (CICD-72). Pacing and
+the recipient limit apply.
 
 **200** `{ "message", "extended": ["<names>"], "failed": ["Name (email): reason"], "skipped": { "submitted",
-"not_invited", "changed" }, "deadline" }`: `changed` counts students whose link changed while their email
+"not_invited", "changed", "no_teammates" }, "deadline" }`: `changed` counts students whose link changed while their email
 went out (they submitted, or another extension won); their new link was not activated. **400**
 `VALIDATION_ERROR` for a bad deadline, scope or id; **404** for a student or team not in this course.
 

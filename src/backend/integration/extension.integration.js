@@ -110,7 +110,7 @@ test('TC-10-74: students who submitted and students never invited are skipped an
   clearEmails();
   const res = await app.request('POST', extendPath(IDS.courseAda), { token: ada, body: { ...deadlineBody(9), scope: 'unsubmitted' } });
   assert.deepEqual(res.body.extended, ['Ann Archer']);
-  assert.deepEqual(res.body.skipped, { submitted: 1, not_invited: 2, changed: 0 });
+  assert.deepEqual(res.body.skipped, { submitted: 1, not_invited: 2, changed: 0, no_teammates: 0 });
   assert.deepEqual(sentEmails.map((e) => e.to), ['ann@example.edu']);
 });
 

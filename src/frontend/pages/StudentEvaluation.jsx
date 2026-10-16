@@ -276,6 +276,13 @@ function StudentEvaluation() {
         </Alert>
       )}
 
+      {/* CICD-72: alone on a team, there is nobody to rate and nothing to submit */}
+      {evaluationData && Array.isArray(evaluationData.teammates) && evaluationData.teammates.length === 0 && (
+        <Alert severity="info" sx={{ mb: 3 }}>
+          You have no teammates to rate yet. Ask your instructor to check your team.
+        </Alert>
+      )}
+
       {/* Evaluation Forms */}
       {evaluationData?.teammates?.map((teammate, index) => (
         <Card key={teammate._id} sx={{ p: 3, mb: 4, boxShadow: 4, borderRadius: 3 }}>
@@ -354,6 +361,7 @@ function StudentEvaluation() {
       ))}
 
       {/* Submit Button */}
+      {!(evaluationData && Array.isArray(evaluationData.teammates) && evaluationData.teammates.length === 0) && (
       <Box sx={{ textAlign: 'center', mt: 4 }}>
         <Button
           variant="contained"
@@ -365,6 +373,7 @@ function StudentEvaluation() {
           {submitting ? <CircularProgress size={24} /> : 'Submit Evaluation'}
         </Button>
       </Box>
+      )}
       {/* Footer */}
       <Box sx={{ mt: 6, textAlign: 'center', color: 'text.secondary' }}>
         <Divider sx={{ mb: 2 }} />
