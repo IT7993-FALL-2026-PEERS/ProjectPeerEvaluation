@@ -92,18 +92,22 @@ flowchart TB
 
     subgraph CD["Continuous Delivery (CD) · runs automatically after merge to main"]
         direction TB
-        ARTIFACTS["Build deployment artifacts<br/>and Docker images"]
-        STG["Deploy to staging<br/>Render.com"]
+        ARTIFACTS["Build and push Docker images<br/>tested, pushed by digest"]
+        STG["Deploy to staging<br/>Render.com<br/>backend image, frontend source"]
+        HEALTH["Verify deployment health<br/>/api/health reports the new commit"]
         SMOKE["Smoke tests"]
-        HEALTH["Verify deployment health<br/>/api/health"]
+        TAG["Move the staging image tag<br/>only after smoke passes"]
         RC["Produce release candidate"]
         DREPORT["Publish reports<br/>build history, deployment status"]
-        ARTIFACTS --> STG --> SMOKE --> HEALTH --> RC --> DREPORT
+        ROLLBACK["Roll back on failure<br/>to the last good image"]
+        ARTIFACTS --> STG --> HEALTH --> SMOKE --> TAG --> RC --> DREPORT
+        STG -. "deploy fails" .-> ROLLBACK
+        SMOKE -. "smoke fails" .-> ROLLBACK
     end
 
     MERGE --> ARTIFACTS
     DREPORT --> APPROVE{{"Manual approval<br/>required for production"}}
-    APPROVE --> PROD(["Production<br/>Render.com"])
+    APPROVE --> PROD(["GitHub release<br/>production hosting out of scope"])
 
     classDef done fill:#dcfce7,stroke:#15803d,color:#14532d,stroke-width:3px
     classDef partial fill:#ecfccb,stroke:#4d7c0f,color:#365314,stroke-width:3px,stroke-dasharray: 9 6
@@ -112,7 +116,7 @@ flowchart TB
     classDef endpoint fill:#dbeafe,stroke:#2563eb,color:#1e3a8a,stroke-width:3px
     linkStyle default stroke-width:2px
 
-    class BUILD_APP,LINT,SEC,DOCKER,UNIT,INTEG,REG,E2E,REPORT,ARTIFACTS,STG,SMOKE,HEALTH,RC,DREPORT done
+    class BUILD_APP,LINT,SEC,DOCKER,UNIT,INTEG,REG,E2E,REPORT,ARTIFACTS,STG,SMOKE,HEALTH,TAG,RC,DREPORT,ROLLBACK done
     class GATE,APPROVE gate
     class DEV,PROD,PR,MERGE,FIX endpoint
 ```
