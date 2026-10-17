@@ -2,7 +2,7 @@
 
 **Gantt task:** Technical Assessment — *"Review software architecture & technology stack"* (M1)
 **Milestone:** 1 — Assessment & Planning
-**Status:** Complete for review. Describes `main` at commit `11cfd3d` (26 Sep 2026); later changes are marked where they apply (last updated 5 Oct 2026)
+**Status:** Complete for review. Describes `main` at commit `11cfd3d` (26 Sep 2026); later changes are marked where they apply (last updated 17 Oct 2026: the delivery diagram and the staging backend, which now runs the Docker image)
 **Related:** [api-documentation.md](api-documentation.md) ·
 [database-schema.md](database-schema.md) ·
 [../research-report/tech-stack-analysis.md](../research-report/tech-stack-analysis.md) ·

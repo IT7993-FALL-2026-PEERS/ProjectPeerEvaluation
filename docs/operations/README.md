@@ -1,6 +1,6 @@
 # Operations runbook
 
-**Backlog:** CICD-31 · **Owner:** M1 (Donald) · **Last checked against the live settings:** 5 Oct 2026
+**Backlog:** CICD-31 · **Owner:** M1 (Donald) · **Last checked against the live settings:** 17 Oct 2026 (the staging backend now runs the Docker image; see the Render handover)
 
 Everything needed to run, test, release and roll back PEERS without asking the people who built it. Start with
 the walkthrough below. Each step links to the page that explains it.

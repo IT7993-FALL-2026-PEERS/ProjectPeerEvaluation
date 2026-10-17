@@ -3,7 +3,7 @@
 **Gantt task:** Technical Assessment — *"Review software architecture & technology stack"* (M1)
 **Milestone:** 1 — Assessment & Planning
 **Status:** Complete for review. Documents the API as it is on `main` (commit `11cfd3d`, 26 Sep 2026)
-**Updated:** 30 Sep 2026 for evaluation link expiry and log redaction (CICD-17): §1, §9, §11 and API-1 in §13; and for evaluation target checks (CICD-18): §11 and API-2 in §13; and for roster upload checks (CICD-19): §7 and API-3 in §13; and for team and student request bodies (CICD-45): §7, §8 and API-4 in §13; and for the team report lookup (CICD-51): §10; and for rate limiting (CICD-34): §1 and API-5 in §13; and for text-only request values (CICD-24): §4, §6, §7 and API-9 in §13
+**Updated:** 17 Oct 2026 for the participation scale (D-19, now 1–5): §10 scoring and §11 ratings; 30 Sep 2026 for evaluation link expiry and log redaction (CICD-17): §1, §9, §11 and API-1 in §13; and for evaluation target checks (CICD-18): §11 and API-2 in §13; and for roster upload checks (CICD-19): §7 and API-3 in §13; and for team and student request bodies (CICD-45): §7, §8 and API-4 in §13; and for the team report lookup (CICD-51): §10; and for rate limiting (CICD-34): §1 and API-5 in §13; and for text-only request values (CICD-24): §4, §6, §7 and API-9 in §13
 **Related:** [system-architecture.md](system-architecture.md) ·
 [database-schema.md](database-schema.md) · [../csv-upload-format.md](../csv-upload-format.md)
 

@@ -2,7 +2,7 @@
 
 Productionization, Automated Testing, and CI/CD for the PEERS Peer Evaluation System
 
-Last updated: 10/05/2026
+Last updated: 10/17/2026
 Status: Milestone 1 (Assessment & Planning) signed off by the sponsor on 28 Sep 2026 · Milestone 2
 (Quality Automation) began 5 Oct (review 26 Oct), and most of its test automation and CI gates already run
 
@@ -145,7 +145,7 @@ flowchart LR
 
 The quality gate is enforced today. Production approval is manual.
 
-**How the percentages are counted** (updated 8 Oct 2026). A partly running box is scored as the steps that
+**How the percentages are counted** (updated 17 Oct 2026). A partly running box is scored as the steps that
 run today out of the steps it needs. A step that is written but has never run counts as not done.
 The numbers move as steps land.
 
@@ -298,6 +298,7 @@ deliverables signed off by the sponsor)
   frontend coverage (about 42% today against the 70% target, as `CourseManagement.js` is split into
   tested components) and the items that need staging running
 - Update 8 Oct: the frontend is at about 93% of lines (the 70% target is met), staging and the CD release stages (images, smoke tests, `rc-*` tags, rollback) are live, and the frontend now builds with Vite and tests with Vitest
+- Update 17 Oct: staging runs the backend as the Docker image CI built and pushed, deployed by its digest, with an automatic rollback to the last good image; participation is now rated 1 to 5 like the other criteria; the frontend build step takes about 2 s in CI (it was about 13 s with Create React App)
 
 📅 **Milestone 3 — Productionization** — 02 Nov – 06 Dec 2026 (review 30 Nov, final 06 Dec)
 - Continuous Delivery pipeline, automated staging deployment, smoke testing
