@@ -25,6 +25,11 @@ record their email addresses.
   `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`, `EMAIL_SEND_INTERVAL_MS`. The ones marked `sync: false` in
   `render.yaml` hold real secrets and live only in the Render dashboard. The frontend has `NODE_VERSION` and
   `REACT_APP_API_URL`.
+- **The backend runs a Docker image** (CICD-73), `ghcr.io/it7993-fall-2026-peers/projectpeerevaluation/backend:staging`.
+  CD deploys the exact image CI built by digest through the hook, and moves the `staging` tag to the digest that passed
+  the smoke tests. The images behind every `rc-*` release must be kept in ghcr.io (a rollback redeploys them); there
+  is no retention rule, and `staging` is the only tag that ever moves. The repository variable `BACKEND_DEPLOY`
+  (`image`; `source` is the way back to building from the repository) says which way CD deploys.
 - **Blueprint.** Changes to `render.yaml` take effect when the Blueprint syncs in Render.
 - **Deploy hooks.** Each service has one (Settings > Deploy Hook). They're stored only as the
   `staging` environment secrets `RENDER_BACKEND_DEPLOY_HOOK_URL` and `RENDER_FRONTEND_DEPLOY_HOOK_URL` in GitHub.
@@ -51,7 +56,8 @@ The new owner (the sponsor, the department, or next year's team) takes over the 
    owner as Admin, and ask Render support whether the creator role can be handed over. Check which plan the
    workspace is on (Billing) before choosing.
 2. **New workspace** (the usual route): copy the `sync: false` environment variables across (MongoDB, SMTP), generate new
-   deploy hooks, and save them as the `staging` environment secrets in GitHub. If the service URLs change,
+   deploy hooks, and save them as the `staging` environment secrets in GitHub. If the image package is private, give the
+   new workspace a registry credential that can read it. If the service URLs change,
    update `FRONTEND_URL` and `REACT_APP_API_URL` in `render.yaml` and the URLs in `cd.yml`,
    `scripts/render-deploy.js` and `promote.yml`.
 3. **Atlas and Mailtrap.** Add the new owner as a project owner, or move the data and credentials to their

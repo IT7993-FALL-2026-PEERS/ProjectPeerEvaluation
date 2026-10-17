@@ -143,7 +143,7 @@ The numbers move as steps land.
 
 | Box | Running today | Not yet | Score |
 |---|---|---|---|
-| Build deployment artifacts and Docker images (also WF07) | Both images build in CI, start and pass a health check; after every merge that passes CI, CD builds, checks and pushes both to GitHub Container Registry tagged with the commit (on since 7 Oct) | — | 4 of 4, 100% |
+| Build deployment artifacts and Docker images (also WF07) | Both images build in CI, start and pass a health check; after every merge that passes CI, CD builds, checks and pushes both to GitHub Container Registry tagged with the commit (on since 7 Oct); the staging backend runs that backend image, deployed by digest | — | 4 of 4, 100% |
 | Deploy to staging | `cd.yml` deploys the exact commit CI tested through Render deploy hooks, after CI passes on `main` (first deploy 5 Oct) | — | 2 of 2, 100% |
 | Verify deployment health | `/api/health` reports the deployed commit; Render checks it before switching traffic; CD waits until each service reports the commit and then checks health | — | 3 of 3, 100% |
 | Publish reports | Build history of the last ten CI runs; deployment status of every CD run | — | 2 of 2, 100% |

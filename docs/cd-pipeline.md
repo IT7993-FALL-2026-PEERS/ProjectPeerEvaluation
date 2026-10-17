@@ -16,7 +16,8 @@ For each service, `scripts/render-deploy.js`:
 2. skips the service when that commit is already live, when a newer commit is live (runs can finish out of order), or
    when no file the service uses changed since the live commit. These paths used to be `buildFilter` in `render.yaml`
    and save build minutes (500 a month). When the live commit can't be read, it deploys;
-3. calls the service's deploy hook with `ref=<commit>`, so Render builds exactly the commit CI tested;
+3. calls the service's deploy hook with `ref=<commit>`, so Render builds exactly the commit CI tested (the
+   backend in image mode: `imgURL=<image>@sha256:<digest>`, so Render runs exactly the image CI tested);
 4. waits up to 20 minutes for the service to report that commit, and fails the job if it doesn't.
 
 Then `deployment-status.yml` checks `/api/health` answers OK and writes the deployment status to the run summary.
@@ -93,7 +94,9 @@ health-checked and pushed, so "tested, packaged with Docker, deployed to staging
 - `FORCE` cannot move a service from a source build to an image: the health check reports the same commit for both, so a
   commit that is already live is skipped. The service is switched over once, in the Render dashboard.
 
-Until `BACKEND_DEPLOY` is `image` and the Render service runs an image, none of this changes what staging runs.
+Since the cutover (`BACKEND_DEPLOY=image`, the Render service converted to the image `backend:staging`), the backend on
+staging runs the image CD built. `source` remains the way back: set the variable to `source` and switch the Render
+service to its git source again in the dashboard.
 
 **Permissions.** The workflow reads by default. `images`, `pointer` and `rollback-pointer` get `packages: write`,
 `prepare` gets `packages: read` (to check a rollback target's image), and only `release` gets `contents: write`. The deploy hooks are `staging` environment secrets, which only `main` can use. Every job runs the
