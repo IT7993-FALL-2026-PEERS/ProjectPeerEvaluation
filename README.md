@@ -107,6 +107,8 @@ flowchart TB
         ROLLBACK --> RBCHECK
     end
 
+    RBCHECK --> FIX
+
     MERGE --> ARTIFACTS
     DREPORT --> APPROVE{{"Manual approval required<br/>(sponsor or team leader)"}}
     APPROVE --> PROD(["Publish a GitHub release<br/>(production hosting is out of scope)"])
@@ -223,6 +225,8 @@ flowchart TB
         WF11 --> WF11B
         WF09 -- "No" --> WF10
     end
+
+    WF11B --> FIX
 
     WF10 --> APPROVE{{"WF12 Manual sponsor<br/>approval required"}}
     APPROVE --> PROD(["Publish a GitHub release<br/>(production hosting is out of scope)"])
