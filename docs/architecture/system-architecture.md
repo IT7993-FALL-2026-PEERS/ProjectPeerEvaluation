@@ -232,14 +232,14 @@ flowchart TB
     DEV(["Developer"]) -->|pull request| GH["GitHub<br/>IT7993-FALL-2026-PEERS/<br/>ProjectPeerEvaluation"]
     GH --> CI["GitHub Actions (ubuntu-24.04)<br/>ci.yml: frontend, backend, integration,<br/>E2E, containers, actionlint<br/>security.yml: OWASP · CodeQL"]
     CI -->|"8 required checks pass"| MAIN["merge to main"]
-    MAIN -->|"cd.yml after CI passes:<br/>build, test, push images"| IMG["Container images (GHCR)<br/>pushed by digest"]
+    MAIN -->|"cd.yml after CI passes:<br/>build, test, push images"| IMG["Container images (GHCR)<br/>(pushed by digest)"]
     IMG -->|"Render deploy hook:<br/>backend by image digest"| STG["Render staging<br/>peers-backend-staging (Starter, runs the image)<br/>peers-frontend-staging (static, built from source)"]
     MAIN -->|"frontend: deploy hook,<br/>tested commit"| STG
     STG --> ATLAS[("MongoDB Atlas M0")]
     STG --> MT["Mailtrap sandbox"]
-    STG -->|"health check, smoke tests"| RC["Release candidate<br/>rc tag and record"]
+    STG -->|"health check, smoke tests"| RC["Release candidate<br/>(rc tag and release record)"]
     STG -. "failure: roll back to<br/>the last good image" .-> IMG
-    RC -. "manual sponsor approval" .-> PROD(["GitHub release<br/>production hosting out of scope"])
+    RC -. "manual sponsor approval" .-> PROD(["Publish a GitHub release<br/>(production hosting is out of scope)"])
 
     classDef ep fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
     class DEV,GH,MAIN,PROD ep

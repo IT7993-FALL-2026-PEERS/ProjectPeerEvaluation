@@ -92,22 +92,22 @@ flowchart TB
 
     subgraph CD["Continuous Delivery (CD) · runs automatically after merge to main"]
         direction TB
-        ARTIFACTS["Build and push Docker images<br/>tested, pushed by digest"]
-        STG["Deploy to staging<br/>Render.com<br/>backend image, frontend source"]
-        HEALTH["Verify deployment health<br/>/api/health reports the new commit"]
+        ARTIFACTS["Build and push Docker images<br/>(tested, pushed by digest)"]
+        STG["Deploy to staging, Render.com<br/>(backend image, frontend from source)"]
+        HEALTH["Verify deployment health<br/>(/api/health reports the new commit)"]
         SMOKE["Smoke tests"]
-        TAG["Move the staging image tag<br/>only after smoke passes"]
+        TAG["Move the staging image tag<br/>(only after smoke passes)"]
         RC["Produce release candidate"]
         DREPORT["Publish reports<br/>build history, deployment status"]
-        ROLLBACK["Roll back on failure<br/>to the last good image"]
+        ROLLBACK["Roll back on failure<br/>(to the last good image)"]
         ARTIFACTS --> STG --> HEALTH --> SMOKE --> TAG --> RC --> DREPORT
         STG -. "deploy fails" .-> ROLLBACK
         SMOKE -. "smoke fails" .-> ROLLBACK
     end
 
     MERGE --> ARTIFACTS
-    DREPORT --> APPROVE{{"Manual approval<br/>required for production"}}
-    APPROVE --> PROD(["GitHub release<br/>production hosting out of scope"])
+    DREPORT --> APPROVE{{"Manual approval required<br/>(sponsor or team leader)"}}
+    APPROVE --> PROD(["Publish a GitHub release<br/>(production hosting is out of scope)"])
 
     classDef done fill:#dcfce7,stroke:#15803d,color:#14532d,stroke-width:3px
     classDef partial fill:#ecfccb,stroke:#4d7c0f,color:#365314,stroke-width:3px,stroke-dasharray: 9 6
@@ -210,18 +210,18 @@ flowchart TB
 
     subgraph CD["CONTINUOUS DELIVERY · runs after merge to main"]
         direction TB
-        WF07["WF07 Build and push Docker images<br/>tested, pushed by digest, tagged with the commit"]
-        WF08["WF08 Deploy to staging · readiness check · smoke tests<br/>backend image, frontend source"]
+        WF07["WF07 Build and push Docker images<br/>(tested, pushed by digest, tagged with the commit)"]
+        WF08["WF08 Deploy to staging · readiness check · smoke tests<br/>(backend image, frontend from source)"]
         WF09{"WF09 Deploy or smoke test failed?"}
-        WF11["WF11 Rollback<br/>automatic to the last good image, or by hand"]
-        WF10["WF10 Move the staging image tag · tag release candidate · retain version and evidence"]
+        WF11["WF11 Rollback<br/>(automatic to the last good image, or by hand)"]
+        WF10["WF10 Move the staging image tag<br/>tag release candidate · retain version and evidence"]
         WF07 --> WF08 --> WF09
         WF09 -- "Yes" --> WF11
         WF09 -- "No" --> WF10
     end
 
     WF10 --> APPROVE{{"WF12 Manual sponsor<br/>approval required"}}
-    APPROVE --> PROD(["GitHub release<br/>production hosting out of scope"])
+    APPROVE --> PROD(["Publish a GitHub release<br/>(production hosting is out of scope)"])
 
     classDef done fill:#dcfce7,stroke:#15803d,color:#14532d,stroke-width:3px
     classDef highlight fill:#dcfce7,stroke:#b45309,color:#14532d,stroke-width:5px
