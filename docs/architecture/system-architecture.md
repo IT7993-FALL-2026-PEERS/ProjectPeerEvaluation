@@ -2,7 +2,7 @@
 
 **Gantt task:** Technical Assessment — *"Review software architecture & technology stack"* (M1)
 **Milestone:** 1 — Assessment & Planning
-**Status:** Complete for review. Describes `main` at commit `11cfd3d` (26 Sep 2026); later changes are marked where they apply (last updated 5 Oct 2026)
+**Status:** Complete for review. Describes `main` at commit `11cfd3d` (26 Sep 2026); later changes are marked where they apply (last updated 17 Oct 2026: the delivery diagram and the staging backend, which now runs the Docker image)
 **Related:** [api-documentation.md](api-documentation.md) ·
 [database-schema.md](database-schema.md) ·
 [../research-report/tech-stack-analysis.md](../research-report/tech-stack-analysis.md) ·
@@ -228,20 +228,21 @@ the new bcrypt hash and clears the token so the link works once.
 ## 7. Deployment and delivery
 
 ```mermaid
-flowchart LR
+flowchart TB
     DEV(["Developer"]) -->|pull request| GH["GitHub<br/>IT7993-FALL-2026-PEERS/<br/>ProjectPeerEvaluation"]
     GH --> CI["GitHub Actions (ubuntu-24.04)<br/>ci.yml: frontend, backend, integration,<br/>E2E, containers, actionlint<br/>security.yml: OWASP · CodeQL"]
     CI -->|"8 required checks pass"| MAIN["merge to main"]
-    MAIN -->|"cd.yml after CI passes:<br/>Render deploy hooks, tested commit"| STG["Render staging<br/>peers-backend-staging (Starter)<br/>peers-frontend-staging (static)"]
+    MAIN -->|"cd.yml after CI passes:<br/>build, test, push images"| IMG["Container images (GHCR)<br/>(pushed by digest)"]
+    IMG -->|"Render deploy hook:<br/>backend by image digest"| STG["Render staging<br/>peers-backend-staging (Starter, runs the image)<br/>peers-frontend-staging (static, built from source)"]
+    MAIN -->|"frontend: deploy hook,<br/>tested commit"| STG
     STG --> ATLAS[("MongoDB Atlas M0")]
     STG --> MT["Mailtrap sandbox"]
-    STG -. "planned: manual sponsor approval" .-> PROD(["Production<br/>out of scope"])
-    MAIN -. "planned: build and push<br/>SHA-tagged images, smoke tests" .-> IMG["Container images<br/>(GHCR)"]
+    STG -->|"health check, smoke tests"| RC["Release candidate<br/>(rc tag and release record)"]
+    STG -. "failure: roll back to<br/>the last good image" .-> IMG
+    RC -. "manual sponsor approval" .-> PROD(["Publish a GitHub release<br/>(production hosting is out of scope)"])
 
     classDef ep fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef plan fill:#f1f5f9,stroke:#475569,color:#334155,stroke-dasharray: 6 4
-    class DEV,GH,MAIN ep
-    class PROD,IMG plan
+    class DEV,GH,MAIN,PROD ep
 ```
 
 - **Local development:** `npm run setup` then `npm run dev` runs the React dev server on

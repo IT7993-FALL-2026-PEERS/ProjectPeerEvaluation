@@ -2,7 +2,7 @@
 
 Productionization, Automated Testing, and CI/CD for the PEERS Peer Evaluation System
 
-Last updated: 10/05/2026
+Last updated: 10/17/2026
 Status: Milestone 1 (Assessment & Planning) signed off by the sponsor on 28 Sep 2026 · Milestone 2
 (Quality Automation) began 5 Oct (review 26 Oct), and most of its test automation and CI gates already run
 
@@ -92,18 +92,26 @@ flowchart TB
 
     subgraph CD["Continuous Delivery (CD) · runs automatically after merge to main"]
         direction TB
-        ARTIFACTS["Build deployment artifacts<br/>and Docker images"]
-        STG["Deploy to staging<br/>Render.com"]
+        ARTIFACTS["Build and push Docker images<br/>(tested, pushed by digest)"]
+        STG["Deploy to staging, Render.com<br/>(backend image, frontend from source)"]
+        HEALTH["Verify deployment health<br/>(/api/health reports the new commit)"]
         SMOKE["Smoke tests"]
-        HEALTH["Verify deployment health<br/>/api/health"]
+        TAG["Move the staging image tag<br/>(only after smoke passes)"]
         RC["Produce release candidate"]
         DREPORT["Publish reports<br/>build history, deployment status"]
-        ARTIFACTS --> STG --> SMOKE --> HEALTH --> RC --> DREPORT
+        ROLLBACK["Roll back on failure<br/>(to the last good image)"]
+        RBCHECK["Check the rolled-back version<br/>(health and smoke tests, no release tag)"]
+        ARTIFACTS --> STG --> HEALTH --> SMOKE --> TAG --> RC --> DREPORT
+        STG -. "deploy fails" .-> ROLLBACK
+        SMOKE -. "smoke fails" .-> ROLLBACK
+        ROLLBACK --> RBCHECK
     end
 
+    RBCHECK --> FIX
+
     MERGE --> ARTIFACTS
-    DREPORT --> APPROVE{{"Manual approval<br/>required for production"}}
-    APPROVE --> PROD(["Production<br/>Render.com"])
+    DREPORT --> APPROVE{{"Manual approval required<br/>(sponsor or team leader)"}}
+    APPROVE --> PROD(["Publish a GitHub release<br/>(production hosting is out of scope)"])
 
     classDef done fill:#dcfce7,stroke:#15803d,color:#14532d,stroke-width:3px
     classDef partial fill:#ecfccb,stroke:#4d7c0f,color:#365314,stroke-width:3px,stroke-dasharray: 9 6
@@ -112,7 +120,7 @@ flowchart TB
     classDef endpoint fill:#dbeafe,stroke:#2563eb,color:#1e3a8a,stroke-width:3px
     linkStyle default stroke-width:2px
 
-    class BUILD_APP,LINT,SEC,DOCKER,UNIT,INTEG,REG,E2E,REPORT,ARTIFACTS,STG,SMOKE,HEALTH,RC,DREPORT done
+    class BUILD_APP,LINT,SEC,DOCKER,UNIT,INTEG,REG,E2E,REPORT,ARTIFACTS,STG,SMOKE,HEALTH,TAG,RC,DREPORT,ROLLBACK,RBCHECK done
     class GATE,APPROVE gate
     class DEV,PROD,PR,MERGE,FIX endpoint
 ```
@@ -137,14 +145,14 @@ flowchart LR
 
 The quality gate is enforced today. Production approval is manual.
 
-**How the percentages are counted** (updated 8 Oct 2026). A partly running box is scored as the steps that
+**How the percentages are counted** (updated 17 Oct 2026). A partly running box is scored as the steps that
 run today out of the steps it needs. A step that is written but has never run counts as not done.
 The numbers move as steps land.
 
 | Box | Running today | Not yet | Score |
 |---|---|---|---|
 | Build deployment artifacts and Docker images (also WF07) | Both images build in CI, start and pass a health check; after every merge that passes CI, CD builds, checks and pushes both to GitHub Container Registry tagged with the commit (on since 7 Oct); the staging backend runs that backend image, deployed by digest | — | 4 of 4, 100% |
-| Deploy to staging | `cd.yml` deploys the exact commit CI tested through Render deploy hooks, after CI passes on `main` (first deploy 5 Oct) | — | 2 of 2, 100% |
+| Deploy to staging | `cd.yml` deploys the exact commit CI tested through Render deploy hooks, after CI passes on `main` (first deploy 5 Oct); since 17 Oct the backend is deployed as the Docker image CI built, by its digest, and a failed deploy or smoke run rolls back automatically | — | 2 of 2, 100% |
 | Verify deployment health | `/api/health` reports the deployed commit; Render checks it before switching traffic; CD waits until each service reports the commit and then checks health | — | 3 of 3, 100% |
 | Publish reports | Build history of the last ten CI runs; deployment status of every CD run | — | 2 of 2, 100% |
 | WF06 Publish results | Test summaries, coverage summaries, build history, deployment status | — | 4 of 4, 100% |
@@ -154,20 +162,20 @@ The numbers move as steps land.
 |---|---|---|---|
 | Install dependencies and build | `npm ci` and the production build (Vite) | M1 / M4 | Live (`.github/workflows/ci.yml`) |
 | Workflow lint | `actionlint` checks the workflow files themselves | M1 / M4 | Live |
-| Unit tests | Vitest and React Testing Library for the frontend (488 tests); Node's built-in test runner (`node:test`) for the backend (400 tests) | M4 / M5 | Live for both in CI on every pull request. Coverage is measured on every pull request and gated by floors that only go up (`coverage-floors.json`; lines today: backend about 72% against a floor of 63%, frontend about 93% against a floor of 93%). The team's target is 70%, and both now meet it (`CourseManagement.js` has been split into tested components and hooks, and is now only the page that wires them together) |
-| Integration tests | Backend, database, authentication, and email, against a real MongoDB that the tests start themselves and an isolated email transport (never real student inboxes) | M4 / M5 | Live: 136 tests, required job `Integration (real MongoDB)` |
+| Unit tests | Vitest and React Testing Library for the frontend (649 tests); Node's built-in test runner (`node:test`) for the backend (475 tests) | M4 / M5 | Live for both in CI on every pull request. Coverage is measured on every pull request and gated by floors that only go up (`coverage-floors.json`; lines today: backend about 72% against a floor of 63%, frontend about 93% against a floor of 93%). The team's target is 70%, and both now meet it (`CourseManagement.js` has been split into tested components and hooks, and is now only the page that wires them together) |
+| Integration tests | Backend, database, authentication, and email, against a real MongoDB that the tests start themselves and an isolated email transport (never real student inboxes) | M4 / M5 | Live: 203 tests, required job `Integration (real MongoDB)` |
 | Functional regression tests | At least one automated test per critical business workflow | M5 | Live: all twelve critical workflows (CW-01 to CW-12) are covered, see [`docs/requirements/critical-workflows.md`](docs/requirements/critical-workflows.md) |
-| End-to-end tests | Playwright drives the real app in a browser: student and instructor workflows, on a throwaway database with email captured, never sent | M4 / M5 | Live: 42 tests, plus 7 `@staging` smoke tests that run against staging after every deploy; required job `E2E smoke (Playwright)` |
+| End-to-end tests | Playwright drives the real app in a browser: student and instructor workflows, on a throwaway database with email captured, never sent | M4 / M5 | Live: 48 tests, plus 7 `@staging` smoke tests that run against staging after every deploy; required job `E2E smoke (Playwright)` |
 | Static analysis | ESLint: frontend (`npm run lint`) and backend (`cd src/backend && npm run lint`) | M1 / M4 | Live |
 | Container build check | `docker compose up --build --wait` builds the frontend and backend images and starts them with MongoDB, then checks the stack is healthy | M2 | Live, required job `Containers (build + compose smoke)` |
 | Dependency validation and security scan | Dependabot, OWASP Dependency Check, CodeQL code scanning, secret scanning | M3 | Live and blocking: OWASP Dependency-Check runs on every pull request, on `main`, and weekly (`.github/workflows/security.yml`) and fails on any finding with CVSS 7 or higher that is not an accepted risk (`.github/dependency-check-suppressions.xml`, each entry with an expiry date); CodeQL (GitHub default setup) scans the code on every pull request. Both are required checks. Dependabot opens weekly update pull requests (`.github/dependabot.yml`); the alerts that came from the old `react-scripts` build tooling went away with the move to Vite. Secret scanning and push protection are on. The policy, the triage and the history of the 10 findings that were accepted until the move to Vite are in [`docs/security/security-policy.md`](docs/security/security-policy.md) |
 | Test report | Executed, passed, and failed tests, duration, and coverage | M4 | Live in CI: each test job writes tests run, passed, failed, skipped and duration to its run summary (`scripts/test-summary.js`) next to the coverage table, and keeps the result files as downloadable artifacts |
 | Quality gate | `main-protection` ruleset: a pull request, eight passing required checks and an up-to-date branch before merge. No approval required, so authors merge their own pull requests. No bypass, and direct pushes are rejected | M1 | Live. More checks are added as jobs are added |
-| Build artifacts and Docker images | Build the deployment artifacts and the frontend and backend images for the exact commit that passed CI | M2 | Live since 7 Oct: the container check builds both images on every pull request, and after every merge that passes CI `cd.yml` calls `image-build.yml`, which builds them, checks they start healthy and pushes both to GitHub Container Registry tagged with the commit SHA (see [`docs/cd-pipeline.md`](docs/cd-pipeline.md)) |
-| Staging deploy | Automatic deploy to Render.com staging | M2 | Live since 5 Oct: after CI passes on `main`, `.github/workflows/cd.yml` deploys the tested commit with each service's Render deploy hook, skips a service when nothing it uses changed, and waits until the service reports the commit (CICD-12). Render's own auto-deploy is off (`render.yaml`). Staging stays running until final delivery ([release procedure](docs/operations/release-procedure.md)) |
+| Build artifacts and Docker images | Build the deployment artifacts and the frontend and backend images for the exact commit that passed CI | M2 | Live since 7 Oct: the container check builds both images on every pull request, and after every merge that passes CI `cd.yml` calls `image-build.yml`, which builds them, checks they start healthy and pushes both to GitHub Container Registry tagged with the commit SHA (see [`docs/cd-pipeline.md`](docs/cd-pipeline.md)). The backend image carries its commit, a pushed tag is never overwritten, and the staging backend runs that image by digest (17 Oct) |
+| Staging deploy | Automatic deploy to Render.com staging | M2 | Live since 5 Oct: after CI passes on `main`, `.github/workflows/cd.yml` deploys the tested commit with each service's Render deploy hook, skips a service when nothing it uses changed, and waits until the service reports the commit (CICD-12). Since 17 Oct (CICD-73) the backend runs the Docker image CI built and pushed, deployed by its digest (`BACKEND_DEPLOY=image`), and the frontend is built from source. Render's own auto-deploy is off (`render.yaml`). Staging stays running until final delivery ([release procedure](docs/operations/release-procedure.md)) |
 | Smoke tests | Verify the deployment after each release | M5 | Live since 7 Oct: `cd.yml` runs Staging regression after every deploy (`CD_RELEASE` is on). Seven `@staging` tests (health, frontend and CORS checks, a check that the app calls the configured backend, a real wrong-credentials login and a deep link, in `e2e/staging.spec.js`); more planned (Kylee), week of 9 Nov |
 | Deployment health check | Poll `/api/health` after deploy | M1 | Live: Render checks `/api/health` before switching traffic, CD waits until each service reports the deployed commit (`/api/health`, `/version.txt`), and the deployment status job checks health after every deploy |
-| Release candidate | Produce a release candidate after staging passes | M1 | Live since 7 Oct (CICD-28): CD tags `rc-*` with a release record only when images, deploy and smoke tests passed, and rolls back to the previous release when they fail. A deliberately broken deploy on 7 Oct produced no tag and was rolled back |
+| Release candidate | Produce a release candidate after staging passes | M1 | Live since 7 Oct (CICD-28): CD tags `rc-*` with a release record only when images, deploy and smoke tests passed, and rolls back to the previous release when they fail (by image digest for the backend since 17 Oct; `backend:staging` is moved to the accepted image after the smoke tests pass). A deliberately broken deploy on 7 Oct produced no tag and was rolled back |
 | Build and deployment reports | Build history and deployment status | M2 | Live: the `Run report` job adds every job's result and duration and the last ten runs to each CI run summary, and every CD run ends with a deployment status section and a `deployment-status` artifact (kept 90 days) |
 | Scheduled staging regression | Weekly smoke and end-to-end run against staging, without sending email | M5 | Workflow (`staging-regression.yml`) runs weekly (Tuesday 06:00 UTC), after each CD deploy and by hand; needs staging running and the `STAGING_URL` / `STAGING_API_URL` variables set |
 | Production deploy | Manual sponsor approval. Not automated | Sponsor | By design. The approval gate is written: `promote.yml` waits for Dr. Vyas or Khoa to approve in the `production` environment (no self-review, `rc-*` tags only), then publishes a GitHub Release. The deploy itself is a placeholder, because production hosting is out of scope (CICD-30, [`docs/cd-pipeline.md`](docs/cd-pipeline.md)) |
@@ -206,20 +214,22 @@ flowchart TB
 
     subgraph CD["CONTINUOUS DELIVERY · runs after merge to main"]
         direction TB
-        WF07["WF07 Build artifacts and version images<br/>images built, checked and pushed, tagged with the commit"]
-        WF08["WF08 Deploy to staging · readiness check · smoke tests"]
+        WF07["WF07 Build and push Docker images<br/>(tested, pushed by digest, tagged with the commit)"]
+        WF08["WF08 Deploy to staging · readiness check · smoke tests<br/>(backend image, frontend from source)"]
         WF09{"WF09 Deploy or smoke test failed?"}
-        BLOCK["Block promotion · follow recovery procedure"]
-        WF10["WF10 Tag release candidate · retain version and evidence"]
+        WF11["WF11 Rollback<br/>(automatic to the last good image, or by hand)"]
+        WF11B["Check the rolled-back version<br/>(health and smoke tests, no release tag)"]
+        WF10["WF10 Move the staging image tag<br/>tag release candidate · retain version and evidence"]
         WF07 --> WF08 --> WF09
-        WF09 -- "Yes" --> BLOCK
+        WF09 -- "Yes" --> WF11
+        WF11 --> WF11B
         WF09 -- "No" --> WF10
     end
 
+    WF11B --> FIX
+
     WF10 --> APPROVE{{"WF12 Manual sponsor<br/>approval required"}}
-    APPROVE --> PROD(["Production · Render.com"])
-    PROD -.-> WF11{{"WF11 Rollback<br/>if approved"}}
-    WF11 -.->|"restore known-good release"| PROD
+    APPROVE --> PROD(["Publish a GitHub release<br/>(production hosting is out of scope)"])
 
     classDef done fill:#dcfce7,stroke:#15803d,color:#14532d,stroke-width:3px
     classDef highlight fill:#dcfce7,stroke:#b45309,color:#14532d,stroke-width:5px
@@ -228,9 +238,8 @@ flowchart TB
     classDef gate fill:#fef3c7,stroke:#d97706,color:#78350f,stroke-width:3px
     classDef endpoint fill:#dbeafe,stroke:#2563eb,color:#1e3a8a,stroke-width:3px
 
-    class WF01,WF02,BUILD,CONT,UNIT,INTEG,REG,E2E,WF05,WF06,WF07,WF08,BLOCK,WF10 done
+    class WF01,WF02,BUILD,CONT,UNIT,INTEG,REG,E2E,WF05,WF06,WF07,WF08,WF11,WF11B,WF10 done
     class WF03 highlight
-    class WF11 planned
     class GATE,APPROVE,WF09 gate
     class DEV,PROD,PR,MERGE,FIX endpoint
 ```
@@ -289,6 +298,7 @@ deliverables signed off by the sponsor)
   frontend coverage (about 42% today against the 70% target, as `CourseManagement.js` is split into
   tested components) and the items that need staging running
 - Update 8 Oct: the frontend is at about 93% of lines (the 70% target is met), staging and the CD release stages (images, smoke tests, `rc-*` tags, rollback) are live, and the frontend now builds with Vite and tests with Vitest
+- Update 17 Oct: staging runs the backend as the Docker image CI built and pushed, deployed by its digest, with an automatic rollback to the last good image; participation is now rated 1 to 5 like the other criteria; the frontend build step takes about 2 s in CI (it was about 13 s with Create React App)
 
 📅 **Milestone 3 — Productionization** — 02 Nov – 06 Dec 2026 (review 30 Nov, final 06 Dec)
 - Continuous Delivery pipeline, automated staging deployment, smoke testing

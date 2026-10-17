@@ -16,7 +16,7 @@ A few short working habits for PEERS. They are adapted from Matt Pocock's
 ## Merging your own pull request
 
 You can merge your own pull request once the required checks pass. No approval is needed. The
-`main-protection` ruleset requires a pull request, the four CI checks, and a branch that is up to
+`main-protection` ruleset requires a pull request, the eight required checks, and a branch that is up to
 date with `main`, but 0 approvals and no code-owner review, so nobody waits on a reviewer to ship.
 Reviews are still welcome: CODEOWNERS requests one automatically, and for a one-way door, ask
 someone to look before you merge.
