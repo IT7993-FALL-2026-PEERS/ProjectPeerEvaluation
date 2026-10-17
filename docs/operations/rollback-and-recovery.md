@@ -74,6 +74,30 @@ Open the run and find the first red job.
 A failed deploy or smoke run never creates an `rc-*` tag. With `CD_RELEASE=on` and an earlier release, CD rolls
 back by itself, but **the run stays failed** on purpose: someone still has to fix the cause.
 
+### After an automatic rollback: what a person has to do
+
+A rollback only changes what runs on staging. It does not change the code on `main`.
+
+1. CD puts both services back on the last good release (the backend as its recorded image digest), checks them with
+   the deployment status report and the smoke tests, and moves the `backend:staging` tag back, so a restart also lands
+   on the good version. Staging works again without anyone clicking anything.
+2. The run stays red and no `rc-*` tag is made. That red run is the signal to act.
+3. **The bad commit is still on `main`.** The next merge, even an unrelated one, deploys `main` again, bad change
+   included, and fails the same way. So someone must either open a pull request with the fix, or revert the bad merge
+   (R1, option C), and merge it once CI passes. CD then deploys the good code like any other change.
+
+When CD does **not** roll back by itself:
+
+| Situation | What happens | What to do |
+|---|---|---|
+| The deploy or the smoke tests fail and an eligible earlier release exists | Automatic rollback | Fix or revert on `main`, as above |
+| No eligible earlier release (the first image-mode deploy, or none left that pass the checks) | The run fails with no rollback | Render's own Rollback (R1, option B), or revert the change (option C) |
+| The earlier release's image is gone from ghcr.io | `prepare` skips that release. If none remains, no rollback | As above. Never delete the images behind `rc-*` releases |
+| `CD_RELEASE` is off | Only the deploy runs, with no rollback | Switch `CD_RELEASE` back on |
+| Deploy and smoke pass, but the release or `staging` tag step fails | No rollback, by design: staging stays on the new, working version, untagged | Run CD again |
+| A problem is found later that no test caught | Nothing notices it | Run CD by hand with `rollback_to` set to the good release's tag, then fix `main` |
+| `BACKEND_DEPLOY` is unset or misspelled | `prepare` fails before anything is deployed, so there is nothing to roll back | Set the variable to `source` or `image` |
+
 ## R3. Staging doesn't answer
 
 `curl` times out or Render shows a "service suspended" page.
