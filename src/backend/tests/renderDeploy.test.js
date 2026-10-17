@@ -147,7 +147,7 @@ test('main skips a service whose files did not change', async (t) => {
     if (options.method === 'POST') throw new Error('must not deploy');
     return reply(200, `{"commit":"${B}"}`);
   };
-  assert.equal(await main({ SERVICE: 'backend', SHA: A, HOOK_URL: 'https://h/?key=k' }, { fetchImpl, gitImpl: gitDiff(['README.md']) }), 0);
+  assert.equal(await main({ SERVICE: 'backend', SHA: A, HOOK_URL: 'https://h/?key=k', DEPLOY_MODE: 'source' }, { fetchImpl, gitImpl: gitDiff(['README.md']) }), 0);
   assert.match(log.mock.calls[0].arguments[0], /backend: skipping/);
   log.mock.restore();
 });
@@ -191,4 +191,116 @@ test('the command line exits 2 with a fixed message for a malformed hook URL', (
   assert.equal(run.status, 2);
   assert.match(run.stderr, /HOOK_URL is not a valid https URL/);
   assert.doesNotMatch(run.stderr + run.stdout, /TOPSECRET/);
+});
+
+// Image deploy mode (CICD-73): the backend can be deployed as the exact image CI built, by digest.
+const IMG_PATH = 'ghcr.io/it7993-fall-2026-peers/projectpeerevaluation/backend';
+const DIGEST = `sha256:${'c'.repeat(64)}`;
+const REF = `${IMG_PATH}@${DIGEST}`;
+
+test('TC-29-53: image mode asks the hook for the exact image digest and sends no git ref', async () => {
+  const calls = [];
+  const fetchImpl = async (url, options = {}) => {
+    calls.push({ url: String(url), method: options.method || 'GET' });
+    return options.method === 'POST' ? reply(200, '') : reply(200, `{"commit":"${A}"}`);
+  };
+  const result = await deploy({ hookUrl: 'https://api.render.com/deploy/srv-1?key=secret', sha: A, versionUrl: 'https://x/api/health', image: REF, fetchImpl, intervalMs: 0, sleep: async () => {} });
+  assert.equal(result.live, true);
+  const hook = new URL(calls[0].url);
+  assert.equal(hook.searchParams.get('imgURL'), REF);
+  assert.equal(hook.searchParams.get('ref'), null);
+  assert.equal(hook.searchParams.get('key'), 'secret');
+});
+
+test('TC-29-54: without an image the hook still gets the git ref (source mode is unchanged)', async () => {
+  const calls = [];
+  const fetchImpl = async (url, options = {}) => { calls.push(String(url)); return options.method === 'POST' ? reply(200, '') : reply(200, `{"commit":"${A}"}`); };
+  await deploy({ hookUrl: 'https://api.render.com/deploy/srv-1?key=secret', sha: A, versionUrl: 'https://x', fetchImpl, intervalMs: 0, sleep: async () => {} });
+  const hook = new URL(calls[0]);
+  assert.equal(hook.searchParams.get('ref'), A);
+  assert.equal(hook.searchParams.get('imgURL'), null);
+});
+
+test('TC-29-55: main refuses a bad mode or image reference before any request', async (t) => {
+  t.mock.method(console, 'error', () => {});
+  let requests = 0;
+  const fetchImpl = async () => { requests += 1; return reply(200, ''); };
+  const base = { SERVICE: 'backend', SHA: A, HOOK_URL: 'https://h/?key=k' };
+  const bad = [
+    { DEPLOY_MODE: '' }, { DEPLOY_MODE: 'imagee' }, { DEPLOY_MODE: 'image' },                       // unset, misspelled, image without a reference
+    { DEPLOY_MODE: 'source', IMAGE_REF: REF },                                                       // a reference in source mode
+    { DEPLOY_MODE: 'image', IMAGE_REF: `${IMG_PATH}:latest` }, { DEPLOY_MODE: 'image', IMAGE_REF: `${IMG_PATH}@sha256:short` },
+    { DEPLOY_MODE: 'image', IMAGE_REF: `${REF} x` }, { DEPLOY_MODE: 'image', IMAGE_REF: `docker.io/library/node@${DIGEST}` },
+    { DEPLOY_MODE: 'image', IMAGE_REF: `${REF}?z=1` }, { DEPLOY_MODE: 'image', IMAGE_REF: `ghcr.io/UPPER/case@${DIGEST}` },
+  ];
+  // Fast dependencies, so that a refusal that goes missing fails the test at once instead of waiting on a real deploy.
+  const fast = { fetchImpl, timeoutMs: 1, intervalMs: 0, sleep: async () => {}, gitImpl: () => '' };
+  for (const extra of bad) assert.equal(await main({ ...base, ...extra }, fast), 2, JSON.stringify(extra));
+  assert.equal(requests, 0);
+});
+
+test('TC-29-66: only the backend can run in image mode (the frontend is a static site)', async (t) => {
+  t.mock.method(console, 'error', () => {});
+  let requests = 0;
+  const fetchImpl = async () => { requests += 1; return reply(200, ''); };
+  assert.equal(await main({ SERVICE: 'frontend', SHA: A, HOOK_URL: 'https://h/?key=k', DEPLOY_MODE: 'image', IMAGE_REF: REF }, { fetchImpl, timeoutMs: 1, intervalMs: 0, sleep: async () => {}, gitImpl: () => '' }), 2);
+  assert.equal(requests, 0);
+});
+
+test('TC-29-56: an image Render cannot find fails with its status, without printing the hook', async () => {
+  const seen = [];
+  const fetchImpl = async (url, options = {}) => {
+    if (options.method === 'POST') { seen.push(new URL(String(url)).searchParams.get('imgURL')); return reply(404, 'image not found'); }
+    return reply(200, `{"commit":"${B}"}`);
+  };
+  const result = await deploy({ hookUrl: 'https://api.render.com/deploy/srv-1?key=secret', sha: A, versionUrl: 'https://x', image: REF, fetchImpl, sleep: async () => {} });
+  assert.deepEqual(seen, [REF]);
+  assert.equal(result.live, false);
+  assert.match(result.detail, /HTTP 404/);
+  assert.doesNotMatch(result.detail, /secret|srv-1/);
+});
+
+test('TC-29-67: a hook that accepts the image but never reaches health times out (the previous version keeps serving)', async () => {
+  let clock = 0;
+  const fetchImpl = async (_url, options = {}) => (options.method === 'POST' ? reply(200, '') : reply(200, `{"commit":"${B}"}`));
+  const result = await deploy({ hookUrl: 'https://h/?key=k', sha: A, versionUrl: 'https://x', image: REF, fetchImpl, timeoutMs: 60000, intervalMs: 20000, sleep: async (ms) => { clock += ms; }, now: () => clock });
+  assert.equal(result.live, false);
+  assert.match(result.detail, /not live after 1 minutes \(live: bbbbbbb\)/);
+});
+
+test('TC-29-57: image mode deploys this run\'s artifact even when no backend file changed, but never an older commit and never one already live', () => {
+  const noFilesChanged = () => '';          // git diff finds nothing for the backend
+  assert.equal(plan({ sha: A, live: B, service: SERVICES.backend, image: REF, gitImpl: gitDiff([]) }).deploy, true);
+  assert.equal(plan({ sha: A, live: A, service: SERVICES.backend, image: REF }).deploy, false);
+  assert.equal(plan({ sha: A, live: A, service: SERVICES.backend, image: REF, force: true }).deploy, false, 'FORCE does not redeploy a commit that is already live');
+  assert.equal(plan({ sha: A, live: B, service: SERVICES.backend, image: REF, gitImpl: noFilesChanged }).deploy, false, 'a newer commit already live');
+  assert.equal(plan({ sha: A, live: B, service: SERVICES.backend, gitImpl: gitDiff([]) }).deploy, false, 'source mode still skips');
+});
+
+test('TC-29-58: a successful image deploy through main forwards the reference and reports live', async (t) => {
+  t.mock.method(console, 'log', () => {});
+  const calls = [];
+  let live = B;
+  const fetchImpl = async (url, options = {}) => {
+    calls.push({ url: String(url), method: options.method || 'GET' });
+    if (options.method === 'POST') { live = A; return reply(200, ''); }
+    return reply(200, `{"commit":"${live}"}`);
+  };
+  const code = await main({ SERVICE: 'backend', SHA: A, HOOK_URL: 'https://api.render.com/deploy/srv-1?key=secret', DEPLOY_MODE: 'image', IMAGE_REF: REF }, { fetchImpl, gitImpl: gitDiff([]), intervalMs: 0, sleep: async () => {} });
+  assert.equal(code, 0);
+  assert.equal(new URL(calls.find((call) => call.method === 'POST').url).searchParams.get('imgURL'), REF);
+});
+
+test('TC-29-68: a rollback in image mode goes back to the recorded digest even though it is older', async (t) => {
+  t.mock.method(console, 'log', () => {});
+  const calls = [];
+  let live = B;
+  const fetchImpl = async (url, options = {}) => {
+    calls.push({ url: String(url), method: options.method || 'GET' });
+    if (options.method === 'POST') { live = A; return reply(200, ''); }
+    return reply(200, `{"commit":"${live}"}`);
+  };
+  const code = await main({ SERVICE: 'backend', SHA: A, HOOK_URL: 'https://api.render.com/deploy/srv-1?key=secret', DEPLOY_MODE: 'image', IMAGE_REF: REF, ROLLBACK: 'true' }, { fetchImpl, gitImpl: () => '', intervalMs: 0, sleep: async () => {} });
+  assert.equal(code, 0);
+  assert.equal(new URL(calls.find((call) => call.method === 'POST').url).searchParams.get('imgURL'), REF);
 });

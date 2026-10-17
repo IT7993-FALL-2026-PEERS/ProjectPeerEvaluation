@@ -21,6 +21,15 @@ name: CD
 # A service is skipped when no file it uses changed since the commit that is live, which saves Render
 # build minutes (scripts/render-deploy.js), so backend and frontend can be on different commits.
 #
+# The backend can be deployed two ways, chosen by the repository variable BACKEND_DEPLOY, which must be
+# exactly "source" or "image" (anything else, or unset, fails prepare before anything is deployed):
+#   source  Render builds the commit itself (the hook gets ref=<sha>). The frontend always works this way.
+#   image   Render runs the backend Docker image the images job built, health-checked and pushed, by its
+#           digest (the hook gets imgURL=<image>@sha256:...). After the smoke tests pass, the `staging` tag
+#           of the backend image is moved to that digest, which is what Render's configured image points
+#           at, so a restart never brings back an older version (CICD-73). Rollback goes back to the
+#           digest recorded in the release.
+#
 # Secrets, in the `staging` environment (Settings > Environments), never as repository secrets:
 #   RENDER_BACKEND_DEPLOY_HOOK_URL   Render > peers-backend-staging > Settings > Deploy Hook
 #   RENDER_FRONTEND_DEPLOY_HOOK_URL  Render > peers-frontend-staging > Settings > Deploy Hook
@@ -67,19 +76,26 @@ jobs:
       || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    # actions: read, to find the CI run of the commit and (for the record) its run link.
+    # actions: read, to find the CI run of the commit and (for the record) its run link. packages: read, to
+    # check that a rollback target's image still exists in ghcr.io.
     permissions:
       contents: read
       actions: read
+      packages: read
     outputs:
       ci_run_id: ${{ steps.ci.outputs.run_id }}
       ci_run_url: ${{ steps.ci.outputs.run_url }}
       sha: ${{ steps.what.outputs.sha }}
       stale: ${{ steps.what.outputs.stale }}
       release: ${{ steps.what.outputs.release }}
+      backend_mode: ${{ steps.what.outputs.backend_mode }}
       previous_tag: ${{ steps.previous.outputs.tag }}
       previous_backend: ${{ steps.previous.outputs.backend }}
       previous_frontend: ${{ steps.previous.outputs.frontend }}
+      previous_backend_image: ${{ steps.previous.outputs.backend_image }}
+      previous_backend_digest: ${{ steps.previous.outputs.backend_digest }}
+      previous_backend_reports_commit: ${{ steps.previous.outputs.backend_reports_commit }}
+      previous_backend_ref: ${{ steps.previous.outputs.backend_ref }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -97,7 +113,13 @@ jobs:
           SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
           MAIN_SHA: ${{ github.sha }}
           CD_RELEASE: ${{ vars.CD_RELEASE }}
+          BACKEND_DEPLOY: ${{ vars.BACKEND_DEPLOY }}
         run: |
+          # Fail closed: a missing or misspelled value must never pick a kind of deploy by accident.
+          if [ "$BACKEND_DEPLOY" != source ] && [ "$BACKEND_DEPLOY" != image ]; then
+            echo "::error::The repository variable BACKEND_DEPLOY must be exactly \"source\" or \"image\" (Settings > Secrets and variables > Actions > Variables). It is \"${BACKEND_DEPLOY}\"."
+            exit 1
+          fi
           stale=false
           if [ "$SHA" != "$MAIN_SHA" ]; then
             stale=true
@@ -105,7 +127,7 @@ jobs:
           fi
           release=off
           [ "$CD_RELEASE" = "on" ] && release=on
-          { echo "sha=${SHA}"; echo "stale=${stale}"; echo "release=${release}"; } >> "$GITHUB_OUTPUT"
+          { echo "sha=${SHA}"; echo "stale=${stale}"; echo "release=${release}"; echo "backend_mode=${BACKEND_DEPLOY}"; } >> "$GITHUB_OUTPUT"
 
       # The CI run that tested this commit. After CI it's the run that triggered CD. A manual deploy
       # needs a CI run on main for the same commit that passed, so nothing untested reaches staging
@@ -133,14 +155,19 @@ jobs:
 
       # The rollback target: the release named in rollback_to, or else the newest rc-* release that the
       # pipeline made. Tags that don't match rc-<date>-<time>-<sha7>, and hand-made releases (no CD run
-      # link, smoke tests not passed), are skipped: scripts/release-record.js `previous` decides.
+      # link, smoke tests not passed), are skipped: scripts/release-record.js `previous` decides. When the
+      # backend runs as an image, only a release whose backend image and digest were recorded counts, and
+      # that image must still resolve in ghcr.io. This is checked here, before any service is changed.
       - name: Find the previous good release
         id: previous
         env:
           GH_TOKEN: ${{ github.token }}
           ROLLBACK_TO: ${{ inputs.rollback_to }}
+          BACKEND_MODE: ${{ steps.what.outputs.backend_mode }}
         run: |
           pattern='^rc-[0-9]{8}-[0-9]{4}-[0-9a-f]{7}$'
+          export REQUIRE_IMAGE=false
+          [ "$BACKEND_MODE" = image ] && REQUIRE_IMAGE=true
           if [ -n "$ROLLBACK_TO" ]; then
             [[ "$ROLLBACK_TO" =~ $pattern ]] || { echo "::error::rollback_to must be an rc-* tag such as rc-20261105-1432-1a2b3c4."; exit 1; }
             candidates="$ROLLBACK_TO"
@@ -148,21 +175,63 @@ jobs:
             candidates=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 100 --json tagName \
               --jq '.[].tagName | select(startswith("rc-"))' | head -n 20)
           fi
-          found="tag=
+          empty="tag=
           backend=
-          frontend="
+          frontend=
+          backend_image=
+          backend_digest=
+          backend_reports_commit="
+          found="$empty"
+          unusable=""
+          if [ "$REQUIRE_IMAGE" = true ]; then
+            echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin >/dev/null
+          fi
           for tag in $candidates; do
             [[ "$tag" =~ $pattern ]] || { echo "Skipping ${tag}: not an rc-<date>-<time>-<sha7> tag"; continue; }
             rm -rf previous
             gh release download "$tag" --repo "$GITHUB_REPOSITORY" --pattern release-record.json --dir previous 2>/dev/null || { echo "Skipping ${tag}: no release record"; continue; }
             out=$(node scripts/release-record.js previous previous/release-record.json)
-            if grep -q '^backend=.' <<< "$out"; then found="$out"; break; fi
+            if grep -q '^backend=.' <<< "$out"; then
+              if [ "$REQUIRE_IMAGE" = true ]; then
+                # The backend runs as an image: the recorded digest must still be in the registry.
+                image=$(sed -n 's/^backend_image=//p' <<< "$out")
+                digest=$(sed -n 's/^backend_digest=//p' <<< "$out")
+                ref="${image%:*}@${digest}"
+                # Only "not there" skips a release. A rate limit, a network error or a refused login must not
+                # be read as "not there": it stops the job, as in image-build.yml's push step.
+                if answer=$(docker buildx imagetools inspect "$ref" 2>&1); then
+                  :
+                elif grep -qiE 'no such manifest|manifest unknown|name unknown|not found' <<< "$answer"; then
+                  echo "Skipping ${tag}: its backend image ${ref} is not in ghcr.io"
+                  unusable="${tag}"
+                  continue
+                else
+                  echo "::error::Could not tell whether ${ref} is in ghcr.io: ${answer}"
+                  exit 1
+                fi
+                out="${out}
+          backend_ref=${ref}"
+              fi
+              found="$out"; break
+            fi
             echo "Skipping ${tag}: not a release the pipeline made"
+            if [ "$REQUIRE_IMAGE" = true ]; then
+              # Was it only missing its image? Then the message below can say so.
+              if [ -z "$unusable" ] && REQUIRE_IMAGE=false node scripts/release-record.js previous previous/release-record.json | grep -q '^backend=.'; then unusable="${tag}"; fi
+            fi
           done
+          [ "$REQUIRE_IMAGE" = true ] && docker logout ghcr.io >/dev/null 2>&1
           echo "$found" | tee -a "$GITHUB_OUTPUT"
           if [ -n "$ROLLBACK_TO" ] && ! grep -q '^backend=.' <<< "$found"; then
-            echo "::error::${ROLLBACK_TO} has no release record the pipeline made, so it can't be rolled back to."
+            if [ -n "$unusable" ]; then
+              echo "::error::${ROLLBACK_TO} has no backend image that can be redeployed: its release record does not show an image that reports its own commit (releases made before the image deploy do not), or the image is no longer in ghcr.io. Pick a newer release."
+            else
+              echo "::error::${ROLLBACK_TO} has no release record the pipeline made, so it can't be rolled back to."
+            fi
             exit 1
+          fi
+          if [ -z "$ROLLBACK_TO" ] && [ -n "$unusable" ] && ! grep -q '^backend=.' <<< "$found"; then
+            echo "::warning::No earlier release has a backend image that can be redeployed, so this run cannot roll the backend back if the deploy fails."
           fi
 
       - name: Plan
@@ -172,6 +241,7 @@ jobs:
           RELEASE: ${{ steps.what.outputs.release }}
           ROLLBACK_TO: ${{ inputs.rollback_to }}
           PREVIOUS_TAG: ${{ steps.previous.outputs.tag }}
+          BACKEND_MODE: ${{ steps.what.outputs.backend_mode }}
         run: |
           short="${SHA:0:7}"
           repo="${GITHUB_REPOSITORY,,}"
@@ -196,7 +266,11 @@ jobs:
               else
                 echo "| Images | would build, check and push \`ghcr.io/${repo}/{backend,frontend}:${SHA}\` |"
               fi
-              echo "| Deploy | deploy \`${short}\` to each service whose files changed, and wait until it reports it |"
+              if [ "$BACKEND_MODE" = image ]; then
+                echo "| Deploy | backend: run this run's image by digest (image mode); frontend: deploy \`${short}\` if its files changed; wait until each reports it |"
+              else
+                echo "| Deploy | deploy \`${short}\` to each service whose files changed, and wait until it reports it |"
+              fi
               if [ "$RELEASE" = "on" ]; then
                 echo "| Smoke tests | run Staging regression against ${STAGING_URL} |"
                 echo "| Release | tag \`rc-<date>-<time>-${short}\` and publish its release record |"
@@ -272,14 +346,93 @@ jobs:
             exit 1
           fi
 
+      # How this service is deployed. The frontend is always built from source. The backend follows
+      # BACKEND_DEPLOY; in image mode it needs the digest of the image this run pushed and never falls
+      # back to a source deploy.
+      - name: Choose how this service is deployed
+        id: mode
+        env:
+          SERVICE: ${{ matrix.service }}
+          BACKEND_MODE: ${{ needs.prepare.outputs.backend_mode }}
+          IMAGES_RESULT: ${{ needs.images.result }}
+          BACKEND_DIGEST: ${{ needs.images.outputs.backend_digest }}
+        run: |
+          mode=source
+          [ "$SERVICE" = backend ] && mode="$BACKEND_MODE"
+          ref=""
+          if [ "$mode" = image ]; then
+            if [ "$IMAGES_RESULT" != success ]; then
+              echo "::error::The backend is deployed as an image (BACKEND_DEPLOY=image) but the images job did not succeed (${IMAGES_RESULT}). Nothing was deployed. Turn CD_RELEASE on, or set BACKEND_DEPLOY to source."
+              exit 1
+            fi
+            if ! [[ "$BACKEND_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+              echo "::error::The images job did not report a valid backend image digest. Nothing was deployed."
+              exit 1
+            fi
+            ref="ghcr.io/${GITHUB_REPOSITORY,,}/backend@${BACKEND_DIGEST}"
+          fi
+          { echo "mode=${mode}"; echo "image_ref=${ref}"; } >> "$GITHUB_OUTPUT"
+
       - name: Deploy and wait until live
         run: node scripts/render-deploy.js
         env:
           SERVICE: ${{ matrix.service }}
           SHA: ${{ needs.prepare.outputs.sha }}
+          DEPLOY_MODE: ${{ steps.mode.outputs.mode }}
+          IMAGE_REF: ${{ steps.mode.outputs.image_ref }}
           HOOK_URL: ${{ matrix.service == 'backend' && secrets.RENDER_BACKEND_DEPLOY_HOOK_URL || secrets.RENDER_FRONTEND_DEPLOY_HOOK_URL }}
           # Redeploy even when nothing changed, but never an older commit than the live one.
           FORCE: ${{ inputs.force || false }}
+
+  # Provisional until the Render spike (CICD-73 Task 2) shows whether Render re-pulls a moved tag: the
+  # deploy above is by digest, so this only keeps Render's configured image (`backend:staging`) on the
+  # version that passed, which is what a restart or scale-out pulls. Image mode only.
+  pointer:
+    name: Move the staging image pointer
+    needs: [prepare, images, deploy, smoke]
+    if: >-
+      !cancelled() && needs.prepare.outputs.backend_mode == 'image' && needs.smoke.result == 'success'
+      && needs.deploy.result == 'success' && needs.images.result == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    # The only job besides the image build that can write packages.
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Log in to ghcr.io
+        run: echo "$REGISTRY_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+        env:
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Registry paths are lower case; the organisation name is not.
+      - name: Work out the image reference
+        id: ref
+        env:
+          BACKEND_DIGEST: ${{ needs.images.outputs.backend_digest }}
+        run: echo "image_ref=ghcr.io/${GITHUB_REPOSITORY,,}/backend@${BACKEND_DIGEST}" >> "$GITHUB_OUTPUT"
+
+      # Moves only when staging reports this run's commit (a late run, or one that deployed nothing, leaves
+      # the pointer where it is). If the move fails the run fails: Render's configured image is behind.
+      - name: Point backend:staging at the image that passed
+        run: node scripts/staging-pointer.js
+        env:
+          IMAGE_REF: ${{ steps.ref.outputs.image_ref }}
+          SMOKE_PASSED: "true"
+          SHA: ${{ needs.prepare.outputs.sha }}
+          HEALTH_URL: https://peers-backend-staging.onrender.com/api/health
+
+      - name: Log out of ghcr.io
+        if: ${{ always() }}
+        run: docker logout ghcr.io
 
   smoke:
     needs: [prepare, deploy]
@@ -291,11 +444,15 @@ jobs:
 
   release:
     name: Tag release candidate
-    needs: [prepare, images, deploy, smoke]
-    # Every stage before it passed, or there is no tag.
+    needs: [prepare, images, deploy, smoke, pointer]
+    # Every stage before it passed, or there is no tag. In image mode that includes moving the backend:staging
+    # pointer, so a published release always has Render's configured image on its backend; in source mode the
+    # pointer job is skipped on purpose.
     if: >-
       !cancelled() && needs.prepare.outputs.release == 'on' && needs.images.result == 'success'
       && needs.deploy.result == 'success' && needs.smoke.result == 'success'
+      && (needs.pointer.result == 'success'
+          || (needs.prepare.outputs.backend_mode != 'image' && needs.pointer.result == 'skipped'))
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     # The only job that can write to the repository: it creates the tag and the release. actions: read
@@ -337,6 +494,11 @@ jobs:
           BACKEND_COVERAGE: ci/backend/coverage/lcov.info
           FRONTEND_COVERAGE: ci/frontend/coverage/coverage-summary.json
           PREVIOUS_TAG: ${{ needs.prepare.outputs.previous_tag }}
+          # When this run did not deploy the backend, the record keeps the artifact that is really running.
+          PREVIOUS_BACKEND_COMMIT: ${{ needs.prepare.outputs.previous_backend }}
+          PREVIOUS_BACKEND_IMAGE: ${{ needs.prepare.outputs.previous_backend_image }}
+          PREVIOUS_BACKEND_DIGEST: ${{ needs.prepare.outputs.previous_backend_digest }}
+          PREVIOUS_BACKEND_REPORTS_COMMIT: ${{ needs.prepare.outputs.previous_backend_reports_commit }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
       # A pre-release: staging only. Production is out of scope (CICD-38).
@@ -406,12 +568,35 @@ jobs:
             exit 1
           fi
 
+      # In image mode the backend goes back to the image digest recorded in the release (prepare checked
+      # that it still resolves, before anything was changed); the frontend is always a source deploy.
+      - name: Choose how this service is rolled back
+        id: mode
+        env:
+          SERVICE: ${{ matrix.service }}
+          BACKEND_MODE: ${{ needs.prepare.outputs.backend_mode }}
+          PREVIOUS_REF: ${{ needs.prepare.outputs.previous_backend_ref }}
+        run: |
+          mode=source
+          [ "$SERVICE" = backend ] && mode="$BACKEND_MODE"
+          ref=""
+          if [ "$mode" = image ]; then
+            if [ -z "$PREVIOUS_REF" ]; then
+              echo "::error::The backend runs as an image but the release to go back to has no checked backend image. Nothing was rolled back."
+              exit 1
+            fi
+            ref="$PREVIOUS_REF"
+          fi
+          { echo "mode=${mode}"; echo "image_ref=${ref}"; } >> "$GITHUB_OUTPUT"
+
       # ROLLBACK, the only mode that may deploy an older commit than the live one.
       - name: Redeploy ${{ needs.prepare.outputs.previous_tag }} and wait until live
         run: node scripts/render-deploy.js
         env:
           SERVICE: ${{ matrix.service }}
           SHA: ${{ matrix.service == 'backend' && needs.prepare.outputs.previous_backend || needs.prepare.outputs.previous_frontend }}
+          DEPLOY_MODE: ${{ steps.mode.outputs.mode }}
+          IMAGE_REF: ${{ steps.mode.outputs.image_ref }}
           HOOK_URL: ${{ matrix.service == 'backend' && secrets.RENDER_BACKEND_DEPLOY_HOOK_URL || secrets.RENDER_FRONTEND_DEPLOY_HOOK_URL }}
           ROLLBACK: "true"
 
@@ -434,6 +619,44 @@ jobs:
     with:
       base_url: https://peers-frontend-staging.onrender.com
       api_url: https://peers-backend-staging.onrender.com/api
+
+  # After a rollback that passed its smoke tests, the pointer goes back to the digest rolled back to.
+  rollback-pointer:
+    name: Move the staging image pointer back
+    needs: [prepare, rollback, rollback-smoke]
+    if: >-
+      !cancelled() && needs.prepare.outputs.backend_mode == 'image' && needs.rollback.result == 'success'
+      && needs.rollback-smoke.result == 'success' && needs.prepare.outputs.previous_backend_ref != ''
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Log in to ghcr.io
+        run: echo "$REGISTRY_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+        env:
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Point backend:staging at the image rolled back to
+        run: node scripts/staging-pointer.js
+        env:
+          IMAGE_REF: ${{ needs.prepare.outputs.previous_backend_ref }}
+          SMOKE_PASSED: "true"
+          SHA: ${{ needs.prepare.outputs.previous_backend }}
+          HEALTH_URL: https://peers-backend-staging.onrender.com/api/health
+
+      - name: Log out of ghcr.io
+        if: ${{ always() }}
+        run: docker logout ghcr.io
 
   report:
     needs: [prepare, deploy]

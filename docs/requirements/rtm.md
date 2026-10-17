@@ -75,7 +75,7 @@ security) and to fixed defects. IDs here may use a backlog number or `SEC` inste
 | Browser origins allowed to call the API | `corsConfig.test.js` · E2E `staging.spec.js` (the four `@staging` tests, against staging) | CICD-37, CICD-27 |
 | Staging mail never reaches a real inbox | `emailGuard.test.js` | CICD-44 |
 | Deployment health check | `health.test.js`: TC-29-50..52 (the image reports the commit it was built from) · `deploymentStatus.test.js`: TC-29-40..48 | `/api/health` used by Render and CD |
-| Deploy and release scripts | `renderDeploy.test.js` · `releaseRecord.test.js` | CICD-28, CICD-58 |
+| Deploy and release scripts | `renderDeploy.test.js`: TC-29-53..58, TC-29-66..68 (image deploy mode, CICD-73) · `releaseRecord.test.js`: TC-29-59..60, TC-29-69..71 (the artifact in the record, rollback eligibility) · `stagingPointer.test.js`: TC-29-61..65, TC-29-72..74 (the `staging` image pointer) | CICD-28, CICD-58, CICD-73 |
 | Configuration safety | `env.test.js` (production refuses a missing or short `JWT_SECRET`) | D-03, PR #16 |
 | Server behind Render's load balancer | `serverTimeouts.test.js` | PR #30 |
 | Frontend API address | FE `apiUrl.test.js` | PR #30 |

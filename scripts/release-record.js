@@ -5,15 +5,21 @@
 //   node scripts/release-record.js record <output dir>
 //     SHA, RUN_URL, CI_RUN_URL, SMOKE_RESULT (the smoke job's result), SMOKE_TESTS (how many @staging
 //     tests ran), BACKEND_IMAGE, FRONTEND_IMAGE, BACKEND_DIGEST, FRONTEND_DIGEST, PREVIOUS_TAG,
-//     BACKEND_COVERAGE (lcov.info), FRONTEND_COVERAGE (coverage-summary.json)
+//     BACKEND_COVERAGE (lcov.info), FRONTEND_COVERAGE (coverage-summary.json),
+//     PREVIOUS_BACKEND_COMMIT / _IMAGE / _DIGEST / _REPORTS_COMMIT (the previous release's backend, from cd.yml's
+//     prepare job)
 //     Reads the commit each staging service reports, then writes release-record.json and
 //     release-record.md and prints the tag name. Exits 1, with no record, when a service can't say
 //     which commit it runs or the smoke tests didn't pass with at least one @staging test.
 //
-//   node scripts/release-record.js previous <release-record.json>
-//     Prints tag=, backend=, frontend= lines for $GITHUB_OUTPUT from a previous record; empty values
-//     when there is none or the record isn't one the pipeline made (first release, a hand-made test
-//     release, a missing file).
+//   [REQUIRE_IMAGE=true] node scripts/release-record.js previous <release-record.json>
+//     Prints tag=, backend=, frontend=, backend_image=, backend_digest=, backend_reports_commit= lines for
+//     $GITHUB_OUTPUT from a previous record; empty values when there is none or the record isn't one the
+//     pipeline made (first release, a hand-made test release, a missing file). With REQUIRE_IMAGE a release
+//     is treated as none unless its backend image can be redeployed (CICD-73): a well-formed image and
+//     digest, the image built for that very commit, and the marker that the image reports its own commit
+//     (set only by releases made after the image carried GIT_COMMIT). Older releases have an image and a
+//     digest too, but redeploying their image would never report the commit CD waits for.
 //
 // The record is attached to the GitHub release as release-record.json, which is where `previous`
 // reads it back from: the release is the one place that keeps it for good.
@@ -25,6 +31,9 @@ const { parseLcov, parseJestSummary } = require('./coverage-gate');
 const SHA_RE = /^[0-9a-f]{40}$/;
 const RC_TAG_RE = /^rc-[0-9]{8}-[0-9]{4}-[0-9a-f]{7}$/;
 const RUN_URL_RE = /^https:\/\/github\.com\/[^/]+\/[^/]+\/actions\/runs\/[0-9]+/;
+const DIGEST_RE = /^sha256:[0-9a-f]{64}$/;
+// What image-build.yml records: ghcr.io/<lower-case path>:<tag>.
+const IMAGE_RE = /^ghcr\.io\/[a-z0-9][a-z0-9._-]*(?:\/[a-z0-9][a-z0-9._-]*)+:[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$/;
 
 // rc-20261105-1432-1a2b3c4: sortable by time, and the short SHA says what was released.
 function tagName(sha, date = new Date()) {
@@ -52,14 +61,35 @@ function readCoverage(file, parse) {
   }
 }
 
-function buildRecord({ env, backend, frontend, smoke, coverage = {}, date = new Date() }) {
+// The backend artifact that is really running. A run that deployed the backend (its commit is this
+// run's) records this run's image; a run that skipped it keeps what the previous release recorded, but
+// only when that release's backend is the commit now live. Otherwise it is unknown (null), never this
+// run's newer image paired with an older commit.
+// imageReportsCommit says the image carries its commit (GIT_COMMIT, CICD-73), so a deploy of it can be waited
+// for and a rollback to it can be verified. Only an image this record-writing code saw built can say so.
+function backendArtifact({ env, backend, previous }) {
+  if (backend === env.SHA) {
+    const image = env.BACKEND_IMAGE || null;
+    const digest = env.BACKEND_DIGEST || null;
+    return { commit: backend, image, digest, imageReportsCommit: Boolean(image && digest) };
+  }
+  const kept = previous?.backend;
+  if (kept && kept.commit === backend) {
+    const image = kept.image || null;
+    const digest = kept.digest || null;
+    return { commit: backend, image, digest, imageReportsCommit: kept.imageReportsCommit === true && Boolean(image && digest) };
+  }
+  return { commit: backend, image: null, digest: null, imageReportsCommit: false };
+}
+
+function buildRecord({ env, backend, frontend, smoke, coverage = {}, previous, date = new Date() }) {
   const tag = tagName(env.SHA, date);
   return {
     tag,
     commit: env.SHA,
     createdAt: date.toISOString(),
     components: {
-      backend: { commit: backend, image: env.BACKEND_IMAGE || null, digest: env.BACKEND_DIGEST || null },
+      backend: backendArtifact({ env, backend, previous }),
       frontend: { commit: frontend, image: env.FRONTEND_IMAGE || null, digest: env.FRONTEND_DIGEST || null },
     },
     smokeTests: smoke.text,
@@ -83,10 +113,12 @@ function formatMarkdown(record) {
       `**Actions > CD > Run workflow** on \`main\` with **rollback_to** set to its tag (the one before this is`,
       `\`${record.previousRelease}\`), or redeploy its commits from the Render dashboard (each service > Manual Deploy >`,
       'Deploy a specific commit).',
+      ...(backend.digest ? [`The backend of this release is the image \`${backend.digest}\`: to redeploy its image by digest, use the same rollback_to run, which reads the digest from this record.`] : []),
     ]
     : [
       'This is the first release candidate, so there is nothing older to roll back to. To go back to this one later, run',
       `**Actions > CD > Run workflow** on \`main\` with **rollback_to** set to \`${record.tag}\`.`,
+      ...(backend.digest ? [`The backend of this release is the image \`${backend.digest}\`: to redeploy its image by digest, use that rollback_to run, which reads the digest from this record.`] : []),
     ];
   return [
     `## Release candidate ${record.tag}`,
@@ -123,14 +155,23 @@ function madeByPipeline(record) {
     && typeof record.smokeTests === 'string' && record.smokeTests.startsWith('passed'));
 }
 
-// Reads a previous release-record.json. Anything unusable means "no previous good release".
-function previousGood(file) {
+// Reads a previous release-record.json. Anything unusable means "no previous good release". With
+// requireImage, a release is usable only when its backend image can be redeployed: a well-formed ghcr.io
+// image and sha256 digest, the image tagged with the backend's own commit, and the record's marker that the
+// image reports its commit. Every release made before CICD-73 has an image and a digest but no marker, and
+// some pair a backend commit with another run's image, so none of them is a rollback target.
+function previousGood(file, { requireImage = false } = {}) {
   try {
     const record = JSON.parse(fs.readFileSync(file, 'utf8'));
     const backend = record.components?.backend?.commit;
     const frontend = record.components?.frontend?.commit;
     if (!madeByPipeline(record) || !SHA_RE.test(backend || '') || !SHA_RE.test(frontend || '')) return null;
-    return { tag: record.tag, backend, frontend };
+    const image = record.components.backend.image;
+    const digest = record.components.backend.digest;
+    const wellFormed = IMAGE_RE.test(image || '') && DIGEST_RE.test(digest || '');
+    const reports = record.components.backend.imageReportsCommit === true;
+    if (requireImage && !(wellFormed && reports && image.endsWith(`:${backend}`))) return null;
+    return { tag: record.tag, backend, frontend, backendImage: wellFormed ? image : null, backendDigest: wellFormed ? digest : null, backendReportsCommit: wellFormed && reports };
   } catch {
     return null;
   }
@@ -156,7 +197,10 @@ async function record(env, outDir, { fetchImpl = fetch, date = new Date() } = {}
     backend: env.BACKEND_COVERAGE ? readCoverage(env.BACKEND_COVERAGE, parseLcov) : null,
     frontend: env.FRONTEND_COVERAGE ? readCoverage(env.FRONTEND_COVERAGE, parseJestSummary) : null,
   };
-  const rec = buildRecord({ env, backend, frontend, smoke, coverage, date });
+  const previous = SHA_RE.test(env.PREVIOUS_BACKEND_COMMIT || '')
+    ? { backend: { commit: env.PREVIOUS_BACKEND_COMMIT, image: env.PREVIOUS_BACKEND_IMAGE || null, digest: env.PREVIOUS_BACKEND_DIGEST || null, imageReportsCommit: env.PREVIOUS_BACKEND_REPORTS_COMMIT === 'true' } }
+    : undefined;
+  const rec = buildRecord({ env, backend, frontend, smoke, coverage, previous, date });
   const markdown = formatMarkdown(rec);
   fs.mkdirSync(outDir, { recursive: true });
   fs.writeFileSync(path.join(outDir, 'release-record.json'), JSON.stringify(rec, null, 2) + '\n');
@@ -170,8 +214,8 @@ async function main(argv, env, deps) {
   const [command, target] = argv;
   if (command === 'record' && target) return record(env, target, deps);
   if (command === 'previous') {
-    const prev = target ? previousGood(target) : null;
-    console.log(`tag=${prev?.tag || ''}\nbackend=${prev?.backend || ''}\nfrontend=${prev?.frontend || ''}`);
+    const prev = target ? previousGood(target, { requireImage: env.REQUIRE_IMAGE === 'true' }) : null;
+    console.log(`tag=${prev?.tag || ''}\nbackend=${prev?.backend || ''}\nfrontend=${prev?.frontend || ''}\nbackend_image=${prev?.backendImage || ''}\nbackend_digest=${prev?.backendDigest || ''}\nbackend_reports_commit=${prev?.backendReportsCommit ? 'true' : ''}`);
     return 0;
   }
   console.error('Usage: node scripts/release-record.js record <output dir> | previous <release-record.json>');
@@ -184,7 +228,7 @@ function failureMessage(error) {
   return `Release record: failed (${error?.message || error}). No release.`;
 }
 
-module.exports = { RC_TAG_RE, tagName, smokeOutcome, readCoverage, buildRecord, formatMarkdown, madeByPipeline, previousGood, failureMessage, record, main };
+module.exports = { RC_TAG_RE, DIGEST_RE, IMAGE_RE, tagName, smokeOutcome, readCoverage, buildRecord, formatMarkdown, madeByPipeline, previousGood, failureMessage, record, main };
 
 if (require.main === module) {
   main(process.argv.slice(2), process.env).then(
