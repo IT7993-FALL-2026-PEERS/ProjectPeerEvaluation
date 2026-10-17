@@ -32,6 +32,9 @@ services:
     build:
       context: ./src/backend
       dockerfile: Dockerfile
+      # The commit the image reports in /api/health (image-build.yml sets it; empty locally).
+      args:
+        GIT_COMMIT: ${GIT_COMMIT:-}
     # The release workflow (image-build.yml) sets BACKEND_IMAGE / FRONTEND_IMAGE to the ghcr.io
     # names tagged with the commit SHA. Locally the defaults below apply.
     image: ${BACKEND_IMAGE:-peers-backend:local}

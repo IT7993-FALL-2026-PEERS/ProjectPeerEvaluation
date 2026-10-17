@@ -3,7 +3,10 @@
 Docker is a **local-dev and CI convenience** for PEERS. It does not replace the Render
 deployment (see README "Deployment") or the plain `npm run dev` path; use whichever you like. The
 delivery pipeline also builds the same images and publishes them to GitHub Container Registry,
-tagged with the commit SHA, as the release-candidate record (Render still builds from source).
+tagged with the commit SHA, as the release-candidate record (Render still builds from source). The backend image
+carries the commit it was built from (`GIT_COMMIT`, a build argument that CD sets and that is empty in a local
+build), and `/api/health` reports it. CD never pushes over a tag that is already in the registry (it keeps
+the image that is there), and the digest is the image's identity.
 
 The stack is three services started in order, each waiting for the previous one to be **healthy**:
 `mongo` → `backend` → `frontend`.

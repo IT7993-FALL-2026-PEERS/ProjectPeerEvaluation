@@ -105,6 +105,8 @@ jobs:
           BACKEND_IMAGE: ${{ steps.names.outputs.backend_image }}
           FRONTEND_IMAGE: ${{ steps.names.outputs.frontend_image }}
           FRONTEND_API_URL: ${{ inputs.frontend_api_url }}
+          # Baked into the backend image; /api/health reports it (CICD-73).
+          GIT_COMMIT: ${{ github.sha }}
 
       - name: Smoke check (backend and frontend)
         run: bash scripts/verify-env.sh
@@ -115,6 +117,8 @@ jobs:
           body=$(curl -sf http://localhost:5000/api/health)
           echo "$body"
           echo "$body" | grep -q '"status":"OK"'
+          # The image reports the commit it was built from, so CD can wait for it after a deploy.
+          echo "$body" | grep -q "\"commit\":\"${GITHUB_SHA}\""
 
       - name: Show container logs on failure
         if: ${{ failure() }}
@@ -137,24 +141,36 @@ jobs:
         env:
           REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Push both images
+      # A tag is never overwritten: the digest is the artifact's identity (CICD-73). When a commit's tag is
+      # already in the registry (CD run again for the same commit), this run keeps the image that is there
+      # and the summary reports its digest, so a second build of the same commit can never replace it.
+      - name: Push the images that are not in the registry yet
         run: |
-          docker push "$BACKEND_IMAGE"
-          docker push "$FRONTEND_IMAGE"
+          for image in "$BACKEND_IMAGE" "$FRONTEND_IMAGE"; do
+            if answer=$(docker buildx imagetools inspect "$image" 2>&1); then
+              echo "::notice::${image} is already in ghcr.io. Tags are never overwritten, so this run keeps that image."
+            elif echo "$answer" | grep -qiE 'no such manifest|manifest unknown|name unknown|not found'; then
+              docker push "$image"
+            else
+              # A rate limit, a network error or a refused login must not be read as "not there yet"
+              echo "::error::Could not tell whether ${image} is already in ghcr.io: ${answer}"
+              exit 1
+            fi
+          done
         env:
           BACKEND_IMAGE: ${{ steps.names.outputs.backend_image }}
           FRONTEND_IMAGE: ${{ steps.names.outputs.frontend_image }}
-
-      - name: Log out of ghcr.io
-        if: ${{ always() }}
-        run: docker logout ghcr.io
 
       # Names, tag and digests for Donald's release record.
       - name: Image summary
         id: digests
         run: |
-          backend_digest=$(docker inspect --format '{{ index .RepoDigests 0 }}' "$BACKEND_IMAGE")
-          frontend_digest=$(docker inspect --format '{{ index .RepoDigests 0 }}' "$FRONTEND_IMAGE")
+          # From the registry, so the digest is the one of the image that is there (pushed now or earlier)
+          digest_of() { docker buildx imagetools inspect "$1" | awk '/^Digest:/ { print $2; exit }'; }
+          backend_digest="@$(digest_of "$BACKEND_IMAGE")"
+          frontend_digest="@$(digest_of "$FRONTEND_IMAGE")"
+          case "${backend_digest#@}" in sha256:*) ;; *) echo "::error::Could not read the backend digest from the registry."; exit 1 ;; esac
+          case "${frontend_digest#@}" in sha256:*) ;; *) echo "::error::Could not read the frontend digest from the registry."; exit 1 ;; esac
           { echo "backend_digest=${backend_digest#*@}"; echo "frontend_digest=${frontend_digest#*@}"; } >> "$GITHUB_OUTPUT"
           {
             echo "### Images pushed to ghcr.io"
@@ -164,9 +180,14 @@ jobs:
             echo "| \`${BACKEND_IMAGE%:*}\` | \`${TAG}\` | \`${backend_digest#*@}\` |"
             echo "| \`${FRONTEND_IMAGE%:*}\` | \`${TAG}\` | \`${frontend_digest#*@}\` |"
             echo ""
-            echo "Commit \`${TAG}\`. Both images were started with Compose and \`/api/health\` reported the database connected before the push."
+            echo "Commit \`${TAG}\`. Both images were started with Compose and \`/api/health\` reported the database connected and this commit before the push. An image already in the registry is kept, never overwritten."
           } >> "$GITHUB_STEP_SUMMARY"
         env:
           BACKEND_IMAGE: ${{ steps.names.outputs.backend_image }}
           FRONTEND_IMAGE: ${{ steps.names.outputs.frontend_image }}
           TAG: ${{ steps.names.outputs.tag }}
+
+      # After the summary on purpose: the digests are read from the registry, which needs the login.
+      - name: Log out of ghcr.io
+        if: ${{ always() }}
+        run: docker logout ghcr.io
