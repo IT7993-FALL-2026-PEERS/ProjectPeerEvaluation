@@ -56,15 +56,15 @@ test('TC-17-21: the course summary counts students and grades from the same numb
   const { summary } = (await app.request('GET', course(), { token: ada })).body;
   assert.equal(summary.totalStudents, 4);
   assert.equal(summary.studentsWithEvaluations, 4);
-  near(summary.averageScore, 81.875, 'course average');
+  near(summary.averageScore, 80.835, 'course average');
   assert.deepEqual(summary.gradeDistribution, { A: 2, B: 0, C: 1, D: 0, F: 1 });
 });
 
 test('TC-17-22: team averages are the mean of the members\' scores', async () => {
   const { teams } = (await app.request('GET', course(), { token: ada })).body;
   const byTeam = Object.fromEntries(teams.map((t) => [t.team_name, t]));
-  near(byTeam.Alpha.averageScore, 89.585, 'Alpha');
-  near(byTeam.Beta.averageScore, 74.165, 'Beta');
+  near(byTeam.Alpha.averageScore, 88.335, 'Alpha');
+  near(byTeam.Beta.averageScore, 73.335, 'Beta');
   assert.equal(byTeam.Alpha.students.length, 2);
 });
 
@@ -72,7 +72,7 @@ test('TC-17-23: the team report matches the course report for that team', async 
   const res = await app.request('GET', course(`/team/${IDS.teamBeta}`), { token: ada });
   assert.equal(res.status, 200);
   assert.deepEqual(res.body.members.map((m) => m.name).sort(), ['Cy Cole', 'Di Diaz']);
-  near(res.body.teamAverage, 74.165, 'team average');
+  near(res.body.teamAverage, 73.335, 'team average');
 });
 
 test('TC-18-20: a student report shows the score, ratings received and ratings given', async () => {
@@ -90,8 +90,8 @@ test('TC-17-24: curved grading lifts scores under 80 half way to the class mean 
   const s = byName(res.body.students);
   assert.equal(s.ann.finalScore, 100);
   assert.equal(s.cy.finalScore, 90);
-  near(s.ben.finalScore, 80.52, 'Ben lifted');
-  near(s.di.finalScore, 70.1, 'Di lifted');
+  near(s.ben.finalScore, 78.75, 'Ben lifted');
+  near(s.di.finalScore, 68.75, 'Di lifted');
   assert.equal(res.body.gradingSettings.boostFactor, 0.5);
 });
 
@@ -116,8 +116,8 @@ test('TC-19-20: the CSV export has one row per student with the same scores as t
   const lines = (await res.text()).split('\n');
   assert.equal(lines[0], 'Student ID,Name,Email,Team,Original Score,Final Score,Letter Grade,Evaluations Received,Improvement');
   assert.equal(lines.length, 5);
-  assert.ok(lines.includes('1002,Ben Baker,ben@example.edu,Alpha,79.17,79.17,C,1,0'));
-  assert.ok(lines.includes('1004,Di Diaz,di@example.edu,Beta,58.33,58.33,F,1,0'));
+  assert.ok(lines.includes('1002,Ben Baker,ben@example.edu,Alpha,76.67,76.67,C,1,0'));
+  assert.ok(lines.includes('1004,Di Diaz,di@example.edu,Beta,56.67,56.67,F,1,0'));
 });
 
 test('TC-19-22: the CSV export applies the grading method from the query, like the report does', async () => {
@@ -127,10 +127,10 @@ test('TC-19-22: the CSV export applies the grading method from the query, like t
     const cells = line.split(',');
     return [cells[1].split(' ')[0].toLowerCase(), cells];
   }));
-  // Columns: ..., 4 Original Score, 5 Final Score. Ben (79.17) and Di (58.33) are lifted, Ann and Cy are not.
-  near(Number(rows.ben[4]), 79.17, 'Ben original');
-  near(Number(rows.ben[5]), 80.52, 'Ben lifted');
-  near(Number(rows.di[5]), 70.1, 'Di lifted');
+  // Columns: ..., 4 Original Score, 5 Final Score. Ben (76.67) and Di (56.67) are lifted, Ann and Cy are not.
+  near(Number(rows.ben[4]), 76.67, 'Ben original');
+  near(Number(rows.ben[5]), 78.75, 'Ben lifted');
+  near(Number(rows.di[5]), 68.75, 'Di lifted');
   assert.equal(Number(rows.ann[5]), 100);
   assert.equal(Number(rows.cy[5]), 90);
 });

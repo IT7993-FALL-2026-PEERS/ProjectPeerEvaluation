@@ -116,7 +116,8 @@ test('TC-16-25: invalid ratings (out of range, fractional, not a number) or feed
   const token = await tokenFromEmail('ann@example.edu');
   const bad = [
     rating(IDS.ben, { ratings: { communication: 6 } }),
-    rating(IDS.ben, { ratings: { participation: 5 } }),
+    rating(IDS.ben, { ratings: { participation: 6 } }),
+    rating(IDS.ben, { ratings: { participation: 0 } }),
     rating(IDS.ben, { overall_feedback: 'too short' }),
     rating(IDS.ben, { ratings: { communication: 4.5 } }),
     rating(IDS.ben, { ratings: { participation: true } }),
@@ -129,6 +130,13 @@ test('TC-16-25: invalid ratings (out of range, fractional, not a number) or feed
   assert.equal(await Evaluation.countDocuments({}), 0);
   const ok = await app.request('POST', `/api/evaluate/${token}`, { body: { evaluations: [rating(IDS.ben)] } });
   assert.equal(ok.status, 201);
+});
+
+test('TC-16-76: participation is rated 1-5 like every other criterion: 5 is accepted and saved', async () => {
+  const token = await tokenFromEmail('ann@example.edu');
+  const res = await app.request('POST', `/api/evaluate/${token}`, { body: { evaluations: [rating(IDS.ben, { ratings: { participation: 5 } })] } });
+  assert.equal(res.status, 201);
+  assert.equal((await Evaluation.findOne({ student_id: IDS.ben })).ratings.participation, 5);
 });
 
 test('TC-16-26: a team of three needs a rating for each teammate, and a bad second one saves neither', async () => {

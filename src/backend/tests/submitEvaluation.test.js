@@ -63,10 +63,18 @@ test('saves nothing when a later evaluation fails the feedback check', async (t)
 
 test('saves nothing when a later evaluation fails schema validation', async (t) => {
   const bad = validEvaluation();
-  bad.ratings.participation = 5; // schema max is 4
+  bad.ratings.participation = 6; // schema max is 5, like the other criteria
   const { saved, error } = await submit(t, [validEvaluation(), bad]);
   assert.equal(error.status, 400);
   assert.equal(saved.length, 0);
+});
+
+test('accepts participation at 5 (it is rated 1-5 like the other criteria)', async (t) => {
+  const top = validEvaluation();
+  top.ratings.participation = 5;
+  const { saved, error } = await submit(t, [top]);
+  assert.equal(error, undefined);
+  assert.equal(saved.length, 1);
 });
 
 test('saves every evaluation when all are valid', async (t) => {
