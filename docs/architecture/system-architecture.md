@@ -257,8 +257,10 @@ flowchart LR
 - **Containers:** `Dockerfile.frontend` (React build served by nginx), `src/backend/Dockerfile`
   (non-root) and `docker-compose.yml` (MongoDB, backend and frontend with health checks) run the
   whole app with `npm run docker:up`, and the CI job `Containers (build + compose smoke)` builds
-  and starts them on every pull request. Render still builds from source; the planned CD
-  workflow builds and pushes SHA-tagged images and smoke-tests them.
+  and starts them on every pull request. After every merge that passes CI, CD builds, health-checks and
+  pushes both images to GHCR, and the **backend on staging runs that exact image**, deployed by digest
+  (`BACKEND_DEPLOY=image`, CICD-73). The frontend stays a Render static site: a static site cannot run an
+  image, and nginx serving the same files would prove nothing the static site does not.
 
 The CI/CD design and status are maintained in the README's
 [CI/CD Pipeline](../../README.md#cicd-pipeline) section.

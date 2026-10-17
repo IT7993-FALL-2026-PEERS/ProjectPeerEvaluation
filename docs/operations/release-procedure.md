@@ -60,7 +60,9 @@ If the deploy fails, go to [Rollback and recovery, R2](rollback-and-recovery.md#
 With the release stages on, the same CD run also:
 
 1. builds both images, checks they're healthy, and pushes them to GHCR tagged with the commit (`images`);
-2. after the deploy, runs Staging regression (`smoke`);
+   the backend on staging runs this image, deployed by its digest (`BACKEND_DEPLOY=image`);
+2. after the deploy, runs Staging regression (`smoke`), then moves the `backend:staging` tag to the image that
+   passed (`pointer`), which is what Render pulls on a restart. If that move fails there is no tag;
 3. if all of that passed, and **at least one `@staging` test ran**, creates the tag `rc-<yyyymmdd>-<hhmm>-<sha7>`
    and a **pre-release** with `release-record.json` attached (`Tag release candidate`). The record lists both
    services' commits as staging reported them, the images and their digests, the smoke result and test count, the

@@ -26,11 +26,15 @@ The app misbehaves, but `/api/health` still answers.
 at least one release since then).
 1. Actions > **CD** > Run workflow > branch `main` > **rollback_to** = the last good `rc-…` tag.
 2. The `Roll back` jobs redeploy each service to the commit in that release's record, in rollback mode, and wait
-   until staging reports it. `rollback-report` then checks health, and `rollback-smoke` runs the smoke tests.
+   until staging reports it. The backend goes back to the **image digest** in the record (`prepare` has already checked
+   that it still resolves in ghcr.io). `rollback-report` then checks health, and `rollback-smoke` runs the smoke tests;
+   `rollback-pointer` then moves `backend:staging` back to that digest.
 3. Confirm: both checks are green, and `/api/health` and `/version.txt` show the release's commits.
 
-A hand-made release (like the #147 test candidate) is refused as a target. Before the first real release
-candidate exists, use B or C.
+A hand-made release (like the #147 test candidate) is refused as a target. So is a release made before the
+backend image carried its commit (CICD-73), and one whose image is no longer in ghcr.io: the run stops with the reason
+before anything is changed. Before an eligible release exists, use B or C. Never delete the images behind `rc-*`
+releases: a rollback needs them.
 
 **Option B: Render's own rollback** (fastest; needs the Render account, Khoa).
 Render > the service > **Events** > an earlier successful deploy > **Rollback**, or Manual Deploy > *Deploy a
@@ -52,6 +56,10 @@ Open the run and find the first red job.
 | Prepare: "No successful CI run on main for …" | A manual run for a commit whose CI on `main` failed or hasn't finished | Wait for CI (or re-run it if an outage cancelled it), then run CD again |
 | Prepare: rollback_to errors | Bad `rollback_to` value, or the tag isn't a release the pipeline made | Use an exact `rc-…` tag name from Releases, of a pipeline release |
 | images | The images didn't build or weren't healthy in Compose | Same as a red `Containers` check in CI: reproduce with `npm run docker:up` |
+| Prepare: "BACKEND_DEPLOY must be exactly source or image" | The repository variable is unset or misspelled | Settings > Secrets and variables > Actions > Variables: set it to `image` (or `source`, the way back) |
+| Deploy: "the images job did not succeed" (image mode) | The backend is deployed as an image, and there is none | Fix `images` first. Nothing was deployed, and it never falls back to a source deploy |
+| Deploy: "was not live after 20 minutes" in image mode | Render could not pull or start the image; the old version keeps serving | Render > service > **Events / Logs**. Check the package is readable by Render |
+| Move the staging image pointer | The registry login or the tag move failed, or staging did not report its commit | Run CD again. No release is tagged until it works; Render's configured image is behind the running version |
 | Deploy or rollback: "The RENDER_…_DEPLOY_HOOK_URL secret is empty or missing" | The named secret isn't set in the `staging` environment (the job stops before any deploy) | Add it ([Render handover](render-handover.md#render-settings-to-know)) |
 | Deploy to staging: "set SERVICE, SHA and HOOK_URL" | A deploy hook secret is missing | Add it to the `staging` environment ([Render handover](render-handover.md#render-settings-to-know)) |
 | Deploy: "Render refused the deploy hook (HTTP 4xx)" | The hook was regenerated or deleted in Render | New hook from Render > service > Settings > Deploy Hook, saved to the `staging` environment secret |
