@@ -25,11 +25,9 @@ const calculateMeanScore = (evaluations) => {
     if (evaluation.ratings) {
       criteriaKeys.forEach(criterion => {
         if (evaluation.ratings[criterion] && evaluation.ratings[criterion] > 0) {
-          // Normalize participation score (1-4 scale) to 1-5 scale to match other criteria
-          const score = criterion === 'participation' ? 
-            (evaluation.ratings[criterion] * 5 / 4) : 
-            evaluation.ratings[criterion];
-          console.log(`  ${criterion}: ${evaluation.ratings[criterion]} -> ${score}`);
+          // Every criterion, participation included, is rated 1-5, so ratings count as they are.
+          const score = evaluation.ratings[criterion];
+          console.log(`  ${criterion}: ${score}`);
           totalSum += score;
           totalCount++;
         }
@@ -192,9 +190,9 @@ exports.getCourseReport = async (req, res, next) => {
       .filter(Boolean);
 
     function flagEvaluation(evaluation) {
-      // Flag if all ratings are 5 (except participation)
+      // Flag if all six ratings are 5
       const ratings = evaluation.ratings || {};
-      const allFive = ['professionalism', 'communication', 'work_ethic', 'content_knowledge_skills', 'overall_contribution']
+      const allFive = ['professionalism', 'communication', 'work_ethic', 'content_knowledge_skills', 'overall_contribution', 'participation']
         .every(key => ratings[key] === 5);
       // Check for concerning words in feedback
       const feedback = (evaluation.overall_feedback || '').toLowerCase();

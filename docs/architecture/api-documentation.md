@@ -528,7 +528,7 @@ Deletes every evaluation in the course and clears all tokens, each student's sub
 | `protectionThreshold` | `80` | Curved only: scores at or above this are not changed |
 
 **Scoring.** Each student's score is the mean of all ratings they received, as a
-percentage (mean × 20). Participation is rated 1–4 and scaled by 5/4 first (D-19). Letter
+percentage (mean × 20). Participation is rated 1–5 like every other criterion (D-19, fixed 17 Oct 2026). Letter
 grades: A ≥ 90, B ≥ 80, C ≥ 70, D ≥ 60, otherwise F. Curved: `score + boostFactor × (mean
 − score)` for scores below the threshold.
 
@@ -608,7 +608,7 @@ submission answer the same, and the status also carries `deadline`.
   }]
 }
 ```
-Ratings are whole numbers 1–5, except `participation`, which is 1–4 (D-19); 4.5, "4" or `true` get a 400. `overall_feedback` must be text of at
+Ratings, `participation` included, are whole numbers 1–5 (D-19, fixed 17 Oct 2026: it was 1–4); 4.5, "4", `true`, 0 or 6 get a 400. `overall_feedback` must be text of at
 least 10 characters (FR-14 asks for 50–500). Every evaluation is validated before any is
 saved (FR-16), and they are saved together in one transaction (or, on a database without
 transactions, one by one with a rollback if anything fails), so a submission is all-or-nothing. A

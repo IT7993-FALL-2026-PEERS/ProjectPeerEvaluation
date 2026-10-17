@@ -706,7 +706,7 @@ function Reports() {
                           <Typography variant="caption">Contribution: {evaluation.ratings?.overall_contribution || 0}/5</Typography>
                         </Grid>
                         <Grid item xs={6} sm={4}>
-                          <Typography variant="caption">Participation: {evaluation.ratings?.participation || 0}/4</Typography>
+                          <Typography variant="caption">Participation: {evaluation.ratings?.participation || 0}/5</Typography>
                         </Grid>
                       </Grid>
                     </Box>

@@ -250,7 +250,7 @@ describe('Reports', () => {
       expect(within(dialog).getByText('AI Flagged Evaluation')).toBeInTheDocument();
       expect(within(dialog).getByText('All 5s & Concerning Word')).toBeInTheDocument();
       expect(within(dialog).getByText('Professionalism: 5/5')).toBeInTheDocument();
-      expect(within(dialog).getByText('Participation: 4/4')).toBeInTheDocument();
+      expect(within(dialog).getByText('Participation: 4/5')).toBeInTheDocument();
 
       await user.click(within(dialog).getByRole('button', { name: 'Close' }));
       await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());

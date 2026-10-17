@@ -29,7 +29,7 @@ function fixture(scores = [60, 80]) {
   const evaluations = scores.map((score, i) => new Evaluation({
     course_id: courseId, student_id: students[i]._id, evaluator_id: new mongoose.Types.ObjectId(),
     ratings: { professionalism: score / 20, communication: score / 20, work_ethic: score / 20,
-      content_knowledge_skills: score / 20, overall_contribution: score / 20, participation: score / 25 },
+      content_knowledge_skills: score / 20, overall_contribution: score / 20, participation: score / 20 },
     overall_feedback: 'Reliable teammate.', evaluation_token: 'token-' + i
   }));
   return { course, team, students, evaluations, professor: new Professor() };
@@ -111,7 +111,7 @@ test('getCourseReport: no evaluations gives every student No evaluations', async
   assert.deepEqual(body.teams, []);
 });
 
-test('getCourseReport: scales participation by 5/4 and averages all ratings across evaluations', async (t) => {
+test('getCourseReport: counts participation like every other criterion (1-5) and averages all ratings across evaluations', async (t) => {
   const data = fixture([80]);
   data.evaluations[0].ratings.participation = 2;
   const second = new Evaluation(data.evaluations[0].toObject());
@@ -119,9 +119,9 @@ test('getCourseReport: scales participation by 5/4 and averages all ratings acro
   data.evaluations.push(second);
   stubCourse(t, data);
   const student = ok(await call('getCourseReport')).students[0];
-  // (5*4 + 2*5/4 + 5*4 + 4*5/4) / 12 * 20 = 79.1666...
-  assert.equal(student.originalScore, 79.17);
-  assert.equal(student.finalScore, 79.17);
+  // (5*4 + 2 + 5*4 + 4) / 12 * 20 = 76.666...
+  assert.equal(student.originalScore, 76.67);
+  assert.equal(student.finalScore, 76.67);
   assert.equal(student.letterGrade, 'C');
   assert.equal(student.evaluationsReceived, 2);
 });
@@ -272,6 +272,14 @@ for (const scenario of [
     assert.deepEqual(flags, { allFive: false, concerning: scenario.concerning, flagged: scenario.concerning });
   });
 }
+
+test('getCourseReport: the all-five flag needs participation at 5 too, now that it is rated 1-5', async (t) => {
+  const data = fixture([100, 100]);
+  data.evaluations[1].ratings.participation = 4;
+  stubCourse(t, data);
+  const students = ok(await call('getCourseReport')).students;
+  assert.deepEqual(students.map(student => student.evaluationDetails[0].aiFlags.allFive), [true, false]);
+});
 
 test('getCourseReport: an empty word list leaves only the all-five rule', async (t) => {
   const data = fixture([80, 100]);

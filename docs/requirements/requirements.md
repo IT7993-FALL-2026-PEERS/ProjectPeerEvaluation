@@ -57,8 +57,8 @@ existing tests and its planned coverage are recorded in the Requirements Traceab
 
 | Status | Count |
 |---|---|
-| Validated | 11 |
-| Defective | 5 |
+| Validated | 12 |
+| Defective | 4 |
 | Needs verification | 3 |
 | Partial | 2 |
 | Unsupported | 2 |
@@ -67,7 +67,7 @@ existing tests and its planned coverage are recorded in the Requirements Traceab
 *Counts revised 27 Sep after a second pass over the backend controllers. Four statuses
 changed: FR-14 to Defective, FR-15 and FR-16 to Validated, FR-19 to Partial. Revised again
 on 7 Oct, when the tests were linked to the matrix: FR-07 to Partial (the email-format check
-does not exist). Each revised entry says what changed and why.*
+does not exist), and on 17 Oct: FR-13 to Validated (participation is now rated 1–5). Each revised entry says what changed and why.*
 
 ---
 
@@ -364,7 +364,7 @@ automation is required, raise it as a defect; if not, amend the requirement to s
 ## 4. Data collection
 
 ### FR-13 — Numeric ratings on a 1–5 scale
-*Inherited: FR4.1* · **Status: Defective** · **Defect: D-19**
+*Inherited: FR4.1* · **Status: Validated** · **Defect: D-19 (fixed 17 Oct 2026)**
 
 **Required functionality.** Students rate teammates numerically on each rubric criterion,
 on a 1–5 scale.
@@ -377,13 +377,15 @@ on a 1–5 scale.
 **when** the evaluation is submitted,
 **then** the ratings are stored against the correct evaluator and evaluatee.
 
-**Current behaviour.** Five criteria enforce 1–5, but **participation is limited to 1–4**,
-contradicting the requirement. The code carries an inline comment acknowledging the
-difference, so it may be deliberate — but the requirement and the implementation disagree
-and one of them must change.
+**Current behaviour.** All six criteria enforce 1–5. Until 17 Oct 2026 participation was limited to 1–4,
+contradicting the requirement; it is now 1–5 (labels: 5 Participated fully, 4 Participated most of the time,
+3 Participated to some extent, 2 Did not participate, 1 Hindered the group), counts in the scores like the
+other criteria without the old 5/4 scaling, and counts towards the report's "all fives" flag. Evaluations
+saved before that date keep their numbers, and a stored 4 now reads as "most of the time" instead of
+"fully" (test data only).
 
-*Evidence.* `models/Evaluation.js` — `participation: { min: 1, max: 4 }` against
-`min: 1, max: 5` for the other five criteria.
+*Evidence.* `models/Evaluation.js` and `config/rubric.js` — `participation` is `min: 1, max: 5` and `1-5`,
+like the other criteria; tests TC-13-20, TC-16-25, TC-16-76 and the report tests.
 
 ### FR-14 — Textual feedback with length limits
 *Inherited: FR4.2* · **Status: Defective** · **Defect: D-22**
@@ -583,8 +585,8 @@ Milestone 2 security-scanning work.
    should it be absolute or inactivity-based?
 4. **FR-12** — must reminders be automated on a schedule, or is the current on-demand
    behaviour acceptable?
-5. **FR-13** — is the 1–4 participation scale intentional, or should it be 1–5 like the
-   others?
+5. **FR-13** — answered: participation is now 1–5 like the others (17 Oct 2026, wording for the
+   fifth level chosen by the team: confirm it with the sponsor).
 6. **FR-19** — are PDF and CSV report downloads in scope for this capstone?
 7. **FR-21, FR-23** — are the AI summary and sentiment features in scope, or recorded and
    deferred?

@@ -76,7 +76,7 @@ test('TC-22-32: one professor\'s word list does not change another\'s', async ()
   assert.ok(!(await words(bo)).body.words.includes('tardy'));
 });
 
-test('TC-13-20: the form\'s rubric is the one fixed rubric: five criteria scored 1-5, participation 1-4, and written feedback', async () => {
+test('TC-13-20: the form\'s rubric is the one fixed rubric: six criteria scored 1-5, participation included, and written feedback', async () => {
   const send = await app.request('POST', `/api/courses/${IDS.courseAda}/evaluations/send`, { token: ada, body: deadlineBody() });
   assert.equal(send.status, 200);
   const { evaluation_token: token } = await Student.findById(IDS.ann);
@@ -86,7 +86,7 @@ test('TC-13-20: the form\'s rubric is the one fixed rubric: five criteria scored
   const scales = Object.fromEntries(form.body.rubric.criteria.map((c) => [c.id, c.scale]));
   assert.deepEqual(scales, {
     professionalism: '1-5', communication: '1-5', work_ethic: '1-5',
-    content_knowledge_skills: '1-5', overall_contribution: '1-5', participation: '1-4',
+    content_knowledge_skills: '1-5', overall_contribution: '1-5', participation: '1-5',
   });
   assert.equal(form.body.rubric.overallFeedback.id, 'overall_feedback');
 });

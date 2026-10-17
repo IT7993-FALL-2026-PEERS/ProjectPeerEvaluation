@@ -79,7 +79,7 @@ test('E2E-12: the same link cannot be used to submit twice', async ({ page, brow
     data: {
       evaluations: form.teammates.map((mate) => ({
         student_id: mate._id,
-        ratings: { professionalism: 5, communication: 5, work_ethic: 5, content_knowledge_skills: 5, overall_contribution: 5, participation: 4 },
+        ratings: { professionalism: 5, communication: 5, work_ethic: 5, content_knowledge_skills: 5, overall_contribution: 5, participation: 5 },
         overall_feedback: 'A second attempt with the same link.',
       })),
     },

@@ -10,7 +10,7 @@ const EvaluationSchema = new mongoose.Schema({
     work_ethic: { type: Number, min: 1, max: 5, required: true },
     content_knowledge_skills: { type: Number, min: 1, max: 5, required: true },
     overall_contribution: { type: Number, min: 1, max: 5, required: true },
-    participation: { type: Number, min: 1, max: 4, required: true } // Note: 1-4 scale for participation
+    participation: { type: Number, min: 1, max: 5, required: true }
   },
   overall_feedback: { type: String, required: true }, // Written comment (required)
   submitted_at: { type: Date, default: Date.now },

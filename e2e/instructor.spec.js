@@ -101,11 +101,11 @@ test('E2E-07: the report shows the class totals and each student\'s score, and d
   await courseAction(page, 'View Reports').click();
 
   await expect(page.getByRole('heading', { name: /Evaluation Reports/ })).toBeVisible();
-  await expect(page.getByText('81.88%')).toBeVisible();
+  await expect(page.getByText('80.84%')).toBeVisible();
   const ann = page.getByRole('row', { name: /Ann Archer/ });
   await expect(ann).toContainText('100%');
   await expect(ann).toContainText('A');
-  await expect(page.getByRole('row', { name: /Di Diaz/ })).toContainText('58.33%');
+  await expect(page.getByRole('row', { name: /Di Diaz/ })).toContainText('56.67%');
 
   const [download] = await Promise.all([
     page.waitForEvent('download'),
@@ -121,9 +121,9 @@ test('E2E-07: the report shows the class totals and each student\'s score, and d
   expect(lines[0]).toBe('Student ID,Name,Email,Team,Original Score,Final Score,Letter Grade,Evaluations Received,Improvement');
   expect(lines.slice(1).sort()).toEqual([
     '1001,Ann Archer,ann@example.edu,Alpha,100,100,A,1,0',
-    '1002,Ben Baker,ben@example.edu,Alpha,79.17,79.17,C,1,0',
+    '1002,Ben Baker,ben@example.edu,Alpha,76.67,76.67,C,1,0',
     '1003,Cy Cole,cy@example.edu,Beta,90,90,A,1,0',
-    '1004,Di Diaz,di@example.edu,Beta,58.33,58.33,F,1,0',
+    '1004,Di Diaz,di@example.edu,Beta,56.67,56.67,F,1,0',
   ]);
 });
 

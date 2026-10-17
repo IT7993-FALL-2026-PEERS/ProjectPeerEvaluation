@@ -79,9 +79,10 @@ const EVALUATION_RUBRIC = {
       id: "participation",
       name: "Participation",
       description: "Rate how your team members participated.",
-      scale: "1-4",
+      scale: "1-5",
       scaleDescriptions: {
-        4: "Participated fully",
+        5: "Participated fully",
+        4: "Participated most of the time",
         3: "Participated to some extent",
         2: "Did not participate",
         1: "Hindered the group"
