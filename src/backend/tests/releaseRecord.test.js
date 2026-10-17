@@ -66,7 +66,8 @@ test('the record lists commits, images and digests, smoke, coverage, the CI run 
     date: WHEN,
   });
   assert.equal(rec.tag, 'rc-20261105-1432-aaaaaaa');
-  assert.deepEqual(rec.components.backend, { commit: B, image: 'ghcr.io/x/backend:a', digest: 'sha256:1234' });
+  // The backend on staging is B, not this run's commit A, so this run's image is not what runs there (TC-29-59).
+  assert.deepEqual(rec.components.backend, { commit: B, image: null, digest: null, imageReportsCommit: false });
   assert.deepEqual(rec.components.frontend, { commit: C, image: null, digest: null });
   assert.deepEqual(rec.smoke, { passed: true, tests: 3 });
   assert.equal(rec.coverage.frontend, null);
@@ -103,7 +104,7 @@ test('only a record the pipeline made counts: rc tag, CD run link, smoke passed'
 test('previousGood reads the commits back from a pipeline release record', () => {
   const file = path.join(tmp(), 'release-record.json');
   fs.writeFileSync(file, JSON.stringify(pipelineRecord()));
-  assert.deepEqual(previousGood(file), { tag: 'rc-20261105-1432-aaaaaaa', backend: B, frontend: C });
+  assert.deepEqual(previousGood(file), { tag: 'rc-20261105-1432-aaaaaaa', backend: B, frontend: C, backendImage: null, backendDigest: null, backendReportsCommit: false });
 });
 
 test('previousGood ignores hand-made, missing and broken records', () => {
@@ -156,7 +157,7 @@ test('record refuses a missing commit', async (t) => {
 test('main previous prints empty outputs when there is no earlier release', async (t) => {
   const log = t.mock.method(console, 'log', () => {});
   assert.equal(await main(['previous', ''], {}), 0);
-  assert.equal(log.mock.calls[0].arguments[0], 'tag=\nbackend=\nfrontend=');
+  assert.equal(log.mock.calls[0].arguments[0], 'tag=\nbackend=\nfrontend=\nbackend_image=\nbackend_digest=\nbackend_reports_commit=');
 });
 
 test('main rejects an unknown command', async (t) => {
@@ -178,4 +179,85 @@ test('the command line exits 2 with its usage line, not a stack trace', () => {
   assert.equal(run.status, 2);
   assert.match(run.stderr, /^Usage: node scripts\/release-record\.js/);
   assert.doesNotMatch(run.stderr, /at .*\.js:\d+/);
+});
+
+// Image deploy mode (CICD-73): the record names the artifact that is really running, and a rollback
+// only targets a release whose backend image is recorded.
+const D1 = `sha256:${'1'.repeat(64)}`;
+const D2 = `sha256:${'2'.repeat(64)}`;
+const IMG = (sha) => `ghcr.io/it7993-fall-2026-peers/projectpeerevaluation/backend:${sha}`;
+
+test('TC-29-59: a backend skipped by a run keeps the artifact that is really running, never this run\'s newer image', () => {
+  const env = { SHA: A, RUN_URL: RUN, BACKEND_IMAGE: IMG(A), BACKEND_DIGEST: D2 };
+  const previous = { backend: { commit: B, image: IMG(B), digest: D1, imageReportsCommit: true } };
+  const kept = buildRecord({ env, backend: B, frontend: A, smoke: smokeOutcome(PASSED), previous, date: WHEN });
+  assert.deepEqual(kept.components.backend, { commit: B, image: IMG(B), digest: D1, imageReportsCommit: true });
+  const fresh = buildRecord({ env, backend: A, frontend: A, smoke: smokeOutcome(PASSED), previous, date: WHEN });
+  assert.deepEqual(fresh.components.backend, { commit: A, image: IMG(A), digest: D2, imageReportsCommit: true });
+  const unknown = buildRecord({ env, backend: B, frontend: A, smoke: smokeOutcome(PASSED), date: WHEN });
+  assert.deepEqual(unknown.components.backend, { commit: B, image: null, digest: null, imageReportsCommit: false });
+  const old = buildRecord({ env, backend: B, frontend: A, smoke: smokeOutcome(PASSED), previous: { backend: { commit: B, image: IMG(B), digest: D1 } }, date: WHEN });
+  assert.deepEqual(old.components.backend, { commit: B, image: IMG(B), digest: D1, imageReportsCommit: false }, 'an old release is carried forward as it is; it never gains the marker');
+  const other = buildRecord({ env, backend: B, frontend: A, smoke: smokeOutcome(PASSED), previous: { backend: { commit: C, image: IMG(C), digest: D1 } }, date: WHEN });
+  assert.deepEqual(other.components.backend, { commit: B, image: null, digest: null, imageReportsCommit: false }, 'a previous release on another commit says nothing about what runs now');
+});
+
+test('TC-29-69: record() takes the skipped backend\'s artifact from the previous release passed in by CD', async (t) => {
+  t.mock.method(console, 'log', () => {});
+  const dir = tmp();
+  const env = {
+    SHA: A, RUN_URL: RUN, ...PASSED, BACKEND_IMAGE: IMG(A), BACKEND_DIGEST: D2,
+    PREVIOUS_BACKEND_COMMIT: B, PREVIOUS_BACKEND_IMAGE: IMG(B), PREVIOUS_BACKEND_DIGEST: D1, PREVIOUS_BACKEND_REPORTS_COMMIT: 'true',
+  };
+  assert.equal(await record(env, dir, { fetchImpl: staging({ backend: B, frontend: A }), date: WHEN }), 0);
+  const rec = JSON.parse(fs.readFileSync(path.join(dir, 'release-record.json'), 'utf8'));
+  assert.deepEqual(rec.components.backend, { commit: B, image: IMG(B), digest: D1, imageReportsCommit: true });
+});
+
+test('TC-29-60: with requireImage, previousGood selects only a release whose backend has an image and a digest, and returns them', () => {
+  const dir = tmp();
+  const write = (name, backend) => {
+    const file = path.join(dir, name);
+    fs.writeFileSync(file, JSON.stringify({ ...pipelineRecord(), components: { backend, frontend: { commit: C } } }));
+    return file;
+  };
+  const withImage = write('with.json', { commit: B, image: IMG(B), digest: D1, imageReportsCommit: true });
+  const without = write('without.json', { commit: B, image: null, digest: null });
+  const badDigest = write('bad.json', { commit: B, image: IMG(B), digest: 'sha256:short', imageReportsCommit: true });
+  const foreignImage = write('foreign.json', { commit: B, image: `docker.io/library/node:${B}`, digest: D1, imageReportsCommit: true });
+  // The shape every release made before this change already has: an image and a digest, the tag equal to the
+  // commit, but no marker. Its image predates GIT_COMMIT (it cannot report its commit), so it is not a target.
+  const realOld = write('real-old.json', { commit: B, image: IMG(B), digest: D1 });
+  // An image built for another commit than the backend that was running (a skipped backend in the old code).
+  const wrongCommit = write('wrong-commit.json', { commit: B, image: IMG(A), digest: D1, imageReportsCommit: true });
+  assert.deepEqual(previousGood(withImage, { requireImage: true }), { tag: pipelineRecord().tag, backend: B, frontend: C, backendImage: IMG(B), backendDigest: D1, backendReportsCommit: true });
+  assert.equal(previousGood(without, { requireImage: true }), null);
+  assert.equal(previousGood(badDigest, { requireImage: true }), null);
+  assert.equal(previousGood(foreignImage, { requireImage: true }), null);
+  assert.equal(previousGood(realOld, { requireImage: true }), null, 'a release made before the image deploy is not a rollback target');
+  assert.equal(previousGood(wrongCommit, { requireImage: true }), null, 'an image of another commit is not a rollback target');
+  assert.equal(previousGood(without).backend, B, 'source mode still accepts it');
+  assert.equal(previousGood(without).backendImage, null);
+  assert.equal(previousGood(realOld).backendReportsCommit, false, 'carried forward as it is, without claiming more');
+});
+
+test('TC-29-70: the previous command prints the backend image and digest, and REQUIRE_IMAGE skips a release without one', async (t) => {
+  const log = t.mock.method(console, 'log', () => {});
+  const dir = tmp();
+  const file = path.join(dir, 'release-record.json');
+  fs.writeFileSync(file, JSON.stringify({ ...pipelineRecord(), components: { backend: { commit: B, image: IMG(B), digest: D1, imageReportsCommit: true }, frontend: { commit: C } } }));
+  assert.equal(await main(['previous', file], {}), 0);
+  assert.equal(log.mock.calls[0].arguments[0], `tag=${pipelineRecord().tag}\nbackend=${B}\nfrontend=${C}\nbackend_image=${IMG(B)}\nbackend_digest=${D1}\nbackend_reports_commit=true`);
+  fs.writeFileSync(file, JSON.stringify({ ...pipelineRecord(), components: { backend: { commit: B }, frontend: { commit: C } } }));
+  assert.equal(await main(['previous', file], { REQUIRE_IMAGE: 'true' }), 0);
+  assert.equal(log.mock.calls[1].arguments[0], 'tag=\nbackend=\nfrontend=\nbackend_image=\nbackend_digest=\nbackend_reports_commit=');
+  assert.equal(await main(['previous', file], {}), 0);
+  assert.match(log.mock.calls[2].arguments[0], new RegExp(`backend=${B}`));
+});
+
+test('TC-29-71: the recovery text names the image digest for a component that has one', () => {
+  const rec = { ...pipelineRecord({ PREVIOUS_TAG: 'rc-20261101-0900-bbbbbbb' }), components: { backend: { commit: B, image: IMG(B), digest: D1, imageReportsCommit: true }, frontend: { commit: C, image: null, digest: null } } };
+  const md = formatMarkdown(rec);
+  assert.match(md, new RegExp(`Backend.*${D1}`));
+  assert.match(md, /redeploy its image by digest/);
 });

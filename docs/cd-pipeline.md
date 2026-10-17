@@ -42,7 +42,7 @@ prepare ──► images ──► deploy (backend, frontend) ──► smoke �
 |---|---|---|
 | `prepare` | Works out the commit, the mode, the CI run that tested it (a manual run without a passing CI run on `main` stops here), and the previous good release: the newest `rc-*` release **the pipeline made**. Tags that don't match `rc-<date>-<time>-<sha7>`, and hand-made releases, are skipped. If `main` has moved on since CI started, the run stands down, and the run for the newer commit deploys instead. Writes the plan | always |
 | `images` | Calls `image-build.yml` (Aaron): builds both images, starts them, checks health, and pushes `ghcr.io/.../backend\|frontend:<sha>`. Never `latest` | `CD_RELEASE` on |
-| `deploy` | Deploys each service whose files changed, then waits until it reports the commit (backend `/api/health`, frontend `/version.txt`). The two services can be on different commits | always (CICD-12) |
+| `deploy` | Deploys each service whose files changed, then waits until it reports the commit (backend `/api/health`, frontend `/version.txt`). The two services can be on different commits. In image mode the backend is the image the `images` job pushed, deployed by digest | always (CICD-12) |
 | `smoke` | Calls `staging-regression.yml`: health, the frontend, and Playwright tests tagged `@staging` (Kylee's smoke tests, read-only, no email) | `CD_RELEASE` on, deploy passed |
 | `release` | Writes the release record (`scripts/release-record.js`), creates the `rc-<yyyymmdd>-<hhmm>-<sha7>` tag and a GitHub pre-release with the record attached. Refuses, with no tag, unless at least one `@staging` test ran and passed | `CD_RELEASE` on, images, deploy and smoke all passed |
 | `rollback` | Redeploys both services to the previous release's commits in rollback mode, the only mode allowed to go back to an older commit. The run stays failed | `CD_RELEASE` on, deploy or smoke failed, and an earlier pipeline release exists; or `rollback_to` |
@@ -69,8 +69,34 @@ instead ([rollback and recovery, R1](operations/rollback-and-recovery.md#r1-stag
 hand-made release can't stand in as a baseline: the pipeline ignores releases it didn't make. So the first run after
 `CD_RELEASE` goes on is the baseline, and it should be one where staging is known to be good.
 
-**Permissions.** The workflow reads by default. Only `images` gets `packages: write`, and only `release` gets
-`contents: write`. The deploy hooks are `staging` environment secrets, which only `main` can use. Every job runs the
+**Backend deploy mode (`BACKEND_DEPLOY`, CICD-73).** The repository variable `BACKEND_DEPLOY` must be exactly `source`
+or `image`; `prepare` fails the whole run, before anything is deployed, when it is unset or misspelled. `source` is how
+staging has always worked: Render builds the commit. `image` makes the backend run the Docker image the `images` job built,
+health-checked and pushed, so "tested, packaged with Docker, deployed to staging" is one artifact:
+
+- `deploy` calls the backend's hook with `imgURL=<image>@sha256:<digest>` (the digest the `images` job read from the
+  registry) and no git ref, then waits until `/api/health` reports the commit, which the image carries (`GIT_COMMIT`). It
+  fails, and deploys nothing, when the images job did not succeed; it never falls back to a source deploy. The frontend is
+  always a source deploy: a static site cannot run an image.
+- The release record names the artifact that is really running. When a run does not deploy the backend, it keeps the
+  previous release's image and digest instead of pairing the older commit with this run's newer image.
+- `pointer` moves the `backend:staging` tag to that digest after the smoke tests pass (and `rollback-pointer` does the
+  same after a rollback), but only when staging reports that image's own commit. Render's configured image is meant to
+  be `backend:staging`, so a restart or scale-out pulls the last accepted version and not an older one. It is the only
+  tag in the registry that ever moves; the per-commit tags are never overwritten and `latest` is never used. These two
+  jobs are provisional until the Render spike shows whether Render re-pulls a moved tag. In image mode `release` waits
+  for `pointer`: if the pointer cannot be moved, or staging cannot say which commit it runs, there is no `rc-*` tag, so a
+  published release always has Render's configured image on its backend.
+- A rollback goes back to the digest recorded in the target release. `prepare` checks, before any service is changed, that
+  the release has a backend image and digest and that the image still resolves in ghcr.io. An automatic rollback skips
+  releases that fail the check; a manual `rollback_to` for one that fails is refused with the reason.
+- `FORCE` cannot move a service from a source build to an image: the health check reports the same commit for both, so a
+  commit that is already live is skipped. The service is switched over once, in the Render dashboard.
+
+Until `BACKEND_DEPLOY` is `image` and the Render service runs an image, none of this changes what staging runs.
+
+**Permissions.** The workflow reads by default. `images`, `pointer` and `rollback-pointer` get `packages: write`,
+`prepare` gets `packages: read` (to check a rollback target's image), and only `release` gets `contents: write`. The deploy hooks are `staging` environment secrets, which only `main` can use. Every job runs the
 code from `main`; none checks out another ref.
 
 **How it was turned on** (done on 7 Oct 2026; kept as the record, and as the checklist for switching it off and on again):

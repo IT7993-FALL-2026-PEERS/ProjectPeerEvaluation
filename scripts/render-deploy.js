@@ -1,9 +1,16 @@
 #!/usr/bin/env node
 // Deploys one staging service on Render from cd.yml (backlog CICD-12) and waits until it is live.
 //
-//   SERVICE=backend|frontend SHA=<commit> HOOK_URL=<deploy hook> [FORCE=true | ROLLBACK=true] node scripts/render-deploy.js
+//   SERVICE=backend|frontend SHA=<commit> HOOK_URL=<deploy hook> DEPLOY_MODE=source|image
+//     [IMAGE_REF=<image>@sha256:<digest>] [FORCE=true | ROLLBACK=true] node scripts/render-deploy.js
 //
-//   HOOK_URL  the service's Render deploy hook (a secret: never printed)
+//   HOOK_URL     the service's Render deploy hook (a secret: never printed)
+//   DEPLOY_MODE  source: Render builds the commit (the hook gets ref=<sha>). image: Render runs the
+//                Docker image CI built and pushed (the hook gets imgURL=<image>@sha256:<digest>, CICD-73).
+//                Required and exact: anything else, or a missing value, fails before any request, so a
+//                typo can never fall back to a different kind of deploy. Only the backend has an image
+//   IMAGE_REF    image mode only: ghcr.io/<path>@sha256:<64 hex digit digest>. The artifact is the digest,
+//                not a tag; the health check still waits for SHA, which the image reports (it carries it)
 //   FORCE     deploy even when no file the service uses changed. Never deploys an older commit
 //             than the live one
 //   ROLLBACK  deploy SHA even when it is older than the live commit: going back is the point. Only
@@ -13,6 +20,11 @@
 // This script does that job instead, because build minutes are limited (500/month): it asks the
 // service which commit is live and deploys only when a file the service uses changed since then.
 // The live commit comes from /api/health (backend) and /version.txt (frontend, written at build).
+//
+// In image mode every run deploys the artifact it just built, so the changed-files filter does not apply:
+// the deploy is skipped only when the live commit is already SHA or is newer. (The health check reports
+// the same commit for a source build and an image build, so FORCE cannot move a service from one to the
+// other; switching the service over is done in the Render dashboard.)
 //
 // Exit codes: 0 deployed or nothing to deploy, 1 the deploy failed or did not go live in time,
 // 2 missing settings.
@@ -33,6 +45,9 @@ const SERVICES = {
 };
 
 const SHA_RE = /^[0-9a-f]{40}$/;
+// A registry path in lower case, no tag, then the digest: what `imgURL` is allowed to carry.
+const IMAGE_REF_RE = /^ghcr\.io\/[a-z0-9][a-z0-9._-]*(?:\/[a-z0-9][a-z0-9._-]*)+@sha256:[0-9a-f]{64}$/;
+const MODES = ['source', 'image'];
 
 // Glob to RegExp for the patterns above: `**/` any directories, `**` anything, `*` one path segment.
 function globToRegExp(glob) {
@@ -69,7 +84,7 @@ async function liveCommit(url, fetchImpl = fetch) {
 const git = (...args) => execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
 
 // Decides whether to deploy `sha`, given the live commit. Returns { deploy, reason }.
-function plan({ sha, live, service, force, rollback, gitImpl = git }) {
+function plan({ sha, live, service, force, rollback, image, gitImpl = git }) {
   if (live === sha) return { deploy: false, reason: `${sha.slice(0, 7)} is already live` };
   if (rollback) return { deploy: true, reason: `rolling back from ${live ? live.slice(0, 7) : 'an unknown commit'}` };
   if (!live) return { deploy: true, reason: 'the live commit is unknown' };
@@ -80,6 +95,7 @@ function plan({ sha, live, service, force, rollback, gitImpl = git }) {
     return { deploy: false, reason: `the live commit ${live.slice(0, 7)} is newer than ${sha.slice(0, 7)}${force ? ' (FORCE never goes back; use rollback_to)' : ''}` };
   } catch { /* sha is not an ancestor of live: carry on */ }
   if (force) return { deploy: true, reason: 'forced' };
+  if (image) return { deploy: true, reason: "image mode: this run's artifact" };
   let files;
   try {
     files = gitImpl('diff', '--name-only', live, sha).split('\n').filter(Boolean);
@@ -92,9 +108,11 @@ function plan({ sha, live, service, force, rollback, gitImpl = git }) {
 }
 
 // Triggers the hook for this exact commit, then polls until the service reports it.
-async function deploy({ hookUrl, sha, versionUrl, fetchImpl = fetch, timeoutMs = 20 * 60000, intervalMs = 20000, sleep = (ms) => new Promise((r) => setTimeout(r, ms)), now = Date.now }) {
+async function deploy({ hookUrl, sha, versionUrl, image, fetchImpl = fetch, timeoutMs = 20 * 60000, intervalMs = 20000, sleep = (ms) => new Promise((r) => setTimeout(r, ms)), now = Date.now }) {
   const url = new URL(hookUrl);
-  url.searchParams.set('ref', sha);
+  // One or the other, never both: an image deploy has no git ref, a source deploy has no image.
+  if (image) url.searchParams.set('imgURL', image);
+  else url.searchParams.set('ref', sha);
   // Never echo the hook URL, the response body or a network error's details: the URL is the secret.
   let response;
   try {
@@ -137,16 +155,33 @@ async function main(env, deps = {}) {
     console.error('Render deploy: HOOK_URL is not a valid https URL. Check the deploy hook secret in the staging environment.');
     return 2;
   }
+  // Fail closed, before anything is read or sent: a missing or misspelled mode must not pick a deploy kind.
+  const mode = env.DEPLOY_MODE;
+  if (!MODES.includes(mode)) {
+    console.error('Render deploy: set DEPLOY_MODE to exactly "source" or "image".');
+    return 2;
+  }
+  if (mode === 'image' && env.SERVICE !== 'backend') {
+    console.error('Render deploy: only the backend runs as an image; the frontend is a static site.');
+    return 2;
+  }
+  if (mode === 'image' ? !IMAGE_REF_RE.test(env.IMAGE_REF || '') : Boolean(env.IMAGE_REF)) {
+    console.error(mode === 'image'
+      ? 'Render deploy: IMAGE_REF must be ghcr.io/<lower-case path>@sha256:<64 hex digits> in image mode.'
+      : 'Render deploy: IMAGE_REF is only for image mode.');
+    return 2;
+  }
+  const image = mode === 'image' ? env.IMAGE_REF : undefined;
   const live = await liveCommit(service.versionUrl, deps.fetchImpl);
-  const decision = plan({ sha: env.SHA, live, service, force: env.FORCE === 'true', rollback: env.ROLLBACK === 'true', gitImpl: deps.gitImpl });
+  const decision = plan({ sha: env.SHA, live, service, force: env.FORCE === 'true', rollback: env.ROLLBACK === 'true', image, gitImpl: deps.gitImpl });
   console.log(`${env.SERVICE}: ${decision.deploy ? 'deploying' : 'skipping'}, ${decision.reason}.`);
   if (!decision.deploy) return 0;
-  const result = await deploy({ hookUrl: env.HOOK_URL, sha: env.SHA, versionUrl: service.versionUrl, ...deps });
+  const result = await deploy({ hookUrl: env.HOOK_URL, sha: env.SHA, versionUrl: service.versionUrl, image, ...deps });
   console.log(`${env.SERVICE}: ${result.detail}.`);
   return result.live ? 0 : 1;
 }
 
-module.exports = { SERVICES, globToRegExp, matchesService, liveCommit, plan, deploy, failureMessage, main };
+module.exports = { SERVICES, IMAGE_REF_RE, globToRegExp, matchesService, liveCommit, plan, deploy, failureMessage, main };
 
 if (require.main === module) {
   main(process.env).then(
