@@ -100,9 +100,11 @@ flowchart TB
         RC["Produce release candidate"]
         DREPORT["Publish reports<br/>build history, deployment status"]
         ROLLBACK["Roll back on failure<br/>(to the last good image)"]
+        RBCHECK["Check the rolled-back version<br/>(health and smoke tests, no release tag)"]
         ARTIFACTS --> STG --> HEALTH --> SMOKE --> TAG --> RC --> DREPORT
         STG -. "deploy fails" .-> ROLLBACK
         SMOKE -. "smoke fails" .-> ROLLBACK
+        ROLLBACK --> RBCHECK
     end
 
     MERGE --> ARTIFACTS
@@ -116,7 +118,7 @@ flowchart TB
     classDef endpoint fill:#dbeafe,stroke:#2563eb,color:#1e3a8a,stroke-width:3px
     linkStyle default stroke-width:2px
 
-    class BUILD_APP,LINT,SEC,DOCKER,UNIT,INTEG,REG,E2E,REPORT,ARTIFACTS,STG,SMOKE,HEALTH,TAG,RC,DREPORT,ROLLBACK done
+    class BUILD_APP,LINT,SEC,DOCKER,UNIT,INTEG,REG,E2E,REPORT,ARTIFACTS,STG,SMOKE,HEALTH,TAG,RC,DREPORT,ROLLBACK,RBCHECK done
     class GATE,APPROVE gate
     class DEV,PROD,PR,MERGE,FIX endpoint
 ```
@@ -214,9 +216,11 @@ flowchart TB
         WF08["WF08 Deploy to staging · readiness check · smoke tests<br/>(backend image, frontend from source)"]
         WF09{"WF09 Deploy or smoke test failed?"}
         WF11["WF11 Rollback<br/>(automatic to the last good image, or by hand)"]
+        WF11B["Check the rolled-back version<br/>(health and smoke tests, no release tag)"]
         WF10["WF10 Move the staging image tag<br/>tag release candidate · retain version and evidence"]
         WF07 --> WF08 --> WF09
         WF09 -- "Yes" --> WF11
+        WF11 --> WF11B
         WF09 -- "No" --> WF10
     end
 
@@ -230,7 +234,7 @@ flowchart TB
     classDef gate fill:#fef3c7,stroke:#d97706,color:#78350f,stroke-width:3px
     classDef endpoint fill:#dbeafe,stroke:#2563eb,color:#1e3a8a,stroke-width:3px
 
-    class WF01,WF02,BUILD,CONT,UNIT,INTEG,REG,E2E,WF05,WF06,WF07,WF08,WF11,WF10 done
+    class WF01,WF02,BUILD,CONT,UNIT,INTEG,REG,E2E,WF05,WF06,WF07,WF08,WF11,WF11B,WF10 done
     class WF03 highlight
     class GATE,APPROVE,WF09 gate
     class DEV,PROD,PR,MERGE,FIX endpoint
