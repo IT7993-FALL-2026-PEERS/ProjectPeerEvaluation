@@ -69,7 +69,10 @@ There are no repository-level secrets, on purpose. A secret goes into the enviro
 - **Accepted security risks expire** on 31 Dec 2026, after which OWASP blocks again. Review them before then
   ([security policy](../security/security-policy.md#2-accepting-a-risk)).
 - **Runner image.** CI is pinned to `ubuntu-24.04`, and GitHub moves `ubuntu-latest` to 26.04 from 19 Oct 2026
-  (CICD-54). Try a new label on a test branch first.
+  (CICD-54). The jobs that start MongoDB (Containers, Integration, E2E and the image build) run on
+  `ubuntu-22.04` instead: the `ubuntu-24.04` image moved to Linux 7.0 on 18 Oct 2026, and MongoDB 8.x refuses to
+  start on kernel 6.19 or newer (SERVER-121912). Move them back once MongoDB runs there. Try a new label on a
+  test branch first.
 
 ## When something is red
 
