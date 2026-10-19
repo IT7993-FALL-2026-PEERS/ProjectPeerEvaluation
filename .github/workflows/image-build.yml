@@ -57,7 +57,9 @@ permissions:
 jobs:
   images:
     name: Build, test and push images
-    runs-on: ubuntu-24.04
+    # ubuntu-22.04, not 24.04: the 24.04 image moved to Linux 7.0 on 18 Oct 2026 and MongoDB 8.x refuses to
+    # start on kernel 6.19 or newer (SERVER-121912). Back to 24.04 once MongoDB runs there.
+    runs-on: ubuntu-22.04
     timeout-minutes: 30
     # The only job in the repo that can write packages, and only this one gets the permission.
     permissions:
