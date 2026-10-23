@@ -37,8 +37,8 @@ test.beforeEach(async (t) => {
   await seedEvaluations();
 });
 
-test('TC-17-20: each student\'s score is the mean of the ratings they received, as a percentage with a letter', async () => {
-  const res = await app.request('GET', course(), { token: ada });
+test('TC-17-20: with the regular method each student\'s score is the mean of the ratings they received, as a percentage with a letter', async () => {
+  const res = await app.request('GET', course('?gradingMethod=mean'), { token: ada });
   assert.equal(res.status, 200);
   const s = byName(res.body.students);
   assert.equal(s.ann.finalScore, EXPECTED_SCORES.ann);
@@ -52,16 +52,16 @@ test('TC-17-20: each student\'s score is the mean of the ratings they received, 
   assert.ok(Object.values(s).every((student) => student.evaluationsReceived === 1));
 });
 
-test('TC-17-21: the course summary counts students and grades from the same numbers', async () => {
-  const { summary } = (await app.request('GET', course(), { token: ada })).body;
+test('TC-17-21: the course summary counts students and grades from the same numbers (regular method)', async () => {
+  const { summary } = (await app.request('GET', course('?gradingMethod=mean'), { token: ada })).body;
   assert.equal(summary.totalStudents, 4);
   assert.equal(summary.studentsWithEvaluations, 4);
   near(summary.averageScore, 80.835, 'course average');
   assert.deepEqual(summary.gradeDistribution, { A: 2, B: 0, C: 1, D: 0, F: 1 });
 });
 
-test('TC-17-22: team averages are the mean of the members\' scores', async () => {
-  const { teams } = (await app.request('GET', course(), { token: ada })).body;
+test('TC-17-22: team averages are the mean of the members\' scores (regular method)', async () => {
+  const { teams } = (await app.request('GET', course('?gradingMethod=mean'), { token: ada })).body;
   const byTeam = Object.fromEntries(teams.map((t) => [t.team_name, t]));
   near(byTeam.Alpha.averageScore, 88.335, 'Alpha');
   near(byTeam.Beta.averageScore, 73.335, 'Beta');
@@ -84,15 +84,28 @@ test('TC-18-20: a student report shows the score, ratings received and ratings g
   assert.equal(res.body.detailedEvaluations.length, 1);
 });
 
-test('TC-17-24: curved grading lifts scores under 80 half way to the class mean and leaves 80 and above alone', async () => {
-  const res = await app.request('GET', course('?gradingMethod=curved'), { token: ada });
+// CICD-75: curved grading with a target mean of 85 and a target standard deviation of 20, and it is the default.
+// Raw scores 100, 76.67, 90 and 56.67 have mean 80.84 and population standard deviation 16.22, so
+// 85 + 20 x z gives Ann 108.63 (capped at 100), Ben 79.86, Cy 96.30 and Di 55.21 (worked out separately from the code).
+test('TC-17-24: curved grading, the default, standardises the class to mean 85 and deviation 20, capped at 100', async () => {
+  const res = await app.request('GET', course(), { token: ada });
   assert.equal(res.status, 200);
+  assert.equal(res.body.gradingMethod, 'curved');
   const s = byName(res.body.students);
   assert.equal(s.ann.finalScore, 100);
-  assert.equal(s.cy.finalScore, 90);
-  near(s.ben.finalScore, 78.75, 'Ben lifted');
-  near(s.di.finalScore, 68.75, 'Di lifted');
-  assert.equal(res.body.gradingSettings.boostFactor, 0.5);
+  near(s.ben.finalScore, 79.86, 'Ben');
+  near(s.cy.finalScore, 96.3, 'Cy');
+  near(s.di.finalScore, 55.21, 'Di');
+  assert.deepEqual(
+    [s.ann.letterGrade, s.ben.letterGrade, s.cy.letterGrade, s.di.letterGrade],
+    ['A', 'C', 'A', 'F']
+  );
+  near(s.ben.originalScore, 76.67, 'Ben original');
+  assert.equal(res.body.gradingSettings.targetMean, 85);
+  assert.equal(res.body.gradingSettings.targetStandardDeviation, 20);
+  assert.equal(res.body.gradingSettings.curveApplied, true);
+  near(res.body.gradingSettings.classStats.mean, 80.84, 'class mean');
+  near(res.body.gradingSettings.classStats.standardDeviation, 16.22, 'class standard deviation');
 });
 
 test('TC-17-25: a course with no evaluations lists its students with no scores; one with no students says so', async () => {
@@ -107,8 +120,8 @@ test('TC-17-25: a course with no evaluations lists its students with no scores; 
   assert.deepEqual(empty.body.students, []);
 });
 
-test('TC-19-20: the CSV export has one row per student with the same scores as the report', async () => {
-  const res = await fetch(`${app.baseUrl}/api/courses/${IDS.courseAda}/reports/download`, { headers: { Authorization: `Bearer ${ada}` } });
+test('TC-19-20: the CSV export has one row per student with the same scores as the report (regular method)', async () => {
+  const res = await fetch(`${app.baseUrl}/api/courses/${IDS.courseAda}/reports/download?gradingMethod=mean`, { headers: { Authorization: `Bearer ${ada}` } });
   assert.equal(res.status, 200);
   assert.match(res.headers.get('content-type'), /text\/csv/);
   assert.match(res.headers.get('content-disposition'), /attachment; filename="course_.*_report\.csv"/);
@@ -120,19 +133,20 @@ test('TC-19-20: the CSV export has one row per student with the same scores as t
   assert.ok(lines.includes('1004,Di Diaz,di@example.edu,Beta,56.67,56.67,F,1,0'));
 });
 
-test('TC-19-22: the CSV export applies the grading method from the query, like the report does', async () => {
-  const res = await fetch(`${app.baseUrl}/api/courses/${IDS.courseAda}/reports/download?gradingMethod=curved`, { headers: { Authorization: `Bearer ${ada}` } });
+test('TC-19-22: the CSV export applies the grading method like the report does: curved unless the query says otherwise', async () => {
+  const res = await fetch(`${app.baseUrl}/api/courses/${IDS.courseAda}/reports/download`, { headers: { Authorization: `Bearer ${ada}` } });
   assert.equal(res.status, 200);
   const rows = Object.fromEntries((await res.text()).split('\n').slice(1).map((line) => {
     const cells = line.split(',');
     return [cells[1].split(' ')[0].toLowerCase(), cells];
   }));
-  // Columns: ..., 4 Original Score, 5 Final Score. Ben (76.67) and Di (56.67) are lifted, Ann and Cy are not.
+  // Columns: ..., 4 Original Score, 5 Final Score, 8 Improvement (final minus original).
   near(Number(rows.ben[4]), 76.67, 'Ben original');
-  near(Number(rows.ben[5]), 78.75, 'Ben lifted');
-  near(Number(rows.di[5]), 68.75, 'Di lifted');
+  near(Number(rows.ben[5]), 79.86, 'Ben curved');
+  near(Number(rows.ben[8]), 3.19, 'Ben change');
+  near(Number(rows.di[5]), 55.21, 'Di curved');
+  near(Number(rows.cy[5]), 96.3, 'Cy curved');
   assert.equal(Number(rows.ann[5]), 100);
-  assert.equal(Number(rows.cy[5]), 90);
 });
 
 test('TC-19-21: a name that starts like a spreadsheet formula or holds a comma cannot break out of its cell', async () => {

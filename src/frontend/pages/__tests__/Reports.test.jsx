@@ -21,7 +21,8 @@ const RATINGS = { professionalism: 5, communication: 5, work_ethic: 5, content_k
 
 const REPORT = {
   summary: { totalStudents: 4, studentsWithEvaluations: 3, averageScore: 81.88, gradeDistribution: { A: 2, B: 0, C: 1, F: 1 } },
-  gradingSettings: { classStats: { mean: 81.88, standardDeviation: 15.3, boostFactor: 0.5, protectionThreshold: 80 } },
+  gradingSettings: { targetMean: 85, targetStandardDeviation: 20, curveApplied: true,
+    classStats: { mean: 81.88, standardDeviation: 15.3, targetMean: 85, targetStandardDeviation: 20 } },
   students: [
     {
       _id: 's1', student_id: '1001', name: 'Ann Archer', team_id: { team_name: 'Alpha' }, evaluationsReceived: 1,
@@ -34,6 +35,10 @@ const REPORT = {
     {
       _id: 's4', student_id: '1004', name: 'Di Diaz', team_id: null, evaluationsReceived: 0,
       originalScore: 50, finalScore: 55, letterGrade: 'F', improvement: 5, evaluationDetails: [],
+    },
+    {
+      _id: 's5', student_id: '1005', name: 'Eli Estes', team_id: null, evaluationsReceived: 1,
+      originalScore: 96, finalScore: 93, letterGrade: 'A', improvement: -3, evaluationDetails: [],
     },
   ],
 };
@@ -93,13 +98,13 @@ describe('Reports', () => {
     expect(screen.queryByRole('option', { name: /CS 1000/ })).not.toBeInTheDocument();
   });
 
-  test('generates the mean-graded report for the chosen course and shows totals, grades and students', async () => {
+  test('generates the curved report by default and shows totals, grades, the original score and the change', async () => {
     renderReports();
     await chooseCourse(/CS 4850 - Capstone/);
     await user.click(screen.getByRole('button', { name: 'Generate Report' }));
 
     expect(await screen.findByText('Report generated successfully')).toBeInTheDocument();
-    expect(reportRequest()).toBe('/courses/c1/reports?gradingMethod=mean&boostFactor=0.5&protectionThreshold=80');
+    expect(reportRequest()).toBe('/courses/c1/reports?gradingMethod=curved');
     // The summary cards show their figure in a level-6 heading, above the label.
     const figures = screen.getAllByRole('heading', { level: 6 }).map((heading) => heading.textContent);
     expect(figures).toEqual(expect.arrayContaining(['4', '3', '81.88%']));
@@ -109,29 +114,59 @@ describe('Reports', () => {
 
     const ann = screen.getByRole('row', { name: /Ann Archer/ });
     expect(within(ann).getByText('Alpha')).toBeInTheDocument();
-    expect(within(ann).getByText('100%')).toBeInTheDocument();
+    expect(within(ann).getAllByText('100%').length).toBeGreaterThan(0);
     expect(screen.getByRole('row', { name: /Di Diaz/ })).toHaveTextContent('No Team');
-    expect(screen.queryByText('Original Score')).not.toBeInTheDocument();
+    expect(screen.getByText('Original Score')).toBeInTheDocument();
+    expect(screen.getByText('Change')).toBeInTheDocument();
   });
 
-  test('curved grading asks for its settings, sends them, and adds the score and improvement columns', async () => {
+  test('curved grading has fixed settings: nothing to set, its formula and its statistics are shown', async () => {
     renderReports();
     await chooseCourse(/CS 4850 - Capstone/);
-    await user.click(screen.getByText('Mean Grading'));
-    await user.click(await screen.findByRole('option', { name: 'Curved Grading' }));
 
-    expect(screen.getByLabelText('Boost Factor (k)')).toHaveValue(0.5);
-    expect(screen.getByLabelText('Protection Threshold')).toHaveValue(80);
+    expect(screen.queryByLabelText('Boost Factor (k)')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Protection Threshold')).not.toBeInTheDocument();
+    expect(screen.getByText(/the class is set to a mean of 85 and a standard deviation of 20/)).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Generate Report' }));
     await screen.findByText('Report generated successfully');
 
-    expect(reportRequest()).toBe('/courses/c1/reports?gradingMethod=curved&boostFactor=0.5&protectionThreshold=80');
-    expect(screen.getByText('Original Score')).toBeInTheDocument();
-    expect(screen.getByText('Improvement')).toBeInTheDocument();
     expect(screen.getByText('Curved Grading Statistics')).toBeInTheDocument();
+    ['Class Mean', 'Standard Deviation', 'Target Mean', 'Target Standard Deviation'].forEach((label) => expect(screen.getByText(label)).toBeInTheDocument());
+    // 81.88% is also the class average card above, so it appears twice
+    expect(screen.getAllByText('81.88%')).toHaveLength(2);
+    expect(screen.getByText('15.3')).toBeInTheDocument();
+    expect(screen.getByText('85%')).toBeInTheDocument();
+    expect(screen.getByText('20')).toBeInTheDocument();
     expect(screen.getByText('+5%')).toBeInTheDocument();
-    expect(screen.getByText('Protected')).toBeInTheDocument();
+    expect(screen.getByText('-3%')).toBeInTheDocument();
+    expect(screen.getAllByText('No change').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Protected')).not.toBeInTheDocument();
+  });
+
+  test('says so when there are too few scored students to curve', async () => {
+    serve({ report: { ...REPORT, gradingSettings: { targetMean: 85, targetStandardDeviation: 20, curveApplied: false } } });
+    renderReports();
+    await chooseCourse(/CS 4850 - Capstone/);
+    await user.click(screen.getByRole('button', { name: 'Generate Report' }));
+    await screen.findByText('Report generated successfully');
+
+    expect(screen.getByText(/Fewer than two students have evaluations/)).toBeInTheDocument();
+    expect(screen.queryByText('Curved Grading Statistics')).not.toBeInTheDocument();
+  });
+
+  test('the regular method is still a choice: it asks for the mean of the ratings and hides the curve columns', async () => {
+    renderReports();
+    await chooseCourse(/CS 4850 - Capstone/);
+    await user.click(screen.getByText(/^Curved \(mean 85/));
+    await user.click(await screen.findByRole('option', { name: 'Regular (mean of the ratings)' }));
+    await user.click(screen.getByRole('button', { name: 'Generate Report' }));
+    await screen.findByText('Report generated successfully');
+
+    expect(reportRequest()).toBe('/courses/c1/reports?gradingMethod=mean');
+    expect(screen.queryByText('Original Score')).not.toBeInTheDocument();
+    expect(screen.queryByText('Change')).not.toBeInTheDocument();
+    expect(screen.queryByText('Curved Grading Statistics')).not.toBeInTheDocument();
   });
 
   test('says why a report could not be made: the server\'s message, or a plain one', async () => {
@@ -164,7 +199,7 @@ describe('Reports', () => {
 
     expect(await screen.findByText('Capstone 01')).toBeInTheDocument();
     expect(await screen.findByText('Report generated successfully')).toBeInTheDocument();
-    expect(reportRequest()).toBe('/courses/c1/reports?gradingMethod=mean&boostFactor=0.5&protectionThreshold=80');
+    expect(reportRequest()).toBe('/courses/c1/reports?gradingMethod=curved');
     expect(screen.getByRole('button', { name: 'Regenerate Report' })).toBeEnabled();
 
     await user.click(screen.getByRole('button', { name: /back to courses/i }));
@@ -207,13 +242,13 @@ describe('Reports', () => {
       await screen.findByText('Report generated successfully');
     }
 
-    test('asks for the file with the same settings and says it downloaded', async () => {
+    test('asks for the file with the same grading method and says it downloaded', async () => {
       await generated();
       await user.click(screen.getByRole('button', { name: 'Download CSV' }));
 
       expect(await screen.findByText('Report downloaded successfully')).toBeInTheDocument();
       expect(api.get).toHaveBeenCalledWith(
-        '/courses/c1/reports/download?gradingMethod=mean&boostFactor=0.5&protectionThreshold=80',
+        '/courses/c1/reports/download?gradingMethod=curved',
         { responseType: 'blob' }
       );
       expect(window.URL.createObjectURL).toHaveBeenCalledTimes(1);

@@ -42,37 +42,38 @@ const calculateMeanScore = (evaluations) => {
   return result;
 };
 
+// The sponsor's curved grading (CICD-75, sheet of 19 Oct 2026): the class is standardised to a target mean of 85
+// and a target standard deviation of 20. A score S becomes 85 + 20 x (S - class mean) / class standard deviation
+// (population), at most 100 and at least 0. With no spread (every score the same) everyone gets the target mean.
+// The parameters are fixed; the old boost factor and protection threshold no longer exist.
+const TARGET_MEAN = 85;
+const TARGET_STANDARD_DEVIATION = 20;
+
 /**
- * Apply curved grading formula
+ * Apply the curved grading formula to the class's scores
  */
-const applyCurvedGrading = (scores, boostFactor = 0.5, protectionThreshold = 80) => {
-  // Calculate class statistics
-  const mean = scores.reduce((sum, score) => sum + score, 0) / scores.length;
-  const variance = scores.reduce((sum, score) => sum + Math.pow(score - mean, 2), 0) / scores.length;
+const applyCurvedGrading = (scores) => {
+  // Identical scores have no spread. This is checked on the scores themselves: computed, their mean can be off in the
+  // last digit (ten times 76.67 has mean 76.66999999999999), which gives a tiny deviation that is not 0.
+  const noSpread = scores.every(score => score === scores[0]);
+  const mean = noSpread ? scores[0] : scores.reduce((sum, score) => sum + score, 0) / scores.length;
+  const variance = noSpread ? 0 : scores.reduce((sum, score) => sum + Math.pow(score - mean, 2), 0) / scores.length;
   const standardDeviation = Math.sqrt(variance);
-  
-  // Apply curved grading
+
   const adjustedScores = scores.map(score => {
-    // Protect scores >= threshold
-    if (score >= protectionThreshold) {
-      return score;
-    }
-    
-    // Apply boost formula: score + k(mean - score)
-    const boostedScore = score + boostFactor * (mean - score);
-    
-    // Ensure score doesn't exceed 100
-    return Math.min(boostedScore, 100);
+    if (noSpread) return TARGET_MEAN;
+    const adjusted = TARGET_MEAN + TARGET_STANDARD_DEVIATION * ((score - mean) / standardDeviation);
+    return Math.min(100, Math.max(0, adjusted));
   });
-  
+
   return {
     originalScores: scores,
     adjustedScores,
     classStats: {
       mean: parseFloat(mean.toFixed(2)),
       standardDeviation: parseFloat(standardDeviation.toFixed(2)),
-      boostFactor,
-      protectionThreshold
+      targetMean: TARGET_MEAN,
+      targetStandardDeviation: TARGET_STANDARD_DEVIATION
     }
   };
 };
@@ -95,9 +96,9 @@ exports.getCourseReport = async (req, res, next) => {
   try {
     console.log('📊 Starting getCourseReport for course:', req.params.course_id);
     const { course_id } = req.params;
-    const { gradingMethod = 'mean', boostFactor = 0.5, protectionThreshold = 80 } = req.query;
+    const { gradingMethod = 'curved' } = req.query;
     
-    console.log('📋 Query parameters:', { gradingMethod, boostFactor, protectionThreshold });
+    console.log('📋 Query parameters:', { gradingMethod });
     
     if (!mongoose.Types.ObjectId.isValid(course_id)) {
       console.log('❌ Invalid course ID:', course_id);
@@ -249,7 +250,7 @@ exports.getCourseReport = async (req, res, next) => {
     
     let gradingResults;
     if (gradingMethod === 'curved' && rawScores.length > 1) {
-      gradingResults = applyCurvedGrading(rawScores, parseFloat(boostFactor), parseFloat(protectionThreshold));
+      gradingResults = applyCurvedGrading(rawScores);
     }
 
     // Apply grading results to students
@@ -267,7 +268,7 @@ exports.getCourseReport = async (req, res, next) => {
         ...item.student.toObject(),
         originalScore: item.originalScore,
         finalScore: finalScore,
-        letterGrade: finalScore > 0 ? getLetterGrade(finalScore) : 'No evaluations',
+        letterGrade: item.originalScore > 0 ? getLetterGrade(finalScore) : 'No evaluations',
         evaluationsReceived: item.evaluationsReceived,
         evaluationDetails: item.evaluationDetails, // Include the evaluation details!
         improvement: gradingMethod === 'curved' && item.originalScore > 0 ? 
@@ -283,7 +284,7 @@ exports.getCourseReport = async (req, res, next) => {
         student => student.team_id && String(student.team_id._id || student.team_id) === team._id.toString()
       );
       
-      const teamScores = teamStudents.map(s => s.finalScore).filter(score => score > 0);
+      const teamScores = teamStudents.filter(s => s.originalScore > 0).map(s => s.finalScore);
       const avgScore = teamScores.length > 0 ? 
         parseFloat((teamScores.reduce((sum, score) => sum + score, 0) / teamScores.length).toFixed(2)) : 0;
       
@@ -291,12 +292,12 @@ exports.getCourseReport = async (req, res, next) => {
         ...team.toObject(),
         students: teamStudents,
         averageScore: avgScore,
-        letterGrade: avgScore > 0 ? getLetterGrade(avgScore) : 'No evaluations'
+        letterGrade: teamScores.length > 0 ? getLetterGrade(avgScore) : 'No evaluations'
       };
     });
 
     // Summary statistics
-    const finalScores = studentsWithGrades.map(s => s.finalScore).filter(score => score > 0);
+    const finalScores = studentsWithGrades.filter(s => s.originalScore > 0).map(s => s.finalScore);
     const summary = {
       totalStudents: students.length,
       studentsWithEvaluations: finalScores.length,
@@ -318,8 +319,10 @@ exports.getCourseReport = async (req, res, next) => {
       summary,
       gradingMethod,
       gradingSettings: gradingMethod === 'curved' ? {
-        boostFactor: parseFloat(boostFactor),
-        protectionThreshold: parseFloat(protectionThreshold),
+        targetMean: TARGET_MEAN,
+        targetStandardDeviation: TARGET_STANDARD_DEVIATION,
+        // false when fewer than two students have a score: there is no class to curve
+        curveApplied: Boolean(gradingResults),
         classStats: gradingResults?.classStats
       } : null
     };

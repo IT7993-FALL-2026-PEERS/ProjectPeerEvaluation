@@ -15,14 +15,12 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  TextField,
   Grid,
   Card,
   CardContent,
   Alert,
   Chip,
   CircularProgress,
-  Divider,
   Tooltip,
   IconButton,
   Dialog,
@@ -50,9 +48,7 @@ function Reports() {
   const [selectedCourse, setSelectedCourse] = useState(courseFromUrl || '');
   const [reportData, setReportData] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [gradingMethod, setGradingMethod] = useState('mean');
-  const [boostFactor, setBoostFactor] = useState(0.5);
-  const [protectionThreshold, setProtectionThreshold] = useState(80);
+  const [gradingMethod, setGradingMethod] = useState('curved');
   const [alert, setAlert] = useState(null);
   const [courseInfo, setCourseInfo] = useState(null); // Store individual course info
   const [commentsDialogOpen, setCommentsDialogOpen] = useState(false);
@@ -68,11 +64,7 @@ function Reports() {
     console.log('🚀 Generating report for course:', courseId);
     setLoading(true);
     try {
-      const params = new URLSearchParams({
-        gradingMethod,
-        boostFactor: boostFactor.toString(),
-        protectionThreshold: protectionThreshold.toString()
-      });
+      const params = new URLSearchParams({ gradingMethod });
 
       const response = await api.get(`/courses/${courseId}/reports?${params}`);
       setReportData(response.data);
@@ -86,7 +78,7 @@ function Reports() {
     } finally {
       setLoading(false);
     }
-  }, [gradingMethod, boostFactor, protectionThreshold]);
+  }, [gradingMethod]);
 
   // Fetch courses on component mount
   useEffect(() => {
@@ -185,9 +177,7 @@ function Reports() {
 
     try {
       const params = new URLSearchParams({
-        gradingMethod,
-        boostFactor: boostFactor.toString(),
-        protectionThreshold: protectionThreshold.toString()
+        gradingMethod
       });
 
       const response = await api.get(`/courses/${selectedCourse}/reports/download?${params}`, {
@@ -345,8 +335,8 @@ function Reports() {
                 onChange={(e) => setGradingMethod(e.target.value)}
                 label="Grading Method"
               >
-                <MenuItem value="mean">Mean Grading</MenuItem>
-                <MenuItem value="curved">Curved Grading</MenuItem>
+                <MenuItem value="curved">Curved (mean 85, standard deviation 20)</MenuItem>
+                <MenuItem value="mean">Regular (mean of the ratings)</MenuItem>
               </Select>
             </FormControl>
           </Grid>
@@ -366,48 +356,15 @@ function Reports() {
             </Box>
           </Grid>
 
-          {/* Curved Grading Settings */}
+          {/* Curved grading: the sponsor's fixed parameters, nothing to set */}
           {gradingMethod === 'curved' && (
-            <>
-              <Grid item xs={12}>
-                <Divider sx={{ my: 2 }}>
-                  <Chip label="Curved Grading Settings" />
-                </Divider>
-              </Grid>
-              
-              <Grid item xs={12} md={6}>
-                <TextField
-                  fullWidth
-                  label="Boost Factor (k)"
-                  type="number"
-                  value={boostFactor}
-                  onChange={(e) => setBoostFactor(parseFloat(e.target.value))}
-                  inputProps={{ min: 0, max: 1, step: 0.1 }}
-                  helperText="Controls the extent of score boost (0.0 - 1.0)"
-                />
-              </Grid>
-              
-              <Grid item xs={12} md={6}>
-                <TextField
-                  fullWidth
-                  label="Protection Threshold"
-                  type="number"
-                  value={protectionThreshold}
-                  onChange={(e) => setProtectionThreshold(parseInt(e.target.value))}
-                  inputProps={{ min: 0, max: 100 }}
-                  helperText="Scores above this value are protected from adjustment"
-                />
-              </Grid>
-
-              <Grid item xs={12}>
-                <Alert severity="info">
-                  <strong>Curved Grading Formula:</strong> For scores below {protectionThreshold}, 
-                  adjusted score = original + {boostFactor} × (class mean - original)
-                  <br />
-                  <strong>Benefits:</strong> Boosts lower scores, protects high performers, maintains grade spread
-                </Alert>
-              </Grid>
-            </>
+            <Grid item xs={12}>
+              <Alert severity="info">
+                <strong>Curved grading (the sponsor&apos;s method):</strong> the class is set to a mean of 85 and a standard deviation of 20.
+                Adjusted score = 85 + 20 × (score − class mean) ÷ class standard deviation, at most 100.
+                If every score is the same, everyone gets 85. It needs at least two students with evaluations.
+              </Alert>
+            </Grid>
           )}
         </Grid>
       </Paper>
@@ -490,6 +447,11 @@ function Reports() {
           </Paper>
 
           {/* Curved Grading Stats */}
+          {gradingMethod === 'curved' && reportData.gradingSettings?.curveApplied === false && (
+            <Alert severity="info" sx={{ mb: 3 }}>
+              Fewer than two students have evaluations, so there is no class to curve. The scores below are the plain mean of the ratings.
+            </Alert>
+          )}
           {gradingMethod === 'curved' && reportData.gradingSettings?.classStats && (
             <Paper sx={{ p: 3, mb: 3 }}>
               <Typography variant="h6" gutterBottom>
@@ -498,19 +460,19 @@ function Reports() {
               <Grid container spacing={2}>
                 <Grid item xs={6} md={3}>
                   <Typography variant="body2" color="textSecondary">Class Mean</Typography>
-                  <Typography variant="h6">{reportData.gradingSettings?.classStats?.mean || 0}%</Typography>
+                  <Typography variant="h6">{reportData.gradingSettings.classStats.mean}%</Typography>
                 </Grid>
                 <Grid item xs={6} md={3}>
                   <Typography variant="body2" color="textSecondary">Standard Deviation</Typography>
-                  <Typography variant="h6">{reportData.gradingSettings?.classStats?.standardDeviation || 0}</Typography>
+                  <Typography variant="h6">{reportData.gradingSettings.classStats.standardDeviation}</Typography>
                 </Grid>
                 <Grid item xs={6} md={3}>
-                  <Typography variant="body2" color="textSecondary">Boost Factor</Typography>
-                  <Typography variant="h6">{reportData.gradingSettings?.classStats?.boostFactor || 1}</Typography>
+                  <Typography variant="body2" color="textSecondary">Target Mean</Typography>
+                  <Typography variant="h6">{reportData.gradingSettings.targetMean}%</Typography>
                 </Grid>
                 <Grid item xs={6} md={3}>
-                  <Typography variant="body2" color="textSecondary">Protection Threshold</Typography>
-                  <Typography variant="h6">{reportData.gradingSettings?.classStats?.protectionThreshold || 0}%</Typography>
+                  <Typography variant="body2" color="textSecondary">Target Standard Deviation</Typography>
+                  <Typography variant="h6">{reportData.gradingSettings.targetStandardDeviation}</Typography>
                 </Grid>
               </Grid>
             </Paper>
@@ -520,7 +482,7 @@ function Reports() {
           <Paper sx={{ p: 3 }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
               <Typography variant="h6">
-                Student Results ({gradingMethod === 'curved' ? 'Curved' : 'Mean'} Grading)
+                Student Results ({gradingMethod === 'curved' ? 'Curved' : 'Regular'} Grading)
               </Typography>
               <Button
                 variant="outlined"
@@ -542,7 +504,7 @@ function Reports() {
                     {gradingMethod === 'curved' && <TableCell align="center">Original Score</TableCell>}
                     <TableCell align="center">Final Score</TableCell>
                     <TableCell align="center">Letter Grade</TableCell>
-                    {gradingMethod === 'curved' && <TableCell align="center">Improvement</TableCell>}
+                    {gradingMethod === 'curved' && <TableCell align="center">Change</TableCell>}
                     <TableCell align="center">Actions</TableCell>
                   </TableRow>
                 </TableHead>
@@ -575,9 +537,16 @@ function Reports() {
                               size="small"
                             />
                           )}
+                          {student.improvement < 0 && (
+                            <Chip
+                              label={`${student.improvement}%`}
+                              color="warning"
+                              size="small"
+                            />
+                          )}
                           {student.improvement === 0 && (
                             <Typography variant="body2" color="textSecondary">
-                              Protected
+                              No change
                             </Typography>
                           )}
                         </TableCell>

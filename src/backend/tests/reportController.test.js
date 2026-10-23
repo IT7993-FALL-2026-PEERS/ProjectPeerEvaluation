@@ -94,7 +94,7 @@ test('getCourseReport: no students response', async (t) => {
   const data = fixture([]);
   stubCourse(t, data);
   assert.deepEqual(ok(await call('getCourseReport')), {
-    course: data.course, students: [], teams: [], gradingMethod: 'mean',
+    course: data.course, students: [], teams: [], gradingMethod: 'curved',
     message: 'No students found in this course'
   });
 });
@@ -126,32 +126,115 @@ test('getCourseReport: counts participation like every other criterion (1-5) and
   assert.equal(student.evaluationsReceived, 2);
 });
 
-test('getCourseReport: letter grade boundaries and summary distribution', async (t) => {
+test('getCourseReport: letter grade boundaries and summary distribution (regular method)', async (t) => {
   const data = fixture([90, 89, 80, 79, 70, 69, 60, 59]);
   stubCourse(t, data);
-  const body = ok(await call('getCourseReport'));
+  const body = ok(await call('getCourseReport', { query: { gradingMethod: 'mean' } }));
   assert.deepEqual(body.students.map(s => s.letterGrade), ['A', 'B', 'B', 'C', 'C', 'D', 'D', 'F']);
   assert.deepEqual(body.summary, { totalStudents: 8, studentsWithEvaluations: 8, averageScore: 74.5,
     gradeDistribution: { A: 1, B: 2, C: 2, D: 2, F: 1 } });
 });
 
-test('getCourseReport: curved scores move toward the mean below the protection threshold', async (t) => {
+// CICD-75: the sponsor's curved grading, target mean 85 and target standard deviation 20 (sheet of 19 Oct 2026).
+// Final = 85 + 20 x (score - class mean) / class standard deviation (population), at most 100 and at least 0.
+// The expected numbers below were worked out separately from the code, from that formula.
+test('getCourseReport: curved is the default method and standardises the class to mean 85, deviation 20', async (t) => {
   const data = fixture([40, 70, 80, 90]);
   stubCourse(t, data);
-  const body = ok(await call('getCourseReport', {
-    query: { gradingMethod: 'curved', boostFactor: '0.5', protectionThreshold: '80' }
-  }));
+  const body = ok(await call('getCourseReport'));
+  // mean 70, population standard deviation 18.71: z = -1.6036, 0, 0.5345, 1.0690
+  assert.equal(body.gradingMethod, 'curved');
   assert.deepEqual(body.students.map(s => s.originalScore), [40, 70, 80, 90]);
-  assert.deepEqual(body.students.map(s => s.finalScore), [55, 70, 80, 90]);
-  assert.deepEqual(body.students.map(s => s.improvement), [15, 0, 0, 0]);
-  assert.deepEqual(body.gradingSettings, { boostFactor: 0.5, protectionThreshold: 80,
-    classStats: { mean: 70, standardDeviation: 18.71, boostFactor: 0.5, protectionThreshold: 80 } });
+  assert.deepEqual(body.students.map(s => s.finalScore), [52.93, 85, 95.69, 100]);
+  assert.deepEqual(body.students.map(s => s.letterGrade), ['F', 'B', 'A', 'A']);
+  assert.deepEqual(body.students.map(s => s.improvement), [12.93, 15, 15.69, 10]);
+  assert.deepEqual(body.gradingSettings, { targetMean: 85, targetStandardDeviation: 20, curveApplied: true,
+    classStats: { mean: 70, standardDeviation: 18.71, targetMean: 85, targetStandardDeviation: 20 } });
 });
 
-test('getCourseReport: team averages include populated team members', async (t) => {
+test('getCourseReport: the regular method is still there and shows the mean of the ratings, with no curve settings', async (t) => {
+  const data = fixture([40, 70, 80, 90]);
+  stubCourse(t, data);
+  const body = ok(await call('getCourseReport', { query: { gradingMethod: 'mean' } }));
+  assert.deepEqual(body.students.map(s => s.finalScore), [40, 70, 80, 90]);
+  assert.deepEqual(body.students.map(s => s.improvement), [0, 0, 0, 0]);
+  assert.equal(body.gradingSettings, null);
+});
+
+test('getCourseReport: the old boost factor and protection threshold are ignored', async (t) => {
+  const data = fixture([40, 70, 80, 90]);
+  stubCourse(t, data);
+  const body = ok(await call('getCourseReport', { query: { gradingMethod: 'curved', boostFactor: '0.9', protectionThreshold: '50' } }));
+  assert.deepEqual(body.students.map(s => s.finalScore), [52.93, 85, 95.69, 100]);
+  assert.equal(body.gradingSettings.boostFactor, undefined);
+});
+
+test('getCourseReport: two students: the lower gets 65 and the higher is capped at 100', async (t) => {
   const data = fixture([60, 80]);
   stubCourse(t, data);
   const body = ok(await call('getCourseReport'));
+  // mean 70, deviation 10: z = -1 and +1 gives 65 and 105, capped to 100
+  assert.deepEqual(body.students.map(s => s.finalScore), [65, 100]);
+  assert.deepEqual(body.students.map(s => s.letterGrade), ['D', 'A']);
+});
+
+test('getCourseReport: when every score is the same there is no spread, so everyone gets 85', async (t) => {
+  const data = fixture([80, 80, 80]);
+  stubCourse(t, data);
+  const body = ok(await call('getCourseReport'));
+  assert.deepEqual(body.students.map(s => s.finalScore), [85, 85, 85]);
+  assert.deepEqual(body.students.map(s => s.letterGrade), ['B', 'B', 'B']);
+  assert.equal(body.gradingSettings.classStats.standardDeviation, 0);
+});
+
+test('getCourseReport: identical scores that are not exact in floating point still get 85 (report and CSV)', async (t) => {
+  // Ten students with 76.67: the computed mean is 76.66999999999999 and the deviation about 1.4e-14, not exactly 0.
+  const data = fixture(Array(10).fill(76.67));
+  stubCourse(t, data);
+  const body = ok(await call('getCourseReport'));
+  assert.deepEqual(body.students.map(s => s.finalScore), Array(10).fill(85));
+  assert.equal(body.gradingSettings.classStats.standardDeviation, 0);
+  const csv = ok(await call('downloadReport'));
+  assert.ok(csv.split('\n').slice(1).every(line => line.split(',').slice(-5)[1] === '85'), csv);
+});
+
+test('getCourseReport: with fewer than two scored students nothing is curved and the screen is told', async (t) => {
+  const data = fixture([80]);
+  stubCourse(t, data);
+  const body = ok(await call('getCourseReport'));
+  assert.equal(body.students[0].finalScore, 80);
+  assert.equal(body.students[0].improvement, 0);
+  assert.deepEqual(body.gradingSettings, { targetMean: 85, targetStandardDeviation: 20, curveApplied: false, classStats: undefined });
+});
+
+test('getCourseReport: a student with no evaluations is left out of the class statistics and has no grade', async (t) => {
+  const data = fixture([60, 80, 70]);
+  data.evaluations = data.evaluations.slice(0, 2); // the third student received nothing
+  stubCourse(t, data);
+  const body = ok(await call('getCourseReport'));
+  assert.deepEqual(body.students.map(s => s.finalScore), [65, 100, 0]);
+  assert.deepEqual(body.students.map(s => s.letterGrade), ['D', 'A', 'No evaluations']);
+  assert.equal(body.gradingSettings.classStats.mean, 70);
+  assert.equal(body.summary.studentsWithEvaluations, 2);
+});
+
+test('getCourseReport: a very low score cannot go below 0, and still has a grade', async (t) => {
+  const data = fixture([...Array(19).fill(100), 20]);
+  stubCourse(t, data);
+  const body = ok(await call('getCourseReport'));
+  // mean 96, deviation 17.44: the low score is 4.36 deviations below, which is below 0 before the floor
+  const low = body.students[19];
+  assert.equal(low.originalScore, 20);
+  assert.equal(low.finalScore, 0);
+  assert.equal(low.letterGrade, 'F');
+  assert.equal(body.students[0].finalScore, 89.59);
+  assert.equal(body.summary.studentsWithEvaluations, 20);
+});
+
+test('getCourseReport: team averages include populated team members (regular method)', async (t) => {
+  const data = fixture([60, 80]);
+  stubCourse(t, data);
+  const body = ok(await call('getCourseReport', { query: { gradingMethod: 'mean' } }));
   assert.equal(body.teams[0].students.length, 2);
   assert.equal(body.teams[0].averageScore, 70);
   assert.equal(body.teams[0].letterGrade, 'C');
@@ -182,15 +265,14 @@ test('downloadReport: sends CSV headers and preserves commas and quotes in colum
     'S0,"Smith, John",student0@example.com,"Team ""A""",80,80,B,1,0');
 });
 
-test('downloadReport: prefixes formula names and preserves negative improvement', async (t) => {
+test('downloadReport: prefixes formula names and exports the curved scores', async (t) => {
   const data = fixture([40, 75, 80]);
   data.students[1].name = '=SUM(1,2)';
   stubCourse(t, data);
-  const csv = ok(await call('downloadReport', {
-    query: { gradingMethod: 'curved', boostFactor: '0.5', protectionThreshold: '80' }
-  }));
-  // Mean is 65: 75 + 0.5*(65-75) = 70, so improvement remains numeric -5.
-  assert.equal(csv.split('\n')[2], 'S1,"\'=SUM(1,2)",student1@example.com,"Team ""A""",75,70,C,1,-5');
+  const csv = ok(await call('downloadReport', { query: { gradingMethod: 'curved' } }));
+  // Mean 65, deviation 17.80: 40 becomes 56.90, 75 becomes 96.24 and 80 is capped at 100.
+  assert.equal(csv.split('\n')[1], 'S0,"Smith, John",student0@example.com,"Team ""A""",40,56.9,F,1,16.9');
+  assert.equal(csv.split('\n')[2], 'S1,"\'=SUM(1,2)",student1@example.com,"Team ""A""",75,96.24,A,1,21.24');
 });
 
 test('getStudentReport: unknown student returns 404', async (t) => {
