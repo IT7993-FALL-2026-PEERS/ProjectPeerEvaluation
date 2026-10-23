@@ -95,17 +95,22 @@ test('E2E-06: sending invitations emails every student a link and opens the stat
   expect(emails.every((e) => /\/evaluate\/[0-9a-f]{64}/.test(e.html))).toBe(true);
 });
 
-test('E2E-07: the report shows the class totals and each student\'s score, and downloads as CSV', async ({ page }) => {
+test('E2E-07: the report is curved by default (mean 85, deviation 20): it shows each student\'s curved score and downloads as CSV', async ({ page }) => {
   await resetData({ evaluations: true });
   await loginAsAda(page, passwords);
   await courseAction(page, 'View Reports').click();
 
   await expect(page.getByRole('heading', { name: /Evaluation Reports/ })).toBeVisible();
+  // The raw scores 100, 76.67, 90 and 56.67 have mean 80.84; the curve (worked out separately from the code) gives
+  // Ann 100 (capped), Ben 79.86, Cy 96.3 and Di 55.21.
+  await expect(page.getByText('Curved Grading Statistics')).toBeVisible();
   await expect(page.getByText('80.84%')).toBeVisible();
   const ann = page.getByRole('row', { name: /Ann Archer/ });
   await expect(ann).toContainText('100%');
   await expect(ann).toContainText('A');
-  await expect(page.getByRole('row', { name: /Di Diaz/ })).toContainText('56.67%');
+  const di = page.getByRole('row', { name: /Di Diaz/ });
+  await expect(di).toContainText('56.67%');
+  await expect(di).toContainText('55.21%');
 
   const [download] = await Promise.all([
     page.waitForEvent('download'),
@@ -121,9 +126,9 @@ test('E2E-07: the report shows the class totals and each student\'s score, and d
   expect(lines[0]).toBe('Student ID,Name,Email,Team,Original Score,Final Score,Letter Grade,Evaluations Received,Improvement');
   expect(lines.slice(1).sort()).toEqual([
     '1001,Ann Archer,ann@example.edu,Alpha,100,100,A,1,0',
-    '1002,Ben Baker,ben@example.edu,Alpha,76.67,76.67,C,1,0',
-    '1003,Cy Cole,cy@example.edu,Beta,90,90,A,1,0',
-    '1004,Di Diaz,di@example.edu,Beta,56.67,56.67,F,1,0',
+    '1002,Ben Baker,ben@example.edu,Alpha,76.67,79.86,C,1,3.19',
+    '1003,Cy Cole,cy@example.edu,Beta,90,96.3,A,1,6.3',
+    '1004,Di Diaz,di@example.edu,Beta,56.67,55.21,F,1,-1.46',
   ]);
 });
 

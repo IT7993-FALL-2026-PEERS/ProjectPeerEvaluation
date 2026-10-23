@@ -542,14 +542,23 @@ Deletes every evaluation in the course and clears all tokens, each student's sub
 
 | Query parameter | Default | Meaning |
 |---|---|---|
-| `gradingMethod` | `mean` | `mean` or `curved` |
-| `boostFactor` | `0.5` | Curved only: how far a low score moves toward the class mean |
-| `protectionThreshold` | `80` | Curved only: scores at or above this are not changed |
+| `gradingMethod` | `curved` | `curved` (the default, the sponsor's method) or `mean` (the regular method) |
+
+The old `boostFactor` and `protectionThreshold` parameters are ignored: the curve has fixed parameters.
 
 **Scoring.** Each student's score is the mean of all ratings they received, as a
 percentage (mean × 20). Participation is rated 1–5 like every other criterion (D-19, fixed 17 Oct 2026). Letter
-grades: A ≥ 90, B ≥ 80, C ≥ 70, D ≥ 60, otherwise F. Curved: `score + boostFactor × (mean
-− score)` for scores below the threshold.
+grades: A ≥ 90, B ≥ 80, C ≥ 70, D ≥ 60, otherwise F.
+
+**Curved grading (the default; CICD-75, the sponsor's sheet of 19 Oct 2026).** The class is standardised to a
+target mean of 85 and a target standard deviation of 20: with *S* a student's score as above, *m* the mean and *s*
+the population standard deviation of the scores of the students who have evaluations, the final score is
+`85 + 20 × (S − m) ÷ s`, at most 100 and at least 0. If every score is the same (*s* = 0) everyone gets 85. With
+fewer than two students who have evaluations nothing is curved and `gradingSettings.curveApplied` is `false`. A student
+with no evaluations is not part of the statistics and has no grade. The choices that the sheet does not state were
+made by the team, with the three defaults shown to the sponsor: the whole class (not each team), the cap at 100
+and the 85 for equal scores; they are to be confirmed with her. `mean` returns the plain scores. The per-student and
+per-team report endpoints below always show the regular scores.
 
 **200**
 ```json
@@ -563,10 +572,14 @@ grades: A ≥ 90, B ≥ 80, C ≥ 70, D ≥ 60, otherwise F. Curved: `score + bo
               "letterGrade": "C" }],
   "summary": { "totalStudents": 8, "studentsWithEvaluations": 8, "averageScore": 74.5,
                "gradeDistribution": { "A": 1, "B": 2, "C": 2, "D": 2, "F": 1 } },
-  "gradingMethod": "mean",
-  "gradingSettings": null
+  "gradingMethod": "curved",
+  "gradingSettings": { "targetMean": 85, "targetStandardDeviation": 20, "curveApplied": true,
+                       "classStats": { "mean": 70, "standardDeviation": 18.71,
+                                       "targetMean": 85, "targetStandardDeviation": 20 } }
 }
 ```
+With `gradingMethod=mean`, `gradingSettings` is `null` and `improvement` is 0. `improvement` is the final score
+minus the original score; with the curve it can be negative.
 With no students or no evaluations yet, the response has a `message` and empty lists.
 `aiFlags.flagged` is true when all five 1–5 ratings are 5, or when the feedback contains
 a word from the professor's list (substring match, ignoring case).
