@@ -83,7 +83,8 @@ test('TC-01-18: login rejects an email or password that is not text, before any 
 
 test('TC-01-19: registration rejects any field that is not text, before any lookup', async (t) => {
   const find = t.mock.method(Professor, 'findOne', async () => { throw new Error('must not be queried'); });
-  const good = { email: 'a@b.c', password: 'Password1', name: 'A', department: 'CS' };
+  // Registration takes no password (CW-11); the password is chosen later, when the emailed link is used.
+  const good = { email: 'a@b.c', name: 'A', department: 'CS' };
   for (const field of Object.keys(good)) {
     assertRejected(await call(auth.register, { body: { ...good, [field]: OPERATOR } }), field);
   }

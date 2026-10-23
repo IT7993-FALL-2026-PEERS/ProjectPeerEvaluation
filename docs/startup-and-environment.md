@@ -89,6 +89,7 @@ All of these work unset. The default is what the code uses.
 | `EMAIL_SEND_INTERVAL_MS` | `0` | Pause between emails in a batch | Mailtrap's free sandbox allows one email per 10 seconds — staging uses `11000` |
 | `SESSION_IDLE_MINUTES` | `60` | Professor session ends after this long with no request; activity renews it | Sponsor decision on FR-04 |
 | `SESSION_MAX_HOURS` | `8` | Hard ceiling on a session since login, regardless of activity | As above |
+| `ALLOWED_EMAIL_DOMAINS` | `kennesaw.edu` | Comma-separated email domains that may register (exact match, no wildcard; `students.kennesaw.edu` is refused). A new account also has to confirm its address through a link emailed to it, so mail must work | For local testing use your own domain, for example `example.edu`. Running with Docker Compose needs working SMTP (Mailtrap's sandbox is enough) to create the first professor, because the container runs in production mode and does not print the link |
 | `TRUST_PROXY` | `2` | How many proxies sit in front of the app, so rate limits see the real client | `0` when running with no proxy. Leave unset on Render — it has two (Cloudflare and its load balancer) |
 
 ### Rate limits

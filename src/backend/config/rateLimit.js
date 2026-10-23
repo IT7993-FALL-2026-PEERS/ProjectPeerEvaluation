@@ -5,7 +5,8 @@
 //   login      failed attempts only (a successful login does not count)
 //   signup     professor registration
 //   reset      password reset requests (each one sends an email)
-//   update     password updates with a reset token; separate from reset on purpose, so a burst of
+//   update     password updates with a reset token, and email confirmations (the same kind of
+//              one-time link); separate from reset on purpose, so a burst of
 //              reset requests from a shared address cannot block someone from using the link
 //              they were just sent. The token is unguessable, so this is only a coarse safeguard.
 //   evaluate   the public student evaluation links
@@ -99,6 +100,7 @@ function applyRateLimits(app, limits = readLimits()) {
   app.use('/api/auth/register', rateLimit(limiterOptions(limits.signup, { what: 'sign-up requests' })));
   app.use('/api/auth/reset-password', rateLimit(limiterOptions(limits.reset, { what: 'password reset requests' })));
   app.use('/api/auth/update-password', rateLimit(limiterOptions(limits.update, { what: 'password update attempts' })));
+  app.use('/api/auth/verify-email', rateLimit(limiterOptions(limits.update, { what: 'email confirmation attempts' })));
   app.use('/api/evaluate', rateLimit(limiterOptions(limits.evaluate, { what: 'requests to this evaluation link' })));
 }
 

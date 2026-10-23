@@ -4,7 +4,11 @@
 
 ## Quick Start with the API
 
-Set the API base URL, then register an administrator account for test data:
+Set the API base URL, then register an administrator account for test data. Registration is limited to
+instructor email addresses (`@kennesaw.edu` unless `ALLOWED_EMAIL_DOMAINS` says otherwise; for local testing
+set it to your own domain, for example `example.edu`), and **no password is sent**: the account owner chooses it
+from a link emailed to the address. Mail has to work for this (Mailtrap's sandbox is enough). In
+development the link is also printed in the backend log.
 
 ```bash
 API_URL=https://projectpeerevaluation.onrender.com/api
@@ -12,20 +16,31 @@ API_URL=https://projectpeerevaluation.onrender.com/api
 curl -X POST "$API_URL/auth/register" \
 	-H "Content-Type: application/json" \
 	-d '{
-		"email": "admin@example.com",
-		"password": "admin-password",
+		"email": "admin@kennesaw.edu",
 		"name": "Test Administrator",
 		"department": "Computer Science"
 	}'
 ```
 
-Log in and copy the returned `access_token` into `TOKEN`:
+Open the emailed link (it ends in `/verify-email/<token>`), or send the token and a password yourself:
+
+```bash
+curl -X POST "$API_URL/auth/verify-email" \
+	-H "Content-Type: application/json" \
+	-d '{
+		"token": "TOKEN_FROM_THE_EMAIL",
+		"password": "admin-password"
+	}'
+```
+
+Log in and copy the returned `access_token` into `TOKEN`. An account that has not confirmed its email
+cannot log in (403 `EMAIL_NOT_VERIFIED`):
 
 ```bash
 curl -X POST "$API_URL/auth/login" \
 	-H "Content-Type: application/json" \
 	-d '{
-		"email": "admin@example.com",
+		"email": "admin@kennesaw.edu",
 		"password": "admin-password"
 	}'
 

@@ -16,4 +16,7 @@ router.post('/reset-password', authController.resetPassword);
 // Password update via token
 router.post('/update-password', authController.updatePassword);
 
+// Email confirmation for a newly registered professor (CW-11)
+router.post('/verify-email', authController.verifyEmail);
+
 module.exports = router;
