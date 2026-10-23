@@ -3,6 +3,8 @@
 // it is required). The rate limits are left out so tests can log in as often as they need;
 // they have their own tests. If index.js gains a router, add it here too.
 process.env.JWT_SECRET = process.env.JWT_SECRET || 'integration-test-secret-at-least-32-characters';
+// Professor registration is limited to instructor domains (CW-11); the seeded professors use example.edu.
+process.env.ALLOWED_EMAIL_DOMAINS = process.env.ALLOWED_EMAIL_DOMAINS || 'example.edu';
 
 const express = require('express');
 const jwt = require('jsonwebtoken');
@@ -18,6 +20,23 @@ let failuresLeft = 0;
 function failNextEmails(count) {
   failuresLeft = count;
 }
+// holdEmails() makes every send wait until the returned function is called, so a test can have a request
+// in flight (waiting on the mail server) while another request is made.
+let emailGate = null;
+function holdEmails() {
+  let release;
+  emailGate = new Promise((resolve) => { release = resolve; });
+  return () => { emailGate = null; release(); };
+}
+// holdNextEmail() holds only the next send (the others go out at once); with { fail: true } that send fails
+// when released. It returns the function that releases it.
+let nextEmailHold = null;
+function holdNextEmail({ fail = false } = {}) {
+  let release;
+  const gate = new Promise((resolve) => { release = resolve; });
+  nextEmailHold = { gate, fail };
+  return release;
+}
 const createTransport = nodemailer.createTransport;
 nodemailer.createTransport = () => {
   const transport = createTransport({ jsonTransport: true });
@@ -27,6 +46,13 @@ nodemailer.createTransport = () => {
       failuresLeft -= 1;
       throw new Error('SMTP down');
     }
+    const mine = nextEmailHold;
+    nextEmailHold = null;
+    if (mine) {
+      await mine.gate;
+      if (mine.fail) throw new Error('SMTP down');
+    }
+    if (emailGate) await emailGate;
     const info = await sendMail(options);
     sentEmails.push(options);
     return info;
@@ -90,6 +116,8 @@ module.exports = {
   startApp,
   sentEmails,
   failNextEmails,
+  holdEmails,
+  holdNextEmail,
   deadlineBody,
   clearEmails: () => { sentEmails.length = 0; failuresLeft = 0; },
 };

@@ -6,6 +6,7 @@ import LoginPage from './pages/LoginPage';
 import StudentEvaluation from './pages/StudentEvaluation';
 import Reports from './pages/Reports';
 import ResetPassword from './pages/ResetPassword';
+import VerifyEmail from './pages/VerifyEmail';
 import Settings from './pages/Settings';
 import ProtectedRoute from './components/ProtectedRoute';
 import SessionExpiredBanner from './components/SessionExpiredBanner';
@@ -22,6 +23,7 @@ function App() {
                 <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
                 <Route path="/evaluate/:token" element={<StudentEvaluation />} />
                 <Route path="/reset-password/:token" element={<ResetPassword />} />
+                <Route path="/verify-email/:token" element={<VerifyEmail />} />
                 <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
                 {/* Catch-all route for debugging */}
                 <Route path="*" element={
@@ -36,6 +38,7 @@ function App() {
                             <li>/reports</li>
                             <li>/evaluate/:token</li>
                             <li>/reset-password/:token</li>
+                            <li>/verify-email/:token</li>
                         <li>/settings</li>
                         </ul>
                     </div>

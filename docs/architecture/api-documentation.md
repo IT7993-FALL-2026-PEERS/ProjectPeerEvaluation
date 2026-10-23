@@ -97,6 +97,7 @@ takes the student's **university ID** string (for example `S0012345`).
 | `POST /auth/login` | 10 per 15 minutes | failed attempts only; a successful login is free |
 | `POST /auth/register` | 10 per hour | every request |
 | `POST /auth/reset-password` | 5 per hour | every request (each one sends an email) |
+| `POST /auth/verify-email` | 20 per hour, shared with the row below | every request |
 | `POST /auth/update-password` | 20 per hour, separate | every request; kept apart from the row above so a burst of reset requests from a shared address cannot stop someone using the link they were just sent |
 | `/evaluate/*` (student links) | 600 per 15 minutes | every request; generous because a class can share one campus address |
 | everything else under `/api` | 1000 per 15 minutes | every request; `/api/health` is never limited |
@@ -124,7 +125,8 @@ on 404 instead of this shape.
 | Method | Path | Auth | Purpose |
 |---|---|---|---|
 | GET | `/health` | 🌐 | Service and database health |
-| POST | `/auth/register` | 🌐 | Create a professor account |
+| POST | `/auth/register` | 🌐 | Create a professor account (instructor email domains only) |
+| POST | `/auth/verify-email` | 🌐 | Confirm a new account's email address |
 | POST | `/auth/login` | 🌐 | Log in, get a token |
 | POST | `/auth/logout` | 🔒 | No-op; the client discards the token |
 | POST | `/auth/reset-password` | 🌐 | Email a password reset link |
@@ -198,18 +200,35 @@ before the database is queried (API-9).
 
 ### `POST /auth/register`
 
-Open to anyone (see CW-11: the sponsor has not yet confirmed that public professor
-sign-up is intended).
+Limited to instructor email addresses (CW-11, sponsor decision of 12 Oct 2026). The email's
+domain must be one of `ALLOWED_EMAIL_DOMAINS` (comma-separated, default `kennesaw.edu`; exact match, so
+`students.kennesaw.edu` and `kennesaw.edu.evil.com` are refused; there is no wildcard). **No password is
+sent:** the account is created unconfirmed and without one, and its owner chooses it from the link
+emailed to the address (`POST /auth/verify-email`). A `password` field in the body is ignored.
 
 | Body field | Required | Notes |
 |---|---|---|
-| `email` | yes | Must be unique |
-| `password` | yes | Stored as a bcrypt hash (10 rounds). No strength rule is enforced |
+| `email` | yes | Must be unique, on an allowed domain |
 | `name` | yes | |
 | `department` | yes | |
 
-**201** `{ "message": "Registration successful.", "professor_id": "<id>" }` ·
-**400** missing field · **409** `DUPLICATE` email already registered.
+**201** `{ "message", "professor_id": "<id>", "verification_email_sent": true }`. If the email
+could not be sent the account is still created (without a link) and `verification_email_sent` is
+`false`. Registering again with an address that is still unconfirmed changes nothing about the
+account; within **15 minutes** of the last link it also sends nothing (201, `verification_email_sent`
+`false`, no `professor_id`), and after that it sends a new link, which replaces the old one only
+once it has been sent (a failed send leaves the old link working). Requests at the same moment are safe: the send slot is taken with one conditional update (or the account insert, protected by the unique email index), so only one of them sends an email, and a link is published only while the account is still pending and only by the request that took the send slot, so a slow send that finishes after a newer request has taken over changes nothing. · **400** missing field ·
+**403** `EMAIL_NOT_ALLOWED` (the message lists the allowed domains) · **409** `DUPLICATE` email
+already registered and confirmed.
+
+### `POST /auth/verify-email`
+
+Body: `{ "token", "password" }`: the token from the emailed link (`FRONTEND_URL/verify-email/<token>`)
+and the password the owner of the mailbox chooses (stored as a bcrypt hash, 10 rounds; no strength rule
+is enforced). The token is 32 random bytes valid for 48 hours; only its SHA-256 hash is stored, and it
+works once: confirming is one conditional update that needs the account to be pending and the token unexpired, so two confirmations at once cannot both succeed. **200** `{ "message": "Email confirmed. You can now log in." }` · **400** `VALIDATION_ERROR`
+missing or non-text token or password (checked before the lookup, so the link is not used up) ·
+**400** `TOKEN_ERROR` unknown, already used or expired.
 
 ### `POST /auth/login`
 
@@ -225,7 +244,7 @@ Body: `{ "email", "password" }`.
 ```
 If `mfa_enabled` is true the response is `{ "mfa_required": true, "professor_id": "<id>" }`
 instead, and the user can't finish logging in because `/auth/verify-mfa` is not
-implemented (D-17). **400** missing field · **401** `AUTH_ERROR` (same message for an
+implemented (D-17). **400** missing field · **403** `EMAIL_NOT_VERIFIED` the account has not been confirmed yet (it has no password until it is) · **401** `AUTH_ERROR` (same message for an
 unknown email and a wrong password).
 
 The token payload is `{ id, email, name, iat, exp }`.

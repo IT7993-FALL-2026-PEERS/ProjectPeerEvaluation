@@ -31,6 +31,7 @@ async function startApp(t, limits = TINY) {
   app.post('/api/auth/register', (req, res) => res.status(201).json({ ok: true }));
   app.post('/api/auth/reset-password', (req, res) => res.json({ ok: true }));
   app.post('/api/auth/update-password', (req, res) => res.json({ ok: true }));
+  app.post('/api/auth/verify-email', (req, res) => res.json({ ok: true }));
   app.get('/api/evaluate/:token', (req, res) => res.json({ form: true }));
   app.get('/api/courses', (req, res) => res.json([]));
   app.use(errorHandler);
@@ -127,6 +128,12 @@ test('TC-01-12: password updates have their own limit', async (t) => {
   const call = await startApp(t);
   assert.deepEqual(await statuses(call, 4, 'POST', '/api/auth/update-password'), [200, 200, 200, 429]);
   assert.equal((await call('POST', '/api/auth/reset-password')).status, 200, 'and do not limit reset requests');
+});
+
+test('TC-01-61: confirming an email address is limited like a password update, and does not limit sign-up', async (t) => {
+  const call = await startApp(t);
+  assert.deepEqual(await statuses(call, 4, 'POST', '/api/auth/verify-email'), [200, 200, 200, 429]);
+  assert.equal((await call('POST', '/api/auth/register')).status, 201);
 });
 
 test('TC-01-06: sign-up has its own limit', async (t) => {
