@@ -378,11 +378,14 @@ on a 1–5 scale.
 **then** the ratings are stored against the correct evaluator and evaluatee.
 
 **Current behaviour.** All six criteria enforce 1–5. Until 17 Oct 2026 participation was limited to 1–4,
-contradicting the requirement; it is now 1–5 (labels: 5 Participated fully, 4 Participated most of the time,
-3 Participated to some extent, 2 Did not participate, 1 Hindered the group), counts in the scores like the
+contradicting the requirement; it is now 1–5, counts in the scores like the
 other criteria without the old 5/4 scaling, and counts towards the report's "all fives" flag. Evaluations
-saved before that date keep their numbers, and a stored 4 now reads as "most of the time" instead of
-"fully" (test data only).
+saved before that date keep their numbers. On 19 Oct 2026 the sponsor sent a new rubric sheet (CICD-74): the
+same six criteria and 1–5 scales, with her wording for every question and level. The participation levels
+are now: 5 They participated fully and exceeded expectations, 4 They participated fully, 3 They participated
+to a moderate extent, 2 They participated to a limited extent / rarely, 1 They did not participate or
+hindered the group; so a stored 4 now reads "participated fully" (test data only). The full wording is in
+`config/rubric.js`; the feedback limit of 10 to 1,000 characters is unchanged (her sheet states none).
 
 *Evidence.* `models/Evaluation.js` and `config/rubric.js` — `participation` is `min: 1, max: 5` and `1-5`,
 like the other criteria; tests TC-13-20, TC-16-25, TC-16-76 and the report tests.
