@@ -282,25 +282,25 @@ flowchart TB
 
 ## Project Timeline and Milestones
 
-📅 **Milestone 1 — Assessment & Planning** — 14 Sep – 30 Sep 2026 (review 28 Sep: all nine
+📅 **Milestone 1 — Assessment & Planning** — Sep 14 – Sep 30, 2026 (review Sep 28: all nine
 deliverables signed off by the sponsor)
 - Application architecture review, technical assessment report
 - Requirements validation, critical workflow identification, Requirements Traceability Matrix
 - Development environment validation, containerization assessment
 - CI/CD architecture design, automated testing strategy
 
-📅 **Milestone 2 — Quality Automation** — 05 Oct – 01 Nov 2026 (review 26 Oct)
+📅 **Milestone 2 — Quality Automation** — Oct 5 – Nov 1, 2026 (submission Oct 25, review Oct 26)
 - Development environment finalized, containerization completed
 - Unit, integration, functional regression, and end-to-end tests implemented
 - Continuous Integration pipeline operational with automated quality gates
-- Status on 5 Oct: containerization, unit, integration, regression and end-to-end tests, the blocking
+- Status on Oct 5: containerization, unit, integration, regression and end-to-end tests, the blocking
   CI gates, and test and run reports in every CI summary already run on every pull request. Left:
   frontend coverage (about 42% today against the 70% target, as `CourseManagement.js` is split into
   tested components) and the items that need staging running
-- Update 8 Oct: the frontend is at about 93% of lines (the 70% target is met), staging and the CD release stages (images, smoke tests, `rc-*` tags, rollback) are live, and the frontend now builds with Vite and tests with Vitest
-- Update 17 Oct: staging runs the backend as the Docker image CI built and pushed, deployed by its digest, with an automatic rollback to the last good image; participation is now rated 1 to 5 like the other criteria; the frontend build step takes about 2 s in CI (it was about 13 s with Create React App)
+- Update Oct 8: the frontend is at about 93% of lines (the 70% target is met), staging and the CD release stages (images, smoke tests, `rc-*` tags, rollback) are live, and the frontend now builds with Vite and tests with Vitest
+- Update Oct 17: staging runs the backend as the Docker image CI built and pushed, deployed by its digest, with an automatic rollback to the last good image; participation is now rated 1 to 5 like the other criteria; the frontend build step takes about 2 s in CI (it was about 13 s with Create React App)
 
-📅 **Milestone 3 — Productionization** — 02 Nov – 06 Dec 2026 (review 30 Nov, final 06 Dec)
+📅 **Milestone 3 — Productionization** — Nov 2 – Dec 6, 2026 (submission Nov 22, review Nov 23, package for the sponsor Nov 29, final package for the professor Dec 6)
 - Continuous Delivery pipeline, automated staging deployment, smoke testing
 - Automated test/build reporting, finalized technical documentation
 - Final system demonstration and repository delivery
