@@ -308,7 +308,6 @@ function StudentEvaluation() {
                 </Typography>
                 <FormControl component="fieldset">
                   <RadioGroup
-                    row
                     value={evaluations[teammate._id]?.ratings[criterion.id] || ''}
                     onChange={(e) => handleRatingChange(teammate._id, criterion.id, e.target.value)}
                   >
