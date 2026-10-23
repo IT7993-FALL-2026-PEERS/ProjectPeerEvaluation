@@ -41,7 +41,7 @@ record their email addresses.
 
 ## The decision: hand over or shut down
 
-Decide at the Milestone 3 review (30 Nov 2026) at the latest, and finish before the final review (6 Dec 2026).
+Decide at the Milestone 3 review (Nov 23, 2026) at the latest, and finish before the final package is due (Dec 6, 2026).
 Ask the sponsor (Dr. Vyas) whether the department wants to keep a running staging environment.
 
 ### Option 1: hand over

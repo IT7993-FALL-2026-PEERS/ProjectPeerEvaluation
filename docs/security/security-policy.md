@@ -1,7 +1,7 @@
 # Security gate policy and triage
 
 **Backlog:** CICD-24 · **Owner:** M3 (Laeticia) · **Status:** proposed 2 Oct 2026; accepted when the team leader merges it
-**Milestone:** 2 (security triage and gates) · **Next review:** Milestone 3 review, 30 Nov 2026
+**Milestone:** 2 (security triage and gates) · **Next review:** Milestone 3 review, Nov 23, 2026
 
 This is the written policy behind the security checks on every pull request, and the record of what was
 found in the inherited code and what was decided about it. The sponsor's guide asks for dependency
@@ -70,7 +70,7 @@ MongoDB (see the update above).
 
 The braces entry was added the same evening (backlog CICD-53): OWASP started reporting GHSA-vfj7-8cjw-p6xm (published 18 Sep 2026, no patched version) after the first nine were triaged, and the check blocked every pull request. It is the tenth accepted risk.
 
-**Owner:** M3 · **Review:** Milestone 3 review (30 Nov 2026) · **Entries expire:** 31 Dec 2026. The
+**Owner:** M3 · **Review:** Milestone 3 review (Nov 23, 2026) · **Entries expire:** Dec 31, 2026. The
 14 findings below CVSS 7 do not block and are not suppressed; they appear in the job summary and the
 report artifact.
 
@@ -106,7 +106,7 @@ new injection or path problem has to be fixed or explained before it can merge.
 
 ## 6. Review
 
-- At each milestone review (next: 26 Oct, then 30 Nov): re-run the counts above, delete suppressions that are no
+- At each milestone review (next: Oct 26, then Nov 23): re-run the counts above, delete suppressions that are no
   longer needed, and re-justify any that remain.
 - When a suppression expires the OWASP job fails on that finding. That is the prompt to review it, not a
   reason to extend the date without looking.
