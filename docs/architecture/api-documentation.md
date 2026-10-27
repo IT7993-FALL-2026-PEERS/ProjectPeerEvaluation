@@ -353,6 +353,16 @@ counters on the professor's courses created by the previous version of the app.
 A student record belongs to one course. `student_id` in request bodies is the
 **university ID**; `:student_id` in paths is the record's ObjectId.
 
+### Team names
+
+Teams are named **Team 1, Team 2, Team 3, ...** everywhere a team is named: `team_name` on
+the team endpoints, `group_assignment` on the student endpoints, and the team column of a
+roster upload. The service writes a name typed another way that means the same team (`team 3`,
+`Team3`, `Team 03`, a bare `3`) as `Team 3`, and refuses any other (`Alpha`, `Team A`,
+`Team 0`) with `400` and the message `Team names are numbered: Team 1, Team 2, Team 3, ...`.
+A team that already has another name (made before this rule) keeps it; it can be edited while
+its name is left alone, and renamed only to a numbered name (`backend/utils/teamName.js`).
+
 ### `GET .../students`
 
 **200** an array of students (`_id`, `student_id`, `name`, `email`, `team_id`,
@@ -361,9 +371,10 @@ A student record belongs to one course. `student_id` in request bodies is the
 ### `POST .../students`
 
 Body: `{ "student_id", "name", "email", "group_assignment"? }`. A non-empty
-`group_assignment` puts the student in that team, creating the team if needed.
-**201** `{ "message": "Student added.", "student": {...} }` · **400** missing field ·
-**409** `DUPLICATE` university ID already in this course.
+`group_assignment` puts the student in that team, creating the team if needed; it must be a
+numbered team name (see [Team names](#team-names)), and `team 6` or `6` is `Team 6`.
+**201** `{ "message": "Student added.", "student": {...} }` · **400** missing field, or a team
+name that is not numbered · **409** `DUPLICATE` university ID already in this course.
 
 ### `PUT .../students/:student_id`
 
@@ -372,7 +383,8 @@ fields in the body (`course_id`, `team_id`, `evaluation_token`, ...) are ignored
 `group_assignment` moves the student to that team in this course (creating it if needed),
 and an empty value removes them from their team. Team and course counts are updated.
 **200** `{ "message": "Student updated." }` · **400** `VALIDATION_ERROR` a field that isn't
-text · **404** not in this course.
+text, or a new team name that is not numbered (a student's team named before the rule can be
+kept as it is) · **404** not in this course.
 
 ### `DELETE .../students/:student_id`
 
@@ -392,7 +404,9 @@ Deletes **every** student, team and evaluation in the course.
 
 Multipart form with the CSV in the field `file` (format: [csv-upload-format.md](../csv-upload-format.md)).
 New students are created, existing ones (same university ID) are updated, and teams are
-created from the group column.
+created from the group column. Team names are numbered (**Team 1, Team 2, ...**, see
+[Team names](#team-names)): `team 4`, `Team4` and `4` are all `Team 4`, and a row naming
+any other team (such as `Alpha`) is skipped and reported in `errors`.
 
 > A roster upload **never deletes submitted evaluations or clears evaluation links** (sponsor
 > decision of 12 Oct 2026, API-3). It adds the students who are new and applies the team names in
@@ -424,8 +438,8 @@ message quotes up to three problem rows.
 | Method and path | Body | Success |
 |---|---|---|
 | `GET .../teams` | — | **200** array of teams, with each member's student record **without** `evaluation_token` or its expiry |
-| `POST .../teams` | `{ "teams": [{ "team_name": "Team A", "team_status"? }, ...] }`. Only the name and status are read. Teams are created empty: add members with `POST .../teams/:team_id/students/:student_id` | **201** `{ "message": "Teams created.", "teams": [ids] }`. **400** `VALIDATION_ERROR` for a missing or blank name, an unknown status, or a non-empty `students` list |
-| `PUT .../teams/:team_id` | `team_name` and/or `team_status` (`Active` or `Inactive`); other fields are ignored | **200** `{ "message", "team" }`. Renaming also updates each member's `group_assignment`. **400** for a blank name or unknown status |
+| `POST .../teams` | `{ "teams": [{ "team_name": "Team 4", "team_status"? }, ...] }`. Only the name and status are read. Teams are created empty: add members with `POST .../teams/:team_id/students/:student_id` | **201** `{ "message": "Teams created.", "teams": [ids] }`. **400** `VALIDATION_ERROR` for a missing, blank or not numbered name (one bad name refuses the whole list), an unknown status, or a non-empty `students` list |
+| `PUT .../teams/:team_id` | `team_name` and/or `team_status` (`Active` or `Inactive`); other fields are ignored | **200** `{ "message", "team" }`. Renaming also updates each member's `group_assignment`. **400** for a blank name, a new name that is not numbered (a team named before the rule keeps its name while the name is left alone) or an unknown status |
 | `DELETE .../teams/:team_id` | — | **200** `{ "message" }`. **409** `CONSTRAINT_ERROR` if the team still has students |
 | `DELETE .../teams` | — | **200** `{ "message", "teams_deleted" }`. Students are kept and unassigned |
 | `POST .../teams/auto-assign` | — | **501** `NOT_IMPLEMENTED` |

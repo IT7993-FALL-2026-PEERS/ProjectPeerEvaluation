@@ -3,6 +3,7 @@ import {
   Dialog, DialogTitle, DialogContent, DialogActions, Box, Typography, Button, LinearProgress,
 } from '@mui/material';
 import UploadIcon from '@mui/icons-material/Upload';
+import CsvFormatGuide from './CsvFormatGuide';
 
 // "Upload Student Roster", opened from the course row, moved out of CourseManagement.js (CICD-57,
 // step 5). `onClose` is every way of closing it without uploading (Cancel, Escape, a click outside),
@@ -14,10 +15,7 @@ function CourseRosterUploadDialog({ open, file, progress, onFileChange, onClose,
       <DialogTitle>Upload Student Roster</DialogTitle>
       <DialogContent>
         <Box sx={{ mt: 2 }}>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-            Upload a CSV file with the following columns:
-          </Typography>
-          <span style={{ fontWeight: 'bold', color: 'red', fontSize: '1.1em' }}>student_id,name,email,team_name</span>
+          <CsvFormatGuide />
           <Button
             variant="outlined"
             component="label"

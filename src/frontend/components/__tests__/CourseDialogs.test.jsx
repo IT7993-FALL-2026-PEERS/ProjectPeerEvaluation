@@ -12,8 +12,8 @@ const user = userEvent.setup({ delay: null });
 
 const COURSE = { _id: 'c1', course_number: 'CS 4850', course_section: '01', course_name: 'Capstone' };
 const STUDENTS = [
-  { _id: 's1', student_id: '1001', name: 'Ann Archer', email: 'ann@example.edu', group_assignment: 'Alpha' },
-  { _id: 's2', student_id: '1002', name: 'Ben Baker', email: 'ben@example.edu', group_assignment: 'Alpha' },
+  { _id: 's1', student_id: '1001', name: 'Ann Archer', email: 'ann@example.edu', group_assignment: 'Team 1' },
+  { _id: 's2', student_id: '1002', name: 'Ben Baker', email: 'ben@example.edu', group_assignment: 'Team 1' },
   { _id: 's3', student_id: '2001', name: 'Eve Evans', email: 'eve@school.org', group_assignment: '' },
 ];
 const NO_SEARCH = { student_id: '', name: '', email: '', team: '' };
@@ -54,7 +54,7 @@ describe('StudentsDialog', () => {
     expect(studentNames()).toEqual(['Ann Archer', 'Ben Baker', 'Eve Evans']);
     expect(screen.getByRole('row', { name: /Ann Archer/ })).toHaveTextContent('1001');
     expect(screen.getByRole('row', { name: /Ann Archer/ })).toHaveTextContent('ann@example.edu');
-    expect(screen.getByRole('row', { name: /Ann Archer/ })).toHaveTextContent('Alpha');
+    expect(screen.getByRole('row', { name: /Ann Archer/ })).toHaveTextContent('Team 1');
     expect(screen.getByRole('row', { name: /Eve Evans/ })).toHaveTextContent('Not assigned');
   });
 
@@ -72,8 +72,8 @@ describe('StudentsDialog', () => {
     ['ID', { student_id: '200' }, ['Eve Evans']],
     ['name, without regard to case', { name: 'BEN' }, ['Ben Baker']],
     ['email', { email: 'school.org' }, ['Eve Evans']],
-    ['team', { team: 'alp' }, ['Ann Archer', 'Ben Baker']],
-    ['several fields at once', { team: 'alpha', name: 'ann' }, ['Ann Archer']],
+    ['team', { team: 'team 1' }, ['Ann Archer', 'Ben Baker']],
+    ['several fields at once', { team: 'team 1', name: 'ann' }, ['Ann Archer']],
   ])('filters by %s', (_label, change, expected) => {
     render(<StudentsDialog {...studentsProps({ showSearch: true, search: { ...NO_SEARCH, ...change } })} />);
     expect(studentNames()).toEqual(expected);
@@ -81,8 +81,8 @@ describe('StudentsDialog', () => {
   });
 
   test('the team search leaves out students on other teams', () => {
-    const students = [...STUDENTS, { _id: 's4', student_id: '3001', name: 'Fay Foster', email: 'fay@example.edu', group_assignment: 'Gamma' }];
-    render(<StudentsDialog {...studentsProps({ students, showSearch: true, search: { ...NO_SEARCH, team: 'alpha' } })} />);
+    const students = [...STUDENTS, { _id: 's4', student_id: '3001', name: 'Fay Foster', email: 'fay@example.edu', group_assignment: 'Team 3' }];
+    render(<StudentsDialog {...studentsProps({ students, showSearch: true, search: { ...NO_SEARCH, team: 'team 1' } })} />);
     expect(studentNames()).toEqual(['Ann Archer', 'Ben Baker']);
   });
 
@@ -311,6 +311,9 @@ describe('CourseRosterUploadDialog', () => {
     render(<CourseRosterUploadDialog {...props()} />);
     expect(screen.getByRole('heading', { name: 'Upload Student Roster' })).toBeInTheDocument();
     expect(screen.getByText('student_id,name,email,team_name')).toBeInTheDocument();
+    // The format guide: required columns and numbered team names.
+    expect(screen.getByText('student_id, name and email are required on every row.')).toBeInTheDocument();
+    expect(screen.getByText(/Team names are numbered: Team 1, Team 2, Team 3/)).toBeInTheDocument();
     expect(screen.getByLabelText('Select CSV File')).toHaveAttribute('accept', '.csv');
   });
 

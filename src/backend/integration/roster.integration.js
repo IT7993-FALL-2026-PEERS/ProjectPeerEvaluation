@@ -18,8 +18,8 @@ let bo;
 
 const ROSTER = [
   'student_id,name,email,group_assignment',
-  '1005,Fay Foster,fay@example.edu,Gamma',
-  '1006,Gus Green,gus@example.edu,Gamma',
+  '1005,Fay Foster,fay@example.edu,Team 3',
+  '1006,Gus Green,gus@example.edu,Team 3',
   '',
 ].join('\n');
 const uploadPath = (courseId) => `/api/courses/${courseId}/roster`;
@@ -59,13 +59,42 @@ test('TC-06-20: a roster adds students and a new team, and membership matches on
   const res = await app.uploadCsv(uploadPath(IDS.courseAda), ROSTER, { token: ada });
   assert.equal(res.status, 200);
   assert.deepEqual(res.body.students.sort(), ['1005', '1006']);
-  assert.deepEqual(res.body.team_names, ['Gamma']);
+  assert.deepEqual(res.body.team_names, ['Team 3']);
 
-  const gamma = await Team.findOne({ course_id: IDS.courseAda, team_name: 'Gamma' });
+  const gamma = await Team.findOne({ course_id: IDS.courseAda, team_name: 'Team 3' });
   const members = await Student.find({ course_id: IDS.courseAda, team_id: gamma._id });
   assert.deepEqual(members.map((s) => s.student_id).sort(), ['1005', '1006']);
   assert.deepEqual(gamma.students.map(String).sort(), members.map((s) => String(s._id)).sort());
   assert.equal(gamma.student_count, 2);
+});
+
+test('TC-06-55: a roster row with a team that is not numbered (Alpha) is reported and skipped; team 4 and 5 become Team 4 and Team 5', async () => {
+  const csv = [
+    'student_id,name,email,team_name',
+    '1005,Fay Foster,fay@example.edu,Alpha',
+    '1006,Gus Green,gus@example.edu,Team 3',
+    '1007,Hal Hill,hal@example.edu,team 4',
+    '1008,Ivy Ives,ivy@example.edu,5',
+    '1009,Jo Jones,jo@example.edu,',
+    '',
+  ].join('\n');
+  const res = await app.uploadCsv(uploadPath(IDS.courseAda), csv, { token: ada });
+
+  assert.equal(res.status, 200);
+  assert.deepEqual(res.body.students.sort(), ['1006', '1007', '1008', '1009']);
+  assert.ok(res.body.errors.some((message) => /Alpha/.test(message) && /Team 1, Team 2, Team 3/.test(message) && /1005/.test(message)), JSON.stringify(res.body.errors));
+  assert.equal(await Student.countDocuments({ course_id: IDS.courseAda, student_id: '1005' }), 0);
+  assert.deepEqual((await Team.find({ course_id: IDS.courseAda })).map((team) => team.team_name).sort(), ['Team 1', 'Team 2', 'Team 3', 'Team 4', 'Team 5']);
+  assert.equal((await Student.findOne({ course_id: IDS.courseAda, student_id: '1009' })).team_id, null);
+});
+
+test('TC-06-56: a roster with only unnumbered team names changes nothing', async () => {
+  const csv = ['student_id,name,email,team_name', '1005,Fay Foster,fay@example.edu,Alpha', '1006,Gus Green,gus@example.edu,Beta', ''].join('\n');
+  const res = await app.uploadCsv(uploadPath(IDS.courseAda), csv, { token: ada });
+
+  assert.equal(res.status, 400);
+  assert.equal(await Student.countDocuments({ course_id: IDS.courseAda }), 4);
+  assert.equal(await Team.countDocuments({ course_id: IDS.courseAda }), 2);
 });
 
 test('TC-06-21: the course counts follow the roster', async () => {
@@ -81,7 +110,7 @@ test('TC-06-22: uploading the same roster twice adds nobody twice', async () => 
   assert.equal(second.status, 200);
   assert.deepEqual(second.body.students, []);
   assert.equal(await Student.countDocuments({ course_id: IDS.courseAda }), 6);
-  assert.equal(await Team.countDocuments({ course_id: IDS.courseAda, team_name: 'Gamma' }), 1);
+  assert.equal(await Team.countDocuments({ course_id: IDS.courseAda, team_name: 'Team 3' }), 1);
 });
 
 test('TC-06-23: a file with no usable rows gets 400 and changes nothing, evaluations included', async () => {
@@ -99,8 +128,8 @@ test('TC-06-23: a file with no usable rows gets 400 and changes nothing, evaluat
 test('TC-06-24: rows missing a required field are reported and the good rows are still added', async () => {
   const csv = [
     'student_id,name,email,group_assignment',
-    '1005,Fay Foster,fay@example.edu,Gamma',
-    '1006,   ,gus@example.edu,Gamma',
+    '1005,Fay Foster,fay@example.edu,Team 3',
+    '1006,   ,gus@example.edu,Team 3',
     '',
   ].join('\n');
   const res = await app.uploadCsv(uploadPath(IDS.courseAda), csv, { token: ada });
@@ -115,8 +144,8 @@ test('TC-06-24: rows missing a required field are reported and the good rows are
 test('TC-07-10: a row with a badly formed email is reported and not saved, and the good rows are still added', async () => {
   const csv = [
     'student_id,name,email,group_assignment',
-    '1005,Fay Foster,fay@example.edu,Gamma',
-    '1006,Gus Green,gus@example,Gamma',
+    '1005,Fay Foster,fay@example.edu,Team 3',
+    '1006,Gus Green,gus@example,Team 3',
     '',
   ].join('\n');
   const res = await app.uploadCsv(uploadPath(IDS.courseAda), csv, { token: ada });
@@ -149,13 +178,13 @@ test('TC-06-25: a successful re-upload keeps the submitted evaluations and the e
 // evaluations keeps their team when a roster says otherwise (the upload says so in `errors`), because moving
 // them would leave the saved evaluations pointing at a team they are no longer in. Everyone else can move.
 test('TC-06-81: an updated roster adds new students and moves those with no evaluations; students with evaluations keep their team', async () => {
-  await seedSubmittedEvaluation(); // Ann submitted an evaluation of Ben (both in Alpha)
+  await seedSubmittedEvaluation(); // Ann submitted an evaluation of Ben (both in Team 1)
   const updated = [
     'student_id,name,email,group_assignment',
-    '1001,Ann Archer,ann@example.edu,Gamma', // submitted: stays in Alpha
-    '1002,Ben Baker,ben@example.edu,Gamma', // received one: stays in Alpha
-    '1003,Cy Cole,cy@example.edu,Gamma', // nothing yet: moves
-    '1005,Fay Foster,fay@example.edu,Gamma', // new
+    '1001,Ann Archer,ann@example.edu,Team 3', // submitted: stays in Team 1
+    '1002,Ben Baker,ben@example.edu,Team 3', // received one: stays in Team 1
+    '1003,Cy Cole,cy@example.edu,Team 3', // nothing yet: moves
+    '1005,Fay Foster,fay@example.edu,Team 3', // new
     '',
   ].join('\n');
   const res = await app.uploadCsv(uploadPath(IDS.courseAda), updated, { token: ada });
@@ -165,8 +194,8 @@ test('TC-06-81: an updated roster adds new students and moves those with no eval
   assert.equal(await Evaluation.countDocuments({ course_id: IDS.courseAda }), 1, 'the evaluation is kept');
   assert.equal(await Student.countDocuments({ course_id: IDS.courseAda }), 5, 'nobody who was not in the file was removed');
 
-  assert.equal((await Student.findById(IDS.ann)).group_assignment, 'Alpha');
-  assert.equal((await Student.findById(IDS.ben)).group_assignment, 'Alpha');
+  assert.equal((await Student.findById(IDS.ann)).group_assignment, 'Team 1');
+  assert.equal((await Student.findById(IDS.ben)).group_assignment, 'Team 1');
   const reported = res.body.errors.join(' | ');
   assert.match(reported, /1001/);
   assert.match(reported, /1002/);
@@ -174,8 +203,8 @@ test('TC-06-81: an updated roster adds new students and moves those with no eval
   assert.doesNotMatch(reported, /1003/, 'Cy was moved, so there is nothing to report');
 
   const cy = await Student.findById(IDS.cy);
-  assert.equal(cy.group_assignment, 'Gamma');
-  const gamma = await Team.findOne({ course_id: IDS.courseAda, team_name: 'Gamma' });
+  assert.equal(cy.group_assignment, 'Team 3');
+  const gamma = await Team.findOne({ course_id: IDS.courseAda, team_name: 'Team 3' });
   assert.deepEqual([...gamma.students].map(String).sort(), [String(IDS.cy), String((await Student.findOne({ student_id: '1005', course_id: IDS.courseAda }))._id)].sort());
   assert.equal(gamma.student_count, 2);
 });
@@ -185,20 +214,20 @@ test('TC-06-81: an updated roster adds new students and moves those with no eval
 // that arrives after the first check is caught by a second look just before the move.
 test('TC-06-91: the evaluation guard uses the team the student is really in, not the label, so a mismatched label does not let a move through', async () => {
   await seedSubmittedEvaluation();
-  await Student.updateOne({ _id: IDS.ann }, { group_assignment: 'Gamma' }); // the label says Gamma, the team id says Alpha
-  const csv = ['student_id,name,email,group_assignment', '1001,Ann Archer,ann@example.edu,Gamma', ''].join('\n');
+  await Student.updateOne({ _id: IDS.ann }, { group_assignment: 'Team 3' }); // the label says Team 3, the team id says Team 1
+  const csv = ['student_id,name,email,group_assignment', '1001,Ann Archer,ann@example.edu,Team 3', ''].join('\n');
   const res = await app.uploadCsv(uploadPath(IDS.courseAda), csv, { token: ada });
   assert.equal(res.status, 200);
   assert.match(res.body.errors.join(' | '), /1001.*submitted or received evaluations/);
   const ann = await Student.findById(IDS.ann);
   assert.equal(String(ann.team_id), String(IDS.teamAlpha), 'she was not moved');
   assert.ok([...(await Team.findById(IDS.teamAlpha)).students].map(String).includes(String(IDS.ann)), 'and she is still listed in her team');
-  assert.equal(await Team.countDocuments({ course_id: IDS.courseAda, team_name: 'Gamma' }), 0, 'no team was made only for a student who could not move');
+  assert.equal(await Team.countDocuments({ course_id: IDS.courseAda, team_name: 'Team 3' }), 0, 'no team was made only for a student who could not move');
   assert.equal(await Evaluation.countDocuments({ course_id: IDS.courseAda }), 1);
 });
 
 test('TC-06-92: if writing a moved student fails, they stay in their team, and uploading again completes the move cleanly', async (t) => {
-  const csv = ['student_id,name,email,group_assignment', '1003,Cy Cole,cy@example.edu,Alpha', ''].join('\n');
+  const csv = ['student_id,name,email,group_assignment', '1003,Cy Cole,cy@example.edu,Team 1', ''].join('\n');
   const original = Student.findByIdAndUpdate.bind(Student);
   const failing = t.mock.method(Student, 'findByIdAndUpdate', async (id, ...rest) => {
     if (String(id) === String(IDS.cy)) throw new Error('write failed');
@@ -208,9 +237,9 @@ test('TC-06-92: if writing a moved student fails, they stay in their team, and u
   const first = await app.uploadCsv(uploadPath(IDS.courseAda), csv, { token: ada });
   assert.equal(first.status, 200);
   assert.match(first.body.errors.join(' | '), /1003/);
-  assert.equal(String((await Student.findById(IDS.cy)).team_id), String(IDS.teamBeta), 'still in Beta');
-  assert.ok([...(await Team.findById(IDS.teamBeta)).students].map(String).includes(String(IDS.cy)), 'and still listed in Beta');
-  assert.ok(![...(await Team.findById(IDS.teamAlpha)).students].map(String).includes(String(IDS.cy)), 'and not listed in Alpha');
+  assert.equal(String((await Student.findById(IDS.cy)).team_id), String(IDS.teamBeta), 'still in Team 2');
+  assert.ok([...(await Team.findById(IDS.teamBeta)).students].map(String).includes(String(IDS.cy)), 'and still listed in Team 2');
+  assert.ok(![...(await Team.findById(IDS.teamAlpha)).students].map(String).includes(String(IDS.cy)), 'and not listed in Team 1');
 
   failing.mock.restore();
   const second = await app.uploadCsv(uploadPath(IDS.courseAda), csv, { token: ada });
@@ -224,10 +253,10 @@ test('TC-06-92: if writing a moved student fails, they stay in their team, and u
 });
 
 test('TC-06-93: an upload run again repairs a student left in two teams\' lists by an earlier failure', async () => {
-  // Cy is really in Alpha but is still listed in Beta's array (a leftover of an interrupted move)
-  await Student.updateOne({ _id: IDS.cy }, { team_id: IDS.teamAlpha, group_assignment: 'Alpha' });
+  // Cy is really in Team 1 but is still listed in Team 2's array (a leftover of an interrupted move)
+  await Student.updateOne({ _id: IDS.cy }, { team_id: IDS.teamAlpha, group_assignment: 'Team 1' });
   await Team.updateOne({ _id: IDS.teamAlpha }, { $addToSet: { students: IDS.cy } });
-  const csv = ['student_id,name,email,group_assignment', '1003,Cy Cole,cy@example.edu,Alpha', ''].join('\n');
+  const csv = ['student_id,name,email,group_assignment', '1003,Cy Cole,cy@example.edu,Team 1', ''].join('\n');
   const res = await app.uploadCsv(uploadPath(IDS.courseAda), csv, { token: ada });
   assert.equal(res.status, 200);
   const beta = await Team.findById(IDS.teamBeta);
@@ -237,7 +266,7 @@ test('TC-06-93: an upload run again repairs a student left in two teams\' lists 
 });
 
 test('TC-06-94: an evaluation saved after the first check but before the move still stops the move', async (t) => {
-  const csv = ['student_id,name,email,group_assignment', '1003,Cy Cole,cy@example.edu,Alpha', ''].join('\n');
+  const csv = ['student_id,name,email,group_assignment', '1003,Cy Cole,cy@example.edu,Team 1', ''].join('\n');
   const original = Team.findOne.bind(Team);
   let submitted = false;
   t.mock.method(Team, 'findOne', async (...args) => {
@@ -259,7 +288,7 @@ test('TC-06-94: an evaluation saved after the first check but before the move st
 });
 
 test('TC-06-84: moving a student with no evaluations takes them out of the old team and keeps both teams\' lists and counts right', async () => {
-  const csv = ['student_id,name,email,group_assignment', '1003,Cy Cole,cy@example.edu,Alpha', ''].join('\n');
+  const csv = ['student_id,name,email,group_assignment', '1003,Cy Cole,cy@example.edu,Team 1', ''].join('\n');
   const res = await app.uploadCsv(uploadPath(IDS.courseAda), csv, { token: ada });
   assert.equal(res.status, 200);
   const alpha = await Team.findById(IDS.teamAlpha);
@@ -281,9 +310,9 @@ test('TC-06-84: moving a student with no evaluations takes them out of the old t
 test('TC-06-87: the same student id twice in one file adds one student (the first row) and says so', async () => {
   const csv = [
     'student_id,name,email,group_assignment',
-    '1005,Fay Foster,fay@example.edu,Gamma',
-    '1005,Someone Else,other@example.edu,Delta',
-    '1006,Gus Green,gus@example.edu,Gamma',
+    '1005,Fay Foster,fay@example.edu,Team 3',
+    '1005,Someone Else,other@example.edu,Team 4',
+    '1006,Gus Green,gus@example.edu,Team 3',
     '',
   ].join('\n');
   const res = await app.uploadCsv(uploadPath(IDS.courseAda), csv, { token: ada });
@@ -292,8 +321,8 @@ test('TC-06-87: the same student id twice in one file adds one student (the firs
   assert.match(res.body.errors.join(' | '), /1005.*(twice|more than once|duplicate)/i);
   const fay = await Student.findOne({ student_id: '1005', course_id: IDS.courseAda });
   assert.equal(fay.name, 'Fay Foster', 'the first row was used');
-  assert.equal(fay.group_assignment, 'Gamma');
-  assert.equal(await Team.countDocuments({ course_id: IDS.courseAda, team_name: 'Delta' }), 0, 'the ignored row made no team');
+  assert.equal(fay.group_assignment, 'Team 3');
+  assert.equal(await Team.countDocuments({ course_id: IDS.courseAda, team_name: 'Team 4' }), 0, 'the ignored row made no team');
 });
 
 test('TC-06-82: uploading rosters for several sections of the same professor keeps every section\'s data', async () => {
@@ -302,7 +331,7 @@ test('TC-06-82: uploading rosters for several sections of the same professor kee
     semester: 'Fall', year: 2026, course_status: 'Active',
   });
   await seedSubmittedEvaluation();
-  const sameIds = ['student_id,name,email,group_assignment', '1001,Ann Archer,ann@example.edu,Delta', '1007,Hal Hart,hal@example.edu,Delta', ''].join('\n');
+  const sameIds = ['student_id,name,email,group_assignment', '1001,Ann Archer,ann@example.edu,Team 4', '1007,Hal Hart,hal@example.edu,Team 4', ''].join('\n');
   const res = await app.uploadCsv(uploadPath(sectionTwo._id), sameIds, { token: ada });
   assert.equal(res.status, 200);
   assert.deepEqual(res.body.students.sort(), ['1001', '1007'], 'the same university id may be in two sections');

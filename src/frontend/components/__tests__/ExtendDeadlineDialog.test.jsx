@@ -5,7 +5,7 @@ import ExtendDeadlineDialog from '../ExtendDeadlineDialog';
 
 // CICD-68: more time with a new link, for one student, one team, or everyone who has not submitted.
 const STUDENTS = [{ id: 's1', name: 'Ann Archer' }, { id: 's2', name: 'Ben Baker' }];
-const TEAMS = [{ id: 't1', name: 'Alpha' }];
+const TEAMS = [{ id: 't1', name: 'Team 1' }];
 const base = { open: true, students: STUDENTS, teams: TEAMS, initialValue: '', busy: false, onConfirm: () => {}, onClose: () => {} };
 const future = '2999-01-01T10:00';
 

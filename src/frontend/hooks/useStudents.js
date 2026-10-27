@@ -6,6 +6,11 @@ import { getErrorMessage } from '../services/apiError';
 const EMPTY_STUDENT_FORM = { student_id: '', name: '', email: '', group_assignment: '' };
 const EMPTY_STUDENT_SEARCH = { student_id: '', name: '', email: '', team: '' };
 
+// All four fields of the add and edit forms are required, and spaces alone are not an entry. The team name
+// is sent without the spaces around it, since the server finds the team by its exact name.
+const hasBlankField = (form) => [form.student_id, form.name, form.email, form.group_assignment].some((value) => !value.trim());
+const withTrimmedTeam = (form) => ({ ...form, group_assignment: form.group_assignment.trim() });
+
 // The Manage Students dialog and the four dialogs that open from it (add, edit, roster upload and
 // delete all), moved out of CourseManagement.js (CICD-57, step 6b-2). The page keeps the alert, the
 // course list and the teams, and passes in:
@@ -75,12 +80,12 @@ export default function useStudents({ setAlert, refreshCourses, onAllStudentsDel
   const handleAddStudent = async () => {
     setStudentFormError('');
     if (!studentsCourse) return;
-    if (!studentForm.student_id || !studentForm.name || !studentForm.email) {
-      setStudentFormError('Student ID, name, and email are required.');
+    if (hasBlankField(studentForm)) {
+      setStudentFormError('Student ID, name, email, and team are required.');
       return;
     }
     try {
-      await api.post(`/courses/${studentsCourse._id || studentsCourse.id}/students`, studentForm);
+      await api.post(`/courses/${studentsCourse._id || studentsCourse.id}/students`, withTrimmedTeam(studentForm));
       setAlert({ severity: 'success', message: 'Student added successfully' });
       setAddStudentOpen(false); // Only close the Add Student dialog
       setStudentForm({ ...EMPTY_STUDENT_FORM });
@@ -114,7 +119,7 @@ export default function useStudents({ setAlert, refreshCourses, onAllStudentsDel
   const handleUpdateStudent = async () => {
     if (!studentsCourse || !studentToEdit) return;
     try {
-      await api.put(`/courses/${studentsCourse._id || studentsCourse.id}/students/${studentToEdit._id || studentToEdit.id}`, studentForm);
+      await api.put(`/courses/${studentsCourse._id || studentsCourse.id}/students/${studentToEdit._id || studentToEdit.id}`, withTrimmedTeam(studentForm));
       setAlert({ severity: 'success', message: 'Student updated successfully' });
       setEditStudentOpen(false);
       setStudentToEdit(null);
@@ -241,6 +246,9 @@ export default function useStudents({ setAlert, refreshCourses, onAllStudentsDel
     }
   };
 
+  // The teams the course's students are in, for the Team list of the add and edit dialogs.
+  const teamNames = [...new Set(students.map((student) => student.group_assignment).filter(Boolean))];
+
   return {
     students,
     setStudents,
@@ -266,6 +274,7 @@ export default function useStudents({ setAlert, refreshCourses, onAllStudentsDel
       open: addStudentOpen,
       form: studentForm,
       error: studentFormError,
+      teamNames,
       onFormChange: setStudentForm,
       onClose: () => { setAddStudentOpen(false); setStudentFormError(''); },
       onSubmit: handleAddStudent,
@@ -273,6 +282,7 @@ export default function useStudents({ setAlert, refreshCourses, onAllStudentsDel
     editStudentDialog: {
       open: editStudentOpen,
       form: studentForm,
+      teamNames,
       onFormChange: setStudentForm,
       onClose: () => { setEditStudentOpen(false); setStudentToEdit(null); setStudentForm({ ...EMPTY_STUDENT_FORM }); },
       onSave: handleUpdateStudent,

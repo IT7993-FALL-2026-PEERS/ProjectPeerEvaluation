@@ -4,6 +4,7 @@ const csv = require('csv-parser');
 const fs = require('fs');
 const { asText, firstNonText, validationError } = require('../utils/inputGuards');
 const { isEmailFormat } = require('../utils/emailFormat');
+const { normalizeTeamName, TEAM_NAME_HELP } = require('../utils/teamName');
 
 // Manual add student to course
 exports.addStudent = async (req, res, next) => {
@@ -27,6 +28,11 @@ exports.addStudent = async (req, res, next) => {
         if (!isEmailFormat(email.trim())) {
       return next(validationError('email is not a valid email address.'));
     }
+    // A team is named "Team 1", "Team 2", ... (utils/teamName.js); "team 4" and "4" are Team 4
+    const groupName = typeof group_assignment === 'string' && group_assignment.trim() !== '' ? normalizeTeamName(group_assignment) : null;
+    if (typeof group_assignment === 'string' && group_assignment.trim() !== '' && !groupName) {
+      return next(validationError(`Team name "${group_assignment.trim()}" is not valid. ${TEAM_NAME_HELP}`));
+    }
     // Check for duplicate student_id in this course
     const existing = await Student.findOne({ course_id, student_id: asText(student_id) });
     if (existing) {
@@ -39,27 +45,27 @@ exports.addStudent = async (req, res, next) => {
     let teamId = null;
     
     // If group_assignment is provided, find or create the team
-    if (group_assignment && group_assignment.trim() !== '') {
+    if (groupName) {
       const Team = require('../models/Team');
       const courseObjectId = new mongoose.Types.ObjectId(course_id);
-      
+
       // Try to find existing team with this name in this course
-      let team = await Team.findOne({ 
-        team_name: group_assignment.trim(), 
-        course_id: courseObjectId 
+      let team = await Team.findOne({
+        team_name: groupName,
+        course_id: courseObjectId
       });
-      
+
       // If team doesn't exist, create it
       if (!team) {
         team = new Team({
-          team_name: group_assignment.trim(),
+          team_name: groupName,
           course_id: courseObjectId,
           students: [],
           student_count: 0,
           team_status: 'Active'
         });
         await team.save();
-        console.log(`Created new team: ${group_assignment.trim()} for manual student addition`);
+        console.log(`Created new team: ${groupName} for manual student addition`);
         
         // Update course team_count
         const Course = require('../models/Course');
@@ -70,12 +76,12 @@ exports.addStudent = async (req, res, next) => {
       teamId = team._id;
     }
     
-    const student = new Student({ 
-      student_id, 
-      name, 
+    const student = new Student({
+      student_id,
+      name,
       email, 
       course_id, 
-      group_assignment: group_assignment || null,
+      group_assignment: groupName,
       team_id: teamId
       // evaluation_token will be generated when evaluations are sent
     });
@@ -94,7 +100,7 @@ exports.addStudent = async (req, res, next) => {
       const teamStudentCount = await Student.countDocuments({ team_id: teamId });
       await Team.findByIdAndUpdate(teamId, { student_count: teamStudentCount });
       
-      console.log(`Added student ${student_id} to team ${group_assignment}, new team count: ${teamStudentCount}`);
+      console.log(`Added student ${student_id} to team ${groupName}, new team count: ${teamStudentCount}`);
     }
     
     // Update student_count in the Course document
@@ -159,7 +165,7 @@ exports.updateStudent = async (req, res, next) => {
     if (updates.email !== undefined && !isEmailFormat(updates.email.trim())) {
       return next(validationError('email is not a valid email address.'));
     }
-    
+
     // Look the student up by ObjectIds, never by the raw request values
     const studentObjectId = new mongoose.Types.ObjectId(student_id);
     const courseIdCast = new mongoose.Types.ObjectId(course_id);
@@ -173,6 +179,15 @@ exports.updateStudent = async (req, res, next) => {
       return next(err);
     }
     
+    // A team is named "Team 1", "Team 2", ... (utils/teamName.js). A student of a team named before that rule
+    // can still be edited: an edit that leaves the team's name as it is is not checked.
+    const requestedTeam = typeof updates.group_assignment === 'string' ? updates.group_assignment.trim() : '';
+    if (requestedTeam !== '' && requestedTeam !== currentStudent.group_assignment) {
+      const teamName = normalizeTeamName(requestedTeam);
+      if (!teamName) return next(validationError(`Team name "${requestedTeam}" is not valid. ${TEAM_NAME_HELP}`));
+      updates.group_assignment = teamName;
+    }
+
     const oldTeamId = currentStudent.team_id;
     let newTeamId = null;
     // Team membership changes only when the request names a team (or clears it). An edit of just the
@@ -405,6 +420,14 @@ exports.uploadRoster = async (req, res, next) => {
           errors.push(`Invalid email in row: ${JSON.stringify(row)}`);
           return;
         }
+        // The team, when there is one, is named "Team 1", "Team 2", ... ("team 4" and "4" are Team 4); another
+        // name skips the row and says why (utils/teamName.js)
+        const teamText = (row.team_name || row.group_assignment || row.group || '').trim();
+        const teamAssignment = teamText ? normalizeTeamName(teamText) : null;
+        if (teamText && !teamAssignment) {
+          errors.push(`Invalid team "${teamText}" for student ${studentId}: ${TEAM_NAME_HELP} The row was skipped.`);
+          return;
+        }
         // The same student twice in one file: the first row is used, and the professor is told. Two inserts
         // for one id would otherwise fail on the unique index and leave the roster half applied.
         if (idsInFile.has(studentId)) {
@@ -413,7 +436,6 @@ exports.uploadRoster = async (req, res, next) => {
         }
         idsInFile.add(studentId);
         // Prepare student object (evaluation_token will be generated when evaluations are sent)
-        const teamAssignment = (row.team_name || row.group_assignment || row.group || '').trim() || null;
         console.log('Final team assignment for student:', row.student_id, '=', teamAssignment);
         studentsToCreate.push({
           student_id: studentId,

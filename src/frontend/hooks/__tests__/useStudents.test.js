@@ -12,7 +12,7 @@ vi.mock('../../services/api', () => ({
 // owns the students and what the professor does with them, and hands back the props each dialog
 // takes.
 const COURSE = { _id: 'c1', course_name: 'Capstone' };
-const ANN = { _id: 's1', student_id: '1001', name: 'Ann Archer', email: 'ann@example.edu', group_assignment: 'Alpha' };
+const ANN = { _id: 's1', student_id: '1001', name: 'Ann Archer', email: 'ann@example.edu', group_assignment: 'Team 1' };
 const BEN = { _id: 's2', student_id: '1002', name: 'Ben Baker', email: 'ben@example.edu', group_assignment: '' };
 const NO_SEARCH = { student_id: '', name: '', email: '', team: '' };
 const EMPTY_FORM = { student_id: '', name: '', email: '', group_assignment: '' };
@@ -128,6 +128,16 @@ describe('useStudents: search', () => {
 describe('useStudents: adding a student', () => {
   const fill = (view, form) => act(() => view.result.current.addStudentDialog.onFormChange(form));
 
+  test('the add and edit dialogs are told which teams the course\'s students are in, each once', async () => {
+    const CY = { _id: 's3', student_id: '1003', name: 'Cy Cole', email: 'cy@example.edu', group_assignment: 'Team 1' };
+    const DI = { _id: 's4', student_id: '1004', name: 'Di Doe', email: 'di@example.edu', group_assignment: 'Team 11' };
+    api.get.mockResolvedValue({ data: [ANN, BEN, CY, DI] });
+    const view = await opened();
+
+    expect(view.result.current.addStudentDialog.teamNames).toEqual(['Team 1', 'Team 11']);
+    expect(view.result.current.editStudentDialog.teamNames).toEqual(['Team 1', 'Team 11']);
+  });
+
   test('the Add Student dialog opens from the list and closes with its error cleared', async () => {
     const view = await opened();
     expect(view.result.current.addStudentDialog).toMatchObject({ open: false, form: EMPTY_FORM, error: '' });
@@ -136,28 +146,43 @@ describe('useStudents: adding a student', () => {
     expect(view.result.current.addStudentDialog.open).toBe(true);
 
     await act(() => view.result.current.addStudentDialog.onSubmit());
-    expect(view.result.current.addStudentDialog.error).toBe('Student ID, name, and email are required.');
+    expect(view.result.current.addStudentDialog.error).toBe('Student ID, name, email, and team are required.');
     act(() => view.result.current.addStudentDialog.onClose());
     expect(view.result.current.addStudentDialog).toMatchObject({ open: false, error: '' });
   });
 
   test.each([
-    ['student id', { student_id: '', name: 'Cy', email: 'cy@example.edu', group_assignment: '' }],
-    ['name', { student_id: '3', name: '', email: 'cy@example.edu', group_assignment: '' }],
-    ['email', { student_id: '3', name: 'Cy', email: '', group_assignment: '' }],
+    ['student id', { student_id: '', name: 'Cy', email: 'cy@example.edu', group_assignment: 'Team 1' }],
+    ['name', { student_id: '3', name: '', email: 'cy@example.edu', group_assignment: 'Team 1' }],
+    ['email', { student_id: '3', name: 'Cy', email: '', group_assignment: 'Team 1' }],
+    ['team', { student_id: '3', name: 'Cy', email: 'cy@example.edu', group_assignment: '' }],
+    ['student id (spaces only)', { student_id: '  ', name: 'Cy', email: 'cy@example.edu', group_assignment: 'Team 1' }],
+    ['team (spaces only)', { student_id: '3', name: 'Cy', email: 'cy@example.edu', group_assignment: '   ' }],
   ])('refuses a student with no %s, and sends nothing', async (_field, form) => {
     const view = await opened();
     fill(view, form);
 
     await act(() => view.result.current.addStudentDialog.onSubmit());
 
-    expect(view.result.current.addStudentDialog.error).toBe('Student ID, name, and email are required.');
+    expect(view.result.current.addStudentDialog.error).toBe('Student ID, name, email, and team are required.');
     expect(api.post).not.toHaveBeenCalled();
+  });
+
+  test('sends the team without the spaces around it', async () => {
+    const view = await opened();
+    fill(view, { student_id: '3', name: 'Cy', email: 'cy@example.edu', group_assignment: '  Team 11 ' });
+    api.post.mockResolvedValue({});
+
+    await act(() => view.result.current.addStudentDialog.onSubmit());
+
+    expect(api.post).toHaveBeenCalledWith('/courses/c1/students', {
+      student_id: '3', name: 'Cy', email: 'cy@example.edu', group_assignment: 'Team 11',
+    });
   });
 
   test('does nothing before a course has been opened', async () => {
     const view = render();
-    fill(view, { student_id: '3', name: 'Cy', email: 'cy@example.edu', group_assignment: '' });
+    fill(view, { student_id: '3', name: 'Cy', email: 'cy@example.edu', group_assignment: 'Team 1' });
 
     await act(() => view.result.current.addStudentDialog.onSubmit());
 
@@ -167,7 +192,7 @@ describe('useStudents: adding a student', () => {
 
   test('saves the student, says so, closes the dialog, empties the form and reloads the list', async () => {
     const view = await opened();
-    const CY = { student_id: '3', name: 'Cy', email: 'cy@example.edu', group_assignment: 'Beta' };
+    const CY = { student_id: '3', name: 'Cy', email: 'cy@example.edu', group_assignment: 'Team 2' };
     fill(view, CY);
     act(() => view.result.current.studentsDialog.onAddStudent());
     act(() => view.result.current.studentsDialog.onToggleSearch());
@@ -188,7 +213,7 @@ describe('useStudents: adding a student', () => {
 
   test('shows the reason the server gives when it refuses the student', async () => {
     const view = await opened();
-    fill(view, { student_id: '1001', name: 'Dup', email: 'dup@example.edu', group_assignment: '' });
+    fill(view, { student_id: '1001', name: 'Dup', email: 'dup@example.edu', group_assignment: 'Team 1' });
     api.post.mockRejectedValue({ response: { data: { error: { message: 'Student ID already in this course' } } } });
 
     await act(() => view.result.current.addStudentDialog.onSubmit());
@@ -199,7 +224,7 @@ describe('useStudents: adding a student', () => {
 
   test('says "Failed to add student." when the server gives no reason', async () => {
     const view = await opened();
-    fill(view, { student_id: '3', name: 'Cy', email: 'cy@example.edu', group_assignment: '' });
+    fill(view, { student_id: '3', name: 'Cy', email: 'cy@example.edu', group_assignment: 'Team 1' });
     api.post.mockRejectedValue(new Error('network'));
 
     await act(() => view.result.current.addStudentDialog.onSubmit());
@@ -211,7 +236,7 @@ describe('useStudents: adding a student', () => {
     const view = await opened();
     await act(() => view.result.current.addStudentDialog.onSubmit());
     expect(view.result.current.addStudentDialog.error).not.toBe('');
-    fill(view, { student_id: '3', name: 'Cy', email: 'cy@example.edu', group_assignment: '' });
+    fill(view, { student_id: '3', name: 'Cy', email: 'cy@example.edu', group_assignment: 'Team 1' });
     api.post.mockResolvedValue({});
 
     await act(() => view.result.current.addStudentDialog.onSubmit());
@@ -226,7 +251,7 @@ describe('useStudents: editing a student', () => {
 
     act(() => view.result.current.studentsDialog.onEdit(ANN));
     expect(view.result.current.editStudentDialog).toMatchObject({
-      open: true, form: { student_id: '1001', name: 'Ann Archer', email: 'ann@example.edu', group_assignment: 'Alpha' },
+      open: true, form: { student_id: '1001', name: 'Ann Archer', email: 'ann@example.edu', group_assignment: 'Team 1' },
     });
 
     act(() => view.result.current.studentsDialog.onEdit(BEN));
@@ -249,6 +274,19 @@ describe('useStudents: editing a student', () => {
     expect(setAlert).toHaveBeenCalledWith({ severity: 'success', message: 'Student updated successfully' });
     expect(view.result.current.editStudentDialog).toMatchObject({ open: false, form: EMPTY_FORM });
     expect(view.result.current.studentsDialog.students[0].name).toBe('Ann A.');
+  });
+
+  test('sends the team without the spaces around it', async () => {
+    const view = await opened();
+    act(() => view.result.current.studentsDialog.onEdit(ANN));
+    act(() => view.result.current.editStudentDialog.onFormChange({ ...EMPTY_FORM, student_id: '1001', name: 'Ann Archer', email: 'ann@example.edu', group_assignment: ' Team 11  ' }));
+    api.put.mockResolvedValue({});
+
+    await act(() => view.result.current.editStudentDialog.onSave());
+
+    expect(api.put).toHaveBeenCalledWith('/courses/c1/students/s1', {
+      student_id: '1001', name: 'Ann Archer', email: 'ann@example.edu', group_assignment: 'Team 11',
+    });
   });
 
   test('identifies a student by id when it has no _id', async () => {
@@ -308,7 +346,7 @@ describe('useStudents: deleting one student', () => {
 
     const message = confirm.mock.calls[0][0];
     expect(message).toContain('Are you sure you want to delete "Ann Archer" (ID: 1001)?');
-    expect(message).toContain('Team: Alpha');
+    expect(message).toContain('Team: Team 1');
     expect(message).toContain('Delete their evaluation data');
     expect(api.delete).not.toHaveBeenCalled();
     expect(setAlert).not.toHaveBeenCalled();

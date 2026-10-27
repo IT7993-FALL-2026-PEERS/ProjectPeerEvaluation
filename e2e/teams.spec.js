@@ -20,25 +20,25 @@ const teamRow = (page, name) => page.getByRole('row', { name: new RegExp(name) }
 
 async function openTeams(page) {
   await courseAction(page, 'Manage Teams').click();
-  await expect(teamRow(page, 'Alpha')).toBeVisible();
+  await expect(teamRow(page, 'Team 1')).toBeVisible();
 }
 
 test('E2E-25: Manage Students in a team moves a student in and out, and the lists follow', async ({ page }) => {
   await openTeams(page);
-  await teamRow(page, 'Alpha').getByTitle('Manage Students').click();
+  await teamRow(page, 'Team 1').getByTitle('Manage Students').click();
 
-  await expect(top(page).getByText('Manage Students in Alpha')).toBeVisible();
+  await expect(top(page).getByText('Manage Students in Team 1')).toBeVisible();
   await expect(top(page).getByText('Students in Team (2)')).toBeVisible();
   await expect(top(page).getByText('Available Students (2)')).toBeVisible();
-  await expect(top(page).getByText('Currently in: Beta')).toHaveCount(2);
+  await expect(top(page).getByText('Currently in: Team 2')).toHaveCount(2);
 
   await top(page).getByTitle('Add to team').first().click();
-  await expect(alertWith(page, 'Student added to Alpha')).toBeVisible();
+  await expect(alertWith(page, 'Student added to Team 1')).toBeVisible();
   await expect(top(page).getByText('Students in Team (3)')).toBeVisible();
   await expect(top(page).getByText('Available Students (1)')).toBeVisible();
 
   await top(page).getByTitle('Remove from team').first().click();
-  await expect(alertWith(page, 'Student removed from Alpha')).toBeVisible();
+  await expect(alertWith(page, 'Student removed from Team 1')).toBeVisible();
   await expect(top(page).getByText('Students in Team (2)')).toBeVisible();
   await expect(top(page).getByText('Available Students (2)')).toBeVisible();
 });
@@ -48,12 +48,12 @@ test('E2E-26: team search narrows the list, says when nothing matches, and Clear
   await page.getByRole('button', { name: 'Show Search' }).click();
   await expect(page.getByText('Search Teams (2 of 2)')).toBeVisible();
 
-  await page.getByLabel('Team Name').fill('alp');
+  await page.getByLabel('Team Name').fill('team 1');
   await expect(page.getByText('Search Teams (1 of 2)')).toBeVisible();
-  await expect(teamRow(page, 'Beta')).toHaveCount(0);
+  await expect(teamRow(page, 'Team 2')).toHaveCount(0);
 
   await page.getByRole('button', { name: 'Clear Search' }).click();
-  await expect(teamRow(page, 'Beta')).toBeVisible();
+  await expect(teamRow(page, 'Team 2')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Show Search' })).toBeVisible();
 
   await page.getByRole('button', { name: 'Show Search' }).click();
@@ -65,32 +65,32 @@ test('E2E-26: team search narrows the list, says when nothing matches, and Clear
 test('E2E-27: Edit Team changes the status, refuses an empty name, and Cancel changes nothing', async ({ page }) => {
   await openTeams(page);
 
-  await teamRow(page, 'Alpha').getByTitle('Edit Team').click();
+  await teamRow(page, 'Team 1').getByTitle('Edit Team').click();
   await top(page).getByLabel('Team Name').fill('');
   await expect(top(page).getByRole('button', { name: 'Save Changes' })).toBeDisabled();
-  await top(page).getByLabel('Team Name').fill('Alpha');
+  await top(page).getByLabel('Team Name').fill('Team 1');
   await top(page).getByRole('combobox').click();
   await page.getByRole('option', { name: 'Inactive' }).click();
   await top(page).getByRole('button', { name: 'Cancel' }).click();
-  await expect(teamRow(page, 'Alpha')).toContainText('Active');
-  await expect(teamRow(page, 'Alpha')).not.toContainText('Inactive');
+  await expect(teamRow(page, 'Team 1')).toContainText('Active');
+  await expect(teamRow(page, 'Team 1')).not.toContainText('Inactive');
 
-  await teamRow(page, 'Alpha').getByTitle('Edit Team').click();
+  await teamRow(page, 'Team 1').getByTitle('Edit Team').click();
   await top(page).getByRole('combobox').click();
   await page.getByRole('option', { name: 'Inactive' }).click();
   await top(page).getByRole('button', { name: 'Save Changes' }).click();
 
-  await expect(alertWith(page, 'Team "Alpha" updated successfully')).toBeVisible();
-  await expect(teamRow(page, 'Alpha')).toContainText('Inactive');
+  await expect(alertWith(page, 'Team "Team 1" updated successfully')).toBeVisible();
+  await expect(teamRow(page, 'Team 1')).toContainText('Inactive');
 });
 
 test('E2E-28: sending to one team emails only that team\'s students', async ({ page }) => {
   await openTeams(page);
 
-  await teamRow(page, 'Alpha').getByTitle('Send Evaluations to Team').click();
+  await teamRow(page, 'Team 1').getByTitle('Send Evaluations to Team').click();
   await sendWithDeadline(page);
 
-  await expect(alertWith(page, 'Evaluation invitations sent to team "Alpha".')).toBeVisible();
+  await expect(alertWith(page, 'Evaluation invitations sent to team "Team 1".')).toBeVisible();
   const sent = (await capturedEmails()).map((e) => e.to).sort();
   expect(sent).toEqual(['ann@example.edu', 'ben@example.edu']);
 });
@@ -100,7 +100,7 @@ test('E2E-29: Clear All Teams asks first, then empties the list and the course\'
 
   page.once('dialog', (confirm) => confirm.dismiss());
   await top(page).getByRole('button', { name: 'Clear All Teams' }).click();
-  await expect(teamRow(page, 'Beta')).toBeVisible();
+  await expect(teamRow(page, 'Team 2')).toBeVisible();
 
   page.once('dialog', (confirm) => confirm.accept());
   await top(page).getByRole('button', { name: 'Clear All Teams' }).click();
@@ -129,7 +129,7 @@ test('E2E-30: with two courses, Manage Teams opens one dialog, not one per cours
 
   await page.getByRole('row', { name: /CS 4850/ }).getByTitle('Manage Teams').click();
 
-  await expect(teamRow(page, 'Alpha')).toBeVisible();
+  await expect(teamRow(page, 'Team 1')).toBeVisible();
   // A plain locator: role queries skip a dialog that another one on top has hidden, which would
   // hide exactly the duplicates this test is looking for.
   await expect(page.locator('[role=dialog]')).toHaveCount(1);
@@ -140,15 +140,15 @@ test('E2E-30: with two courses, Manage Teams opens one dialog, not one per cours
 test('E2E-47: a student alone on a team is skipped by Send Evaluations and shown as having no teammates', async ({ page }) => {
   await openTeams(page);
 
-  // Ben moves to Beta, so Ann is alone on Alpha
-  await teamRow(page, 'Beta').getByTitle('Manage Students').click();
+  // Ben moves to Team 2, so Ann is alone on Team 1
+  await teamRow(page, 'Team 2').getByTitle('Manage Students').click();
   // the row is a plain box: the innermost one that holds Ben's name and an Add button
   await top(page).locator('div', { hasText: 'Ben Baker' }).filter({ has: page.getByTitle('Add to team') }).last().getByTitle('Add to team').click();
-  await expect(alertWith(page, 'Student added to Beta')).toBeVisible();
+  await expect(alertWith(page, 'Student added to Team 2')).toBeVisible();
   await top(page).getByRole('button', { name: 'Close' }).click();
 
-  // Sending to Alpha reaches nobody and says why
-  await teamRow(page, 'Alpha').getByTitle('Send Evaluations to Team').click();
+  // Sending to Team 1 reaches nobody and says why
+  await teamRow(page, 'Team 1').getByTitle('Send Evaluations to Team').click();
   await sendWithDeadline(page);
   await expect(alertWith(page, 'Alone on their team (add a teammate, then send again): Ann Archer.')).toBeVisible();
   expect(await capturedEmails()).toHaveLength(0);
@@ -166,4 +166,23 @@ test('E2E-47: a student alone on a team is skipped by Send Evaluations and shown
   await courseAction(page, 'Evaluation Status').click();
   await expect(top(page).getByText('Progress: 0/3 evaluations completed')).toBeVisible();
   await expect(top(page).getByText('No teammates to rate. Add a teammate to their team, then send again.')).toBeVisible();
+});
+
+test('E2E-51: a team name must be numbered: Alpha cannot be created, team 4 becomes Team 4, and an Edit cannot rename a team to Alpha', async ({ page }) => {
+  await openTeams(page);
+  await page.getByRole('button', { name: 'Create Team' }).click();
+  await expect(top(page).getByText('Create New Team')).toBeVisible();
+
+  await top(page).getByLabel(/Team Name/).fill('Alpha');
+  await expect(top(page).getByText('Team names are numbered: Team 1, Team 2, Team 3, ...')).toBeVisible();
+  await expect(top(page).getByRole('button', { name: 'Create Team' })).toBeDisabled();
+
+  await top(page).getByLabel(/Team Name/).fill('team 4');
+  await expect(top(page).getByRole('button', { name: 'Create Team' })).toBeEnabled();
+  await top(page).getByRole('button', { name: 'Create Team' }).click();
+  await expect(teamRow(page, 'Team 4')).toBeVisible();
+
+  await teamRow(page, 'Team 4').getByTitle('Edit Team').click();
+  await top(page).getByLabel(/Team Name/).fill('Alpha');
+  await expect(top(page).getByRole('button', { name: 'Save Changes' })).toBeDisabled();
 });

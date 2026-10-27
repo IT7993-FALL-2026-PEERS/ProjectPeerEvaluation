@@ -36,7 +36,7 @@ test('E2E-21: before sending, the status says so; after sending, it shows every 
   await sendWithDeadline(page);
 
   await expect(top(page).getByText('Progress: 0/4 evaluations completed')).toBeVisible();
-  for (const name of ['Alpha', 'Beta']) await expect(top(page).getByText(name, { exact: true })).toBeVisible();
+  for (const name of ['Team 1', 'Team 2']) await expect(top(page).getByText(name, { exact: true })).toBeVisible();
   for (const name of ['Ann Archer', 'Ben Baker', 'Cy Cole', 'Di Diaz']) await expect(top(page).getByText(name)).toBeVisible();
   await expect(top(page).getByText('Pending', { exact: true })).toHaveCount(4);
   await expect(top(page).getByText('0/2', { exact: true })).toHaveCount(2);
@@ -69,7 +69,7 @@ test('E2E-24: changing a team after invitations went out asks first; Cancel chan
   await top(page).getByRole('button', { name: 'Close' }).click();
 
   await courseAction(page, 'Manage Teams').click();
-  await page.getByRole('row', { name: /Alpha/ }).getByTitle('Manage Students').click();
+  await page.getByRole('row', { name: /Team 1/ }).getByTitle('Manage Students').click();
   await expect(top(page).getByText('Students in Team (2)')).toBeVisible();
 
   // Cancel: the question is shown, nothing changes.
@@ -82,13 +82,13 @@ test('E2E-24: changing a team after invitations went out asks first; Cancel chan
   // Continue: the evaluation state is reset, then the student is removed.
   await top(page).getByTitle('Remove from team').first().click();
   await top(page).getByRole('button', { name: 'Continue' }).click();
-  await expect(alertWith(page, 'Student removed from Alpha')).toBeVisible();
+  await expect(alertWith(page, 'Student removed from Team 1')).toBeVisible();
   await expect(top(page).getByText('Students in Team (1)')).toBeVisible();
 
   // The page has one message slot, so "Cleared 4 tokens" is replaced by the line above within one
   // round trip; check the reset by what it did: the status goes back to "not sent".
   await top(page).getByRole('button', { name: 'Close' }).click();
-  await expect(page.getByText('Manage Students in Alpha')).toHaveCount(0);
+  await expect(page.getByText('Manage Students in Team 1')).toHaveCount(0);
   await top(page).getByRole('button', { name: 'Close' }).click();
   await expect(page.getByText('Manage Teams for CS 4850')).toHaveCount(0);
   await courseAction(page, 'Evaluation Status').click();

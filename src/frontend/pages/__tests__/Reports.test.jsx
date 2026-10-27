@@ -25,7 +25,7 @@ const REPORT = {
     classStats: { mean: 81.88, standardDeviation: 15.3, targetMean: 85, targetStandardDeviation: 20 } },
   students: [
     {
-      _id: 's1', student_id: '1001', name: 'Ann Archer', team_id: { team_name: 'Alpha' }, evaluationsReceived: 1,
+      _id: 's1', student_id: '1001', name: 'Ann Archer', team_id: { team_name: 'Team 1' }, evaluationsReceived: 1,
       originalScore: 100, finalScore: 100, letterGrade: 'A', improvement: 0,
       evaluationDetails: [{
         overall_feedback: 'Carried the project.', submitted_at: '2026-10-01T12:00:00Z', ratings: RATINGS,
@@ -113,7 +113,7 @@ describe('Reports', () => {
     expect(screen.getByText('F: 1')).toBeInTheDocument();
 
     const ann = screen.getByRole('row', { name: /Ann Archer/ });
-    expect(within(ann).getByText('Alpha')).toBeInTheDocument();
+    expect(within(ann).getByText('Team 1')).toBeInTheDocument();
     expect(within(ann).getAllByText('100%').length).toBeGreaterThan(0);
     expect(screen.getByRole('row', { name: /Di Diaz/ })).toHaveTextContent('No Team');
     expect(screen.getByText('Original Score')).toBeInTheDocument();

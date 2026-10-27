@@ -71,8 +71,8 @@ curl -X POST "$API_URL/courses/$COURSE_ID/teams" \
 	-H "Content-Type: application/json" \
 	-d '{
 		"teams": [
-			{ "team_name": "Team Alpha" },
-			{ "team_name": "Team Beta" }
+			{ "team_name": "Team 1" },
+			{ "team_name": "Team 2" }
 		]
 	}'
 ```
@@ -87,7 +87,7 @@ curl -X POST "$API_URL/courses/$COURSE_ID/students" \
 		"student_id": "S1001",
 		"name": "Alex Smith",
 		"email": "alex.smith@example.com",
-		"group_assignment": "Team Alpha"
+		"group_assignment": "Team 1"
 	}'
 
 curl -X POST "$API_URL/courses/$COURSE_ID/students" \
@@ -97,7 +97,7 @@ curl -X POST "$API_URL/courses/$COURSE_ID/students" \
 		"student_id": "S1002",
 		"name": "Jordan Lee",
 		"email": "jordan.lee@example.com",
-		"group_assignment": "Team Beta"
+		"group_assignment": "Team 2"
 	}'
 ```
 

@@ -6,7 +6,7 @@ const Evaluation = require('../models/Evaluation');
 const { startDatabase, stopDatabase, clearDatabase } = require('./helpers/db');
 const { startApp } = require('./helpers/app');
 const { seed, IDS } = require('./helpers/seed');
-const { assertCourseConsistent } = require('./helpers/consistency');
+const { assertCourseConsistent } = require('./helpers/consistency');
 const { ORDINARY_RATINGS: RATINGS } = require('./helpers/evaluations');
 
 // CW-04 roster management by hand: add, edit and remove students one at a time or in bulk. Each
@@ -39,9 +39,9 @@ test.beforeEach(async (t) => {
 });
 
 test('TC-06-30: a student added to a new team creates the team and is a member on both sides', async () => {
-  const res = await app.request('POST', students(), { token: ada, body: { ...NEW_STUDENT, group_assignment: 'Gamma' } });
+  const res = await app.request('POST', students(), { token: ada, body: { ...NEW_STUDENT, group_assignment: 'Team 3' } });
   assert.equal(res.status, 201);
-  const gamma = await Team.findOne({ course_id: IDS.courseAda, team_name: 'Gamma' });
+  const gamma = await Team.findOne({ course_id: IDS.courseAda, team_name: 'Team 3' });
   assert.ok(gamma);
   assert.deepEqual(gamma.students.map(String), [String(res.body.student._id)]);
   await assertCourseConsistent(IDS.courseAda);
@@ -73,8 +73,42 @@ test('TC-06-33: a missing name, ID or email is refused and nothing is saved', as
   assert.equal(await Student.countDocuments({ course_id: IDS.courseAda }), 4);
 });
 
+test('TC-06-53: a student is put in a team only by a numbered name: team 6 and 8 are Team 6 and Team 8; Alpha is refused and nothing is saved', async () => {
+  for (const name of ['Alpha', 'Team A', 'Team 0']) {
+    const res = await app.request('POST', students(), { token: ada, body: { ...NEW_STUDENT, group_assignment: name } });
+    assert.equal(res.status, 400, name);
+    assert.match(res.body.error.message, /Team 1, Team 2, Team 3/);
+  }
+  assert.equal(await Student.countDocuments({ course_id: IDS.courseAda }), 4);
+  assert.equal(await Team.countDocuments({ course_id: IDS.courseAda }), 2);
+
+  const six = await app.request('POST', students(), { token: ada, body: { ...NEW_STUDENT, group_assignment: 'team 6' } });
+  assert.equal(six.status, 201);
+  const eight = await app.request('POST', students(), { token: ada, body: { student_id: '1006', name: 'Gus Green', email: 'gus@example.edu', group_assignment: '8' } });
+  assert.equal(eight.status, 201);
+  assert.deepEqual((await Team.find({ course_id: IDS.courseAda })).map((team) => team.team_name).sort(), ['Team 1', 'Team 2', 'Team 6', 'Team 8']);
+  assert.equal((await Student.findById(six.body.student._id)).group_assignment, 'Team 6');
+  await assertCourseConsistent(IDS.courseAda);
+});
+
+test('TC-06-54: editing a student into a team takes only a numbered name; a student of an older team (Alpha) can still be edited', async () => {
+  const refused = await app.request('PUT', `${students()}/${IDS.ann}`, { token: ada, body: { group_assignment: 'Alpha' } });
+  assert.equal(refused.status, 400);
+  assert.equal((await Student.findById(IDS.ann)).group_assignment, 'Team 1');
+  assert.equal((await app.request('PUT', `${students()}/${IDS.ann}`, { token: ada, body: { group_assignment: '9' } })).status, 200);
+  assert.equal((await Student.findById(IDS.ann)).group_assignment, 'Team 9');
+
+  // A team named before the rule: its student's other edits send the team name unchanged.
+  const legacy = await Team.create({ team_name: 'Alpha', course_id: IDS.courseAda, students: [IDS.cy], student_count: 1 });
+  await Student.updateOne({ _id: IDS.cy }, { team_id: legacy._id, group_assignment: 'Alpha' });
+  const edited = await app.request('PUT', `${students()}/${IDS.cy}`, { token: ada, body: { name: 'Cy Cole-Reyes', group_assignment: 'Alpha' } });
+  assert.equal(edited.status, 200);
+  assert.equal((await Student.findById(IDS.cy)).name, 'Cy Cole-Reyes');
+  assert.equal((await Student.findById(IDS.cy)).group_assignment, 'Alpha');
+});
+
 test('TC-06-34: moving a student to another team by editing keeps both teams consistent', async () => {
-  const res = await app.request('PUT', `${students()}/${IDS.ann}`, { token: ada, body: { group_assignment: 'Beta' } });
+  const res = await app.request('PUT', `${students()}/${IDS.ann}`, { token: ada, body: { group_assignment: 'Team 2' } });
   assert.equal(res.status, 200);
   const ann = await Student.findById(IDS.ann);
   assert.equal(String(ann.team_id), String(IDS.teamBeta));
@@ -84,8 +118,8 @@ test('TC-06-34: moving a student to another team by editing keeps both teams con
 });
 
 test('TC-06-35: editing a student to a new team name creates that team', async () => {
-  await app.request('PUT', `${students()}/${IDS.ann}`, { token: ada, body: { group_assignment: 'Gamma' } });
-  assert.ok(await Team.findOne({ course_id: IDS.courseAda, team_name: 'Gamma' }));
+  await app.request('PUT', `${students()}/${IDS.ann}`, { token: ada, body: { group_assignment: 'Team 3' } });
+  assert.ok(await Team.findOne({ course_id: IDS.courseAda, team_name: 'Team 3' }));
   await assertCourseConsistent(IDS.courseAda);
 });
 

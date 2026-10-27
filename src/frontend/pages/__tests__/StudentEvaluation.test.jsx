@@ -26,7 +26,7 @@ const FORM = {
     overallFeedback: { name: 'Overall feedback', description: 'Say what went well' },
   },
   course: { name: 'Capstone', number: 'CS 4850', section: '01', semester: 'Fall 2026' },
-  evaluator: { name: 'Ann Archer', student_id: '1001', team: 'Alpha' },
+  evaluator: { name: 'Ann Archer', student_id: '1001', team: 'Team 1' },
   teammates: [
     { _id: 'b1', name: 'Ben Baker', student_id: '1002' },
     { _id: 'c1', name: 'Cy Cole', student_id: '1003' },

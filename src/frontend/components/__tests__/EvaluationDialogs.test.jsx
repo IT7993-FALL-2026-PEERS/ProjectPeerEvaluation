@@ -37,9 +37,9 @@ describe('EvaluationResetDialog', () => {
 
 const COURSE = { _id: 'c1', course_number: 'CS 4850', course_section: '01', course_name: 'Capstone' };
 const STUDENTS = [
-  { student_id: '1001', name: 'Ann Archer', team: 'Alpha', completed: true, last_activity: '2026-10-01T15:00:00Z' },
-  { student_id: '1002', name: 'Ben Baker', team: 'Alpha', completed: false, last_activity: null },
-  { student_id: '1003', name: 'Cy Cole', team: 'Beta', completed: false, last_activity: null },
+  { student_id: '1001', name: 'Ann Archer', team: 'Team 1', completed: true, last_activity: '2026-10-01T15:00:00Z' },
+  { student_id: '1002', name: 'Ben Baker', team: 'Team 1', completed: false, last_activity: null },
+  { student_id: '1003', name: 'Cy Cole', team: 'Team 2', completed: false, last_activity: null },
   { student_id: '1004', name: 'Di Diaz', team: '', completed: false, last_activity: null },
 ];
 const SENT = { evaluations_sent: true, completed_count: 1, total_count: 4, students: STUDENTS };
@@ -95,10 +95,10 @@ describe('EvaluationStatusDialog', () => {
     render(<EvaluationStatusDialog {...statusProps()} />);
 
     expect(screen.getByText('Progress: 1/4 evaluations completed')).toBeInTheDocument();
-    expect(screen.getByText('Alpha')).toBeInTheDocument();
-    expect(screen.getByText('Beta')).toBeInTheDocument();
+    expect(screen.getByText('Team 1')).toBeInTheDocument();
+    expect(screen.getByText('Team 2')).toBeInTheDocument();
     expect(screen.getByText('No Team')).toBeInTheDocument();
-    expect(screen.getByText('1/2')).toBeInTheDocument(); // Alpha: one of two
+    expect(screen.getByText('1/2')).toBeInTheDocument(); // Team 1: one of two
     expect(screen.getAllByText('Done')).toHaveLength(1);
     expect(screen.getAllByText('Pending')).toHaveLength(3);
     expect(screen.getByText('Ann Archer')).toBeInTheDocument();
@@ -107,7 +107,7 @@ describe('EvaluationStatusDialog', () => {
 
   test('lists the teams in order, with the students without a team last', () => {
     render(<EvaluationStatusDialog {...statusProps()} />);
-    const cards = ['Alpha', 'Beta', 'No Team'].map((team) => screen.getByText(team));
+    const cards = ['Team 1', 'Team 2', 'No Team'].map((team) => screen.getByText(team));
     for (let i = 0; i < cards.length - 1; i += 1) {
       // eslint-disable-next-line no-bitwise
       expect(cards[i].compareDocumentPosition(cards[i + 1]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -148,8 +148,8 @@ describe('EvaluationStatusDialog', () => {
     const onExtend = vi.fn();
     const onAllowResubmission = vi.fn();
     const students = [
-      { id: 's1', student_id: '1001', name: 'Ann Archer', team: 'Alpha', completed: true, resubmission_allowed: false },
-      { id: 's2', student_id: '1002', name: 'Ben Baker', team: 'Alpha', completed: false },
+      { id: 's1', student_id: '1001', name: 'Ann Archer', team: 'Team 1', completed: true, resubmission_allowed: false },
+      { id: 's2', student_id: '1002', name: 'Ben Baker', team: 'Team 1', completed: false },
     ];
     render(<EvaluationStatusDialog {...statusProps({ onExtend, onAllowResubmission, status: { evaluations_sent: true, completed_count: 1, total_count: 2, students } })} />);
     await user.click(screen.getByRole('button', { name: 'Extend Deadline' }));
@@ -160,7 +160,7 @@ describe('EvaluationStatusDialog', () => {
   });
 
   test('a student allowed to resubmit is marked as such, with no second button', () => {
-    const students = [{ id: 's1', student_id: '1001', name: 'Ann Archer', team: 'Alpha', completed: true, resubmission_allowed: true }];
+    const students = [{ id: 's1', student_id: '1001', name: 'Ann Archer', team: 'Team 1', completed: true, resubmission_allowed: true }];
     render(<EvaluationStatusDialog {...statusProps({ status: { evaluations_sent: true, completed_count: 1, total_count: 1, students } })} />);
     expect(screen.getByText('Resubmission allowed')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Allow Ann Archer to resubmit' })).not.toBeInTheDocument();
@@ -170,8 +170,8 @@ describe('EvaluationStatusDialog', () => {
   test('a student marked submitted with no ratings on file says so and keeps the Allow resubmission button', async () => {
     const onAllowResubmission = vi.fn();
     const students = [
-      { id: 's1', student_id: '1001', name: 'Ann Archer', team: 'Alpha', completed: true, ratings_on_file: false, resubmission_allowed: false },
-      { id: 's2', student_id: '1002', name: 'Ben Baker', team: 'Alpha', completed: true, ratings_on_file: true, resubmission_allowed: false },
+      { id: 's1', student_id: '1001', name: 'Ann Archer', team: 'Team 1', completed: true, ratings_on_file: false, resubmission_allowed: false },
+      { id: 's2', student_id: '1002', name: 'Ben Baker', team: 'Team 1', completed: true, ratings_on_file: true, resubmission_allowed: false },
     ];
     render(<EvaluationStatusDialog {...statusProps({ onAllowResubmission, status: { evaluations_sent: true, completed_count: 2, total_count: 2, students } })} />);
     expect(screen.getAllByText('Marked submitted, no ratings on file. Use Allow resubmission to send a new link.')).toHaveLength(1);
@@ -188,9 +188,9 @@ describe('EvaluationStatusDialog', () => {
   // CICD-72: a student with nobody to rate is listed with the reason, not as a missing submission
   test('a student with nobody to rate says so, and their team is not counted as unfinished', () => {
     const students = [
-      { id: 's1', student_id: '1001', name: 'Ann Archer', team: 'Alpha', completed: false, nobody_to_rate: true },
-      { id: 's2', student_id: '1003', name: 'Cy Cole', team: 'Beta', completed: true, ratings_on_file: true, nobody_to_rate: false },
-      { id: 's3', student_id: '1004', name: 'Di Diaz', team: 'Beta', completed: true, ratings_on_file: true, nobody_to_rate: false },
+      { id: 's1', student_id: '1001', name: 'Ann Archer', team: 'Team 1', completed: false, nobody_to_rate: true },
+      { id: 's2', student_id: '1003', name: 'Cy Cole', team: 'Team 2', completed: true, ratings_on_file: true, nobody_to_rate: false },
+      { id: 's3', student_id: '1004', name: 'Di Diaz', team: 'Team 2', completed: true, ratings_on_file: true, nobody_to_rate: false },
     ];
     render(<EvaluationStatusDialog {...statusProps({ status: { evaluations_sent: true, completed_count: 2, total_count: 2, students } })} />);
     expect(screen.getAllByText('No teammates to rate. Add a teammate to their team, then send again.')).toHaveLength(1);

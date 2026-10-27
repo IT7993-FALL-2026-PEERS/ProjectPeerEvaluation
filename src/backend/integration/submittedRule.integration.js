@@ -33,7 +33,7 @@ test.after(async () => {
   await stopDatabase(replSet);
 });
 
-// Ann and Ben carry the mark with no evaluations; Cy and Di have working links (team Beta was sent to).
+// Ann and Ben carry the mark with no evaluations; Cy and Di have working links (Team 2 was sent to).
 test.beforeEach(async (t) => {
   t.mock.method(console, 'log', () => {});
   t.mock.method(console, 'error', () => {});

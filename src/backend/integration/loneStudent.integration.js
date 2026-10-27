@@ -15,8 +15,8 @@ let ada;
 const course = (path) => `/api/courses/${IDS.courseAda}/${path}`;
 const sendCourse = () => app.request('POST', course('evaluations/send'), { token: ada, body: deadlineBody(5) });
 const sendTeam = (teamId) => app.request('POST', course(`teams/${teamId}/evaluations/send`), { token: ada, body: deadlineBody(5) });
-const moveBenToBeta = () => Student.updateOne({ _id: IDS.ben }, { team_id: IDS.teamBeta, group_assignment: 'Beta' });
-const moveBenToAlpha = () => Student.updateOne({ _id: IDS.ben }, { team_id: IDS.teamAlpha, group_assignment: 'Alpha' });
+const moveBenToBeta = () => Student.updateOne({ _id: IDS.ben }, { team_id: IDS.teamBeta, group_assignment: 'Team 2' });
+const moveBenToAlpha = () => Student.updateOne({ _id: IDS.ben }, { team_id: IDS.teamAlpha, group_assignment: 'Team 1' });
 
 test.before(async () => {
   process.env.FRONTEND_URL = 'https://peers.example.test';
@@ -35,7 +35,7 @@ test.beforeEach(async (t) => {
   await clearDatabase();
   await seed();
   clearEmails();
-  await moveBenToBeta(); // Ann is now alone on Alpha; Beta is Ben, Cy and Di
+  await moveBenToBeta(); // Ann is now alone on Team 1; Team 2 is Ben, Cy and Di
 });
 
 test('TC-10-78: a course send skips the student alone on a team, names them, and emails the others', async () => {
@@ -143,7 +143,7 @@ test('TC-10-81: extending everyone does not email the lone student a new link, a
 });
 
 test('TC-10-82: extending one student in a team of two still works (the counts come from the whole course)', async () => {
-  await moveBenToAlpha(); // Alpha is Ann and Ben again
+  await moveBenToAlpha(); // Team 1 is Ann and Ben again
   await sendCourse();
   clearEmails();
   const { body } = await app.request('POST', course('evaluations/extend'), { token: ada, body: { scope: 'student', student_id: String(IDS.ann), ...deadlineBody(9) } });

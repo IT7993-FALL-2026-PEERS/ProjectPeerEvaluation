@@ -14,7 +14,7 @@ const courseId = String(new mongoose.Types.ObjectId());
 const otherCourseId = String(new mongoose.Types.ObjectId());
 const studentId = String(new mongoose.Types.ObjectId());
 const foreignTeam = new mongoose.Types.ObjectId();
-const myTeam = { _id: new mongoose.Types.ObjectId(), team_name: 'Team A' };
+const myTeam = { _id: new mongoose.Types.ObjectId(), team_name: 'Team 1' };
 
 function stub(t) {
   const seen = { teamUpdates: [] };
@@ -27,7 +27,7 @@ function stub(t) {
   t.mock.method(Student, 'countDocuments', async () => 1);
   t.mock.method(Team, 'findOne', async (filter) => {
     seen.teamFilter = filter;
-    return filter.team_name === 'Team A' ? myTeam : null;
+    return filter.team_name === 'Team 1' ? myTeam : null;
   });
   t.mock.method(Team, 'findByIdAndUpdate', async (id, update) => { seen.teamUpdates.push([id, update]); return {}; });
   t.mock.method(Team, 'countDocuments', async () => 1);
@@ -68,9 +68,9 @@ test('TC-05-01: a student update keeps only the editable fields', async (t) => {
 });
 
 test('TC-05-02: a team set through the body is ignored; the team comes from group_assignment in this course', async (t) => {
-  const { seen } = await update(t, { group_assignment: 'Team A', team_id: String(foreignTeam) });
+  const { seen } = await update(t, { group_assignment: 'Team 1', team_id: String(foreignTeam) });
   assert.equal(String(seen.update.team_id), String(myTeam._id));
-  assert.equal(seen.update.group_assignment, 'Team A');
+  assert.equal(seen.update.group_assignment, 'Team 1');
   assert.equal(String(seen.teamFilter.course_id), courseId, 'the team is found within the URL course');
 });
 

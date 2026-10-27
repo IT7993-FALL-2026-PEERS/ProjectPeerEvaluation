@@ -4,7 +4,7 @@ const Student = require('../../models/Student');
 const Evaluation = require('../../models/Evaluation');
 const { startDatabase, stopDatabase, clearDatabase } = require('./db');
 const { startApp, clearEmails, deadlineBody } = require('./app');
-const { seed, IDS } = require('./seed');
+const { seed, IDS } = require('./seed');
 const { STUDENT_RATINGS: RATINGS } = require('./evaluations');
 
 // FR-16 / CICD-33: a submission is all or nothing, and a double submit saves once. The same cases
@@ -42,11 +42,11 @@ function registerAtomicSubmissionTests({ standalone }) {
 
   const tokenOf = (studentId) => Student.findById(studentId).then((s) => s.evaluation_token);
 
-  // A third member for team Alpha, so Ann has two teammates to rate.
+  // A third member for Team 1, so Ann has two teammates to rate.
   async function addFay() {
     const fay = await Student.create({
       student_id: '1007', name: 'Fay Fox', email: 'fay@example.edu',
-      course_id: IDS.courseAda, team_id: IDS.teamAlpha, group_assignment: 'Alpha',
+      course_id: IDS.courseAda, team_id: IDS.teamAlpha, group_assignment: 'Team 1',
     });
     await app.request('POST', `/api/courses/${IDS.courseAda}/evaluations/send`, { token: ada, body: deadlineBody() });
     return fay;

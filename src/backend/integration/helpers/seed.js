@@ -8,7 +8,7 @@ const Team = require('../../models/Team');
 // The shared, deterministic fixture for the integration tests. Same ids, names and passwords
 // on every run, so a failing test can be reproduced exactly.
 //
-//   Professor Ada  owns course CS 4850 with 4 students in two teams (Alpha: Ann, Ben; Beta: Cy, Di)
+//   Professor Ada  owns course CS 4850 with 4 students in two teams (Team 1: Ann, Ben; Team 2: Cy, Di)
 //   Professor Bo   owns course IT 3100 with 1 student (Eve), no team
 //
 // Passwords are test values only and appear nowhere else.
@@ -50,14 +50,14 @@ async function seed() {
     },
   ]);
   await Team.create([
-    { _id: IDS.teamAlpha, team_name: 'Alpha', course_id: IDS.courseAda, students: [IDS.ann, IDS.ben], student_count: 2 },
-    { _id: IDS.teamBeta, team_name: 'Beta', course_id: IDS.courseAda, students: [IDS.cy, IDS.di], student_count: 2 },
+    { _id: IDS.teamAlpha, team_name: 'Team 1', course_id: IDS.courseAda, students: [IDS.ann, IDS.ben], student_count: 2 },
+    { _id: IDS.teamBeta, team_name: 'Team 2', course_id: IDS.courseAda, students: [IDS.cy, IDS.di], student_count: 2 },
   ]);
   await Student.create([
-    { _id: IDS.ann, student_id: '1001', name: 'Ann Archer', email: 'ann@example.edu', course_id: IDS.courseAda, team_id: IDS.teamAlpha, group_assignment: 'Alpha' },
-    { _id: IDS.ben, student_id: '1002', name: 'Ben Baker', email: 'ben@example.edu', course_id: IDS.courseAda, team_id: IDS.teamAlpha, group_assignment: 'Alpha' },
-    { _id: IDS.cy, student_id: '1003', name: 'Cy Cole', email: 'cy@example.edu', course_id: IDS.courseAda, team_id: IDS.teamBeta, group_assignment: 'Beta' },
-    { _id: IDS.di, student_id: '1004', name: 'Di Diaz', email: 'di@example.edu', course_id: IDS.courseAda, team_id: IDS.teamBeta, group_assignment: 'Beta' },
+    { _id: IDS.ann, student_id: '1001', name: 'Ann Archer', email: 'ann@example.edu', course_id: IDS.courseAda, team_id: IDS.teamAlpha, group_assignment: 'Team 1' },
+    { _id: IDS.ben, student_id: '1002', name: 'Ben Baker', email: 'ben@example.edu', course_id: IDS.courseAda, team_id: IDS.teamAlpha, group_assignment: 'Team 1' },
+    { _id: IDS.cy, student_id: '1003', name: 'Cy Cole', email: 'cy@example.edu', course_id: IDS.courseAda, team_id: IDS.teamBeta, group_assignment: 'Team 2' },
+    { _id: IDS.di, student_id: '1004', name: 'Di Diaz', email: 'di@example.edu', course_id: IDS.courseAda, team_id: IDS.teamBeta, group_assignment: 'Team 2' },
     { _id: IDS.eve, student_id: '2001', name: 'Eve Evans', email: 'eve@example.edu', course_id: IDS.courseBo },
   ]);
   return { IDS, PASSWORDS };
