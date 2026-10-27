@@ -60,8 +60,12 @@ can't say which commit a component runs, there is no release.
 **Failure means no tag.** `release` needs every stage before it to have passed. A failed deploy or smoke run fails the
 workflow, and `rollback` puts back the previous release.
 
-**Manual rollback:** Actions > CD > Run workflow on `main`, with `rollback_to` set to an `rc-*` tag that the pipeline
-made. It redeploys that release's commits, then checks them with the deployment status report and the smoke tests. This
+**Manual rollback:** Actions > **Manual Rollback** (`manual-rollback.yml`, CICD-78): paste an `rc-*` tag that the
+pipeline made into the box and click Run workflow. It checks the tag's shape and that the release exists, refuses to
+start while a CD run is queued or in progress (CD keeps only one pending run, so a rollback queued behind a deploy could be
+replaced without notice), then starts CD (the same as Actions > CD > Run workflow on `main` with `rollback_to` set to that
+tag, which can also be done by hand), links that CD run and waits for it. The release notes name the tag to paste. CD's
+`prepare` job decides whether the release can be rolled back to. The rollback redeploys that release's commits, then checks them with the deployment status report and the smoke tests. This
 works whether `CD_RELEASE` is on or off.
 
 **The first release has nothing to roll back to.** Rollback needs an earlier release the pipeline made, so until the

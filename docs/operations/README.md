@@ -54,7 +54,8 @@ Khoa, see [Render handover](render-handover.md)).
 
 ### 5. Roll it back
 
-- [ ] Redeploy an earlier release candidate with **CD > Run workflow > rollback_to**
+- [ ] Redeploy an earlier release candidate with **Actions > Manual Rollback** (paste its `rc-…` tag, from the release
+      notes)
       ([Rollback and recovery, R1](rollback-and-recovery.md#r1-staging-is-broken-after-a-deploy)), and check that
       `/api/health` shows its commit.
 - [ ] Without any `rc-*` release: revert your change from step 3 in a pull request and let CD deploy the revert
