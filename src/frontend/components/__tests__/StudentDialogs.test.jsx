@@ -27,12 +27,12 @@ describe('AddStudentDialog', () => {
     await user.type(screen.getByLabelText('Student ID'), '1007');
     await user.type(screen.getByLabelText('Name'), 'Zed Zimmer');
     await user.type(screen.getByLabelText('Email'), 'zed@example.edu');
-    await user.type(screen.getByLabelText('Team Assignment (Optional)'), 'Gamma');
+    await user.type(screen.getByLabelText('Team Assignment (Optional)'), 'Team 3');
 
     expect(screen.getByLabelText('Student ID')).toHaveValue('1007');
     expect(screen.getByLabelText('Name')).toHaveValue('Zed Zimmer');
     expect(screen.getByLabelText('Email')).toHaveValue('zed@example.edu');
-    expect(screen.getByLabelText('Team Assignment (Optional)')).toHaveValue('Gamma');
+    expect(screen.getByLabelText('Team Assignment (Optional)')).toHaveValue('Team 3');
   });
 
   test('passes the whole updated form to the page on every change', async () => {
@@ -73,7 +73,7 @@ describe('AddStudentDialog', () => {
 });
 
 describe('EditStudentDialog', () => {
-  const STUDENT = { student_id: '1001', name: 'Ann Archer', email: 'ann@example.edu', group_assignment: 'Alpha' };
+  const STUDENT = { student_id: '1001', name: 'Ann Archer', email: 'ann@example.edu', group_assignment: 'Team 1' };
 
   test('is not shown while closed', () => {
     render(<EditStudentDialog open={false} form={STUDENT} onFormChange={() => {}} onClose={() => {}} onSave={() => {}} />);
@@ -84,7 +84,7 @@ describe('EditStudentDialog', () => {
     render(<Page Dialog={EditStudentDialog} initial={STUDENT} onClose={() => {}} onSave={() => {}} />);
     expect(screen.getByRole('heading', { name: 'Edit Student' })).toBeInTheDocument();
     expect(screen.getByLabelText('Student ID')).toHaveValue('1001');
-    expect(screen.getByLabelText('Team Assignment (Optional)')).toHaveValue('Alpha');
+    expect(screen.getByLabelText('Team Assignment (Optional)')).toHaveValue('Team 1');
 
     await user.clear(screen.getByLabelText('Name'));
     await user.type(screen.getByLabelText('Name'), 'Ann Archer-Reyes');

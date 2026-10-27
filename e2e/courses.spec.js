@@ -58,7 +58,7 @@ test('E2E-32: student search narrows the list, says when nothing matches, and Cl
   await expect(page.getByRole('button', { name: 'Show Search' })).toBeVisible();
 
   await page.getByRole('button', { name: 'Show Search' }).click();
-  await page.getByLabel('Team', { exact: true }).fill('beta');
+  await page.getByLabel('Team', { exact: true }).fill('team 2');
   await expect(page.getByText('Search Students (2 of 4)')).toBeVisible();
   await page.getByLabel('Email', { exact: true }).fill('nobody');
   await expect(page.getByText('No students match your search criteria.')).toBeVisible();

@@ -21,7 +21,7 @@ const remind = (body = {}) => app.request('POST', `/api/courses/${IDS.courseAda}
 async function addStudents(count) {
   await Student.create(Array.from({ length: count }, (_, i) => ({
     student_id: `9${String(i).padStart(3, '0')}`, name: `Extra Student ${i}`, email: `extra${i}@example.edu`,
-    course_id: IDS.courseAda, team_id: IDS.teamAlpha, group_assignment: 'Alpha',
+    course_id: IDS.courseAda, team_id: IDS.teamAlpha, group_assignment: 'Team 1',
   })));
 }
 
@@ -86,7 +86,7 @@ test('TC-10-32: with no pacing there is no limit, so a big class is sent in full
 });
 
 test('TC-10-33: sending to one team is limited the same way', async () => {
-  await addStudents(5); // team Alpha now has 7
+  await addStudents(5); // Team 1 now has 7
   const big = await app.request('POST', `/api/courses/${IDS.courseAda}/teams/${IDS.teamAlpha}/evaluations/send`, { token: ada, body: deadlineBody() });
   assert.equal(big.status, 400);
   assert.equal(big.body.error.code, 'TOO_MANY_RECIPIENTS');

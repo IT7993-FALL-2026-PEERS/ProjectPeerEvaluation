@@ -12,7 +12,7 @@ vi.mock('../../services/api', () => ({
 // owns the students and what the professor does with them, and hands back the props each dialog
 // takes.
 const COURSE = { _id: 'c1', course_name: 'Capstone' };
-const ANN = { _id: 's1', student_id: '1001', name: 'Ann Archer', email: 'ann@example.edu', group_assignment: 'Alpha' };
+const ANN = { _id: 's1', student_id: '1001', name: 'Ann Archer', email: 'ann@example.edu', group_assignment: 'Team 1' };
 const BEN = { _id: 's2', student_id: '1002', name: 'Ben Baker', email: 'ben@example.edu', group_assignment: '' };
 const NO_SEARCH = { student_id: '', name: '', email: '', team: '' };
 const EMPTY_FORM = { student_id: '', name: '', email: '', group_assignment: '' };
@@ -167,7 +167,7 @@ describe('useStudents: adding a student', () => {
 
   test('saves the student, says so, closes the dialog, empties the form and reloads the list', async () => {
     const view = await opened();
-    const CY = { student_id: '3', name: 'Cy', email: 'cy@example.edu', group_assignment: 'Beta' };
+    const CY = { student_id: '3', name: 'Cy', email: 'cy@example.edu', group_assignment: 'Team 2' };
     fill(view, CY);
     act(() => view.result.current.studentsDialog.onAddStudent());
     act(() => view.result.current.studentsDialog.onToggleSearch());
@@ -226,7 +226,7 @@ describe('useStudents: editing a student', () => {
 
     act(() => view.result.current.studentsDialog.onEdit(ANN));
     expect(view.result.current.editStudentDialog).toMatchObject({
-      open: true, form: { student_id: '1001', name: 'Ann Archer', email: 'ann@example.edu', group_assignment: 'Alpha' },
+      open: true, form: { student_id: '1001', name: 'Ann Archer', email: 'ann@example.edu', group_assignment: 'Team 1' },
     });
 
     act(() => view.result.current.studentsDialog.onEdit(BEN));
@@ -308,7 +308,7 @@ describe('useStudents: deleting one student', () => {
 
     const message = confirm.mock.calls[0][0];
     expect(message).toContain('Are you sure you want to delete "Ann Archer" (ID: 1001)?');
-    expect(message).toContain('Team: Alpha');
+    expect(message).toContain('Team: Team 1');
     expect(message).toContain('Delete their evaluation data');
     expect(api.delete).not.toHaveBeenCalled();
     expect(setAlert).not.toHaveBeenCalled();

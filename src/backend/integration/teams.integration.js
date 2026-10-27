@@ -39,7 +39,7 @@ test('TC-08-20: the seeded course is consistent to begin with', async () => {
 });
 
 test('TC-08-21: a team is created empty and the course team count follows', async () => {
-  const res = await app.request('POST', teams(), { token: ada, body: { teams: [{ team_name: 'Gamma' }, { team_name: 'Delta' }] } });
+  const res = await app.request('POST', teams(), { token: ada, body: { teams: [{ team_name: 'Team 3' }, { team_name: 'Team 4' }] } });
   assert.equal(res.status, 201);
   assert.equal(res.body.teams.length, 2);
   await assertCourseConsistent(IDS.courseAda);
@@ -47,7 +47,7 @@ test('TC-08-21: a team is created empty and the course team count follows', asyn
 
 test('TC-08-22: a team with a blank name, or with members in the request, is refused and nothing is saved', async () => {
   const blank = await app.request('POST', teams(), { token: ada, body: { teams: [{ team_name: '  ' }] } });
-  const members = await app.request('POST', teams(), { token: ada, body: { teams: [{ team_name: 'Gamma', students: [String(IDS.ann)] }] } });
+  const members = await app.request('POST', teams(), { token: ada, body: { teams: [{ team_name: 'Team 3', students: [String(IDS.ann)] }] } });
   assert.equal(blank.status, 400);
   assert.equal(members.status, 400);
   assert.equal(await Team.countDocuments({ course_id: IDS.courseAda }), 2);
@@ -57,7 +57,7 @@ test('TC-08-23: adding a student to a team moves them out of their old team, on 
   const res = await app.request('POST', `${teams()}/${IDS.teamBeta}/students/${IDS.ann}`, { token: ada });
   assert.equal(res.status, 200);
   assert.equal(String((await Student.findById(IDS.ann)).team_id), String(IDS.teamBeta));
-  assert.equal((await Student.findById(IDS.ann)).group_assignment, 'Beta');
+  assert.equal((await Student.findById(IDS.ann)).group_assignment, 'Team 2');
   assert.deepEqual((await Team.findById(IDS.teamAlpha)).students.map(String), [String(IDS.ben)]);
   await assertCourseConsistent(IDS.courseAda);
 });
@@ -83,11 +83,11 @@ test('TC-08-26: removing a student from a team clears both sides', async () => {
 });
 
 test('TC-08-27: renaming a team renames it for its students too', async () => {
-  const res = await app.request('PUT', `${teams()}/${IDS.teamAlpha}`, { token: ada, body: { team_name: 'Alpha Squad' } });
+  const res = await app.request('PUT', `${teams()}/${IDS.teamAlpha}`, { token: ada, body: { team_name: 'Team 7' } });
   assert.equal(res.status, 200);
   const members = await Student.find({ team_id: IDS.teamAlpha });
   assert.equal(members.length, 2);
-  assert.ok(members.every((s) => s.group_assignment === 'Alpha Squad'));
+  assert.ok(members.every((s) => s.group_assignment === 'Team 7'));
 });
 
 test('TC-08-28: a team with students cannot be deleted; an empty one can, and the count follows', async () => {
@@ -134,16 +134,16 @@ test('TC-08-32: auto-assign is currently not implemented (501)', async () => {
 });
 
 test('TC-08-33: a roster upload with teams leaves every course consistent', async () => {
-  const csv = ['student_id,name,email,group_assignment', '1005,Fay Foster,fay@example.edu,Alpha', '1006,Gus Green,gus@example.edu,Gamma', ''].join('\n');
+  const csv = ['student_id,name,email,group_assignment', '1005,Fay Foster,fay@example.edu,Team 1', '1006,Gus Green,gus@example.edu,Team 3', ''].join('\n');
   const res = await app.uploadCsv(`/api/courses/${IDS.courseAda}/roster`, csv, { token: ada });
   assert.equal(res.status, 200);
   await assertCourseConsistent(IDS.courseAda);
 });
 
 test('TC-08-34: the API takes { teams: [...] } and refuses a bare array, which the Create Team dialog used to send (CICD-52)', async () => {
-  const bare = await app.request('POST', teams(), { token: ada, body: [{ team_name: 'Gamma' }] });
+  const bare = await app.request('POST', teams(), { token: ada, body: [{ team_name: 'Team 3' }] });
   assert.equal(bare.status, 400);
-  const wrapped = await app.request('POST', teams(), { token: ada, body: { teams: [{ team_name: 'Gamma', team_status: 'Active' }] } });
+  const wrapped = await app.request('POST', teams(), { token: ada, body: { teams: [{ team_name: 'Team 3', team_status: 'Active' }] } });
   assert.equal(wrapped.status, 201);
   await assertCourseConsistent(IDS.courseAda);
 });

@@ -8,8 +8,8 @@ const CONTROL = process.env.E2E_CONTROL_URL || 'http://127.0.0.1:5051';
 const ROSTER_CSV = path.join(__dirname, '..', 'fixtures', 'roster.csv');
 const HEADER_ONLY_CSV = path.join(__dirname, '..', 'fixtures', 'header-only.csv');
 
-// Empties the database and seeds it again: professor Ada (course CS 4850, 4 students in teams Alpha
-// and Beta) and professor Bo. Pass { evaluations: true } to add four submitted evaluations.
+// Empties the database and seeds it again: professor Ada (course CS 4850, 4 students in teams Team 1
+// and Team 2) and professor Bo. Pass { evaluations: true } to add four submitted evaluations.
 async function resetData({ evaluations = false } = {}) {
   const res = await fetch(`${CONTROL}/reset${evaluations ? '?evaluations=1' : ''}`, { method: 'POST' });
   if (!res.ok) throw new Error(`reset failed: ${res.status}`);

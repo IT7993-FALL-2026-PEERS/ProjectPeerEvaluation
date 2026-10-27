@@ -7,17 +7,17 @@ const names = (groups) => groups.map(([team]) => team);
 
 describe('groupStudentsByTeam', () => {
   test('groups students by team, keeping each team\'s students in the order given', () => {
-    const groups = groupStudentsByTeam([student('Ann', 'Alpha'), student('Cy', 'Beta'), student('Ben', 'Alpha')]);
+    const groups = groupStudentsByTeam([student('Ann', 'Team 1'), student('Cy', 'Team 2'), student('Ben', 'Team 1')]);
 
-    expect(names(groups)).toEqual(['Alpha', 'Beta']);
+    expect(names(groups)).toEqual(['Team 1', 'Team 2']);
     expect(groups[0][1].map((s) => s.name)).toEqual(['Ann', 'Ben']);
     expect(groups[1][1].map((s) => s.name)).toEqual(['Cy']);
   });
 
   test('puts students with no team under "No Team", and that group last', () => {
-    const groups = groupStudentsByTeam([student('Eve', ''), student('Ann', 'Alpha'), student('Zed', null), student('Cy', 'Zulu')]);
+    const groups = groupStudentsByTeam([student('Eve', ''), student('Ann', 'Team 1'), student('Zed', null), student('Cy', 'Team 9')]);
 
-    expect(names(groups)).toEqual(['Alpha', 'Zulu', 'No Team']);
+    expect(names(groups)).toEqual(['Team 1', 'Team 9', 'No Team']);
     expect(groups[2][1].map((s) => s.name)).toEqual(['Eve', 'Zed']);
   });
 
@@ -27,13 +27,13 @@ describe('groupStudentsByTeam', () => {
   });
 
   test('compares the words before the number first, then the number, then what follows it', () => {
-    const groups = groupStudentsByTeam(['Group 2', 'Alpha 9', 'Group 1B', 'Group 1A', 'Alpha 10'].map((t) => student(t, t)));
-    expect(names(groups)).toEqual(['Alpha 9', 'Alpha 10', 'Group 1A', 'Group 1B', 'Group 2']);
+    const groups = groupStudentsByTeam(['Group 2', 'Team 9', 'Group 1B', 'Group 1A', 'Team 10'].map((t) => student(t, t)));
+    expect(names(groups)).toEqual(['Group 1A', 'Group 1B', 'Group 2', 'Team 9', 'Team 10']);
   });
 
   test('falls back to plain alphabetical order when a name has no number', () => {
-    const groups = groupStudentsByTeam(['Gamma', 'Alpha', 'Beta 3'].map((t) => student(t, t)));
-    expect(names(groups)).toEqual(['Alpha', 'Beta 3', 'Gamma']);
+    const groups = groupStudentsByTeam(['Team 3', 'Team 1', 'Group 3'].map((t) => student(t, t)));
+    expect(names(groups)).toEqual(['Group 3', 'Team 1', 'Team 3']);
   });
 
   test('gives nothing for no students, or no list at all', () => {

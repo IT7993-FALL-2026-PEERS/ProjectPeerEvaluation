@@ -4,7 +4,7 @@ const Student = require('../models/Student');
 const Evaluation = require('../models/Evaluation');
 const { startDatabase, stopDatabase, clearDatabase } = require('./helpers/db');
 const { startApp, sentEmails, clearEmails, deadlineBody } = require('./helpers/app');
-const { seed, IDS } = require('./helpers/seed');
+const { seed, IDS } = require('./helpers/seed');
 const { STUDENT_RATINGS: RATINGS } = require('./helpers/evaluations');
 
 // FR-09 / FR-16: the student path, from the invitation to a saved evaluation. The student has no
@@ -49,7 +49,7 @@ test('TC-16-20: a student opens the link from the email and sees only their team
   const res = await app.request('GET', `/api/evaluate/${token}`);
   assert.equal(res.status, 200);
   assert.equal(res.body.evaluator.name, 'Ann Archer');
-  assert.equal(res.body.evaluator.team, 'Alpha');
+  assert.equal(res.body.evaluator.team, 'Team 1');
   assert.deepEqual(res.body.teammates.map((t) => t.name), ['Ben Baker']);
   assert.equal(res.body.rubric.criteria.length, 6);
 });
@@ -142,7 +142,7 @@ test('TC-16-76: participation is rated 1-5 like every other criterion: 5 is acce
 test('TC-16-26: a team of three needs a rating for each teammate, and a bad second one saves neither', async () => {
   const fay = await Student.create({
     student_id: '1007', name: 'Fay Fox', email: 'fay@example.edu',
-    course_id: IDS.courseAda, team_id: IDS.teamAlpha, group_assignment: 'Alpha',
+    course_id: IDS.courseAda, team_id: IDS.teamAlpha, group_assignment: 'Team 1',
   });
   await app.request('POST', `/api/courses/${IDS.courseAda}/evaluations/send`, { token: ada, body: deadlineBody() });
   const token = (await Student.findById(IDS.ann)).evaluation_token;

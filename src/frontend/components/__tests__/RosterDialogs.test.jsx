@@ -59,13 +59,13 @@ describe('CsvUploadDialog', () => {
 
   test('shows a clean result as a success, with the counts and team names', () => {
     render(<CsvUploadDialog {...csvProps({
-      results: { message: '2 students added successfully', students: [{}, {}], teams_created: 1, team_names: ['Gamma', 'Delta'], errors: [] },
+      results: { message: '2 students added successfully', students: [{}, {}], teams_created: 1, team_names: ['Team 3', 'Team 4'], errors: [] },
     })} />);
 
     expect(screen.getByText('2 students added successfully')).toBeInTheDocument();
     expect(screen.getByText('Students added: 2')).toBeInTheDocument();
     expect(screen.getByText('Teams created: 1')).toBeInTheDocument();
-    expect(screen.getByText('Team names: Gamma, Delta')).toBeInTheDocument();
+    expect(screen.getByText('Team names: Team 3, Team 4')).toBeInTheDocument();
     expect(screen.queryByText('Errors:')).not.toBeInTheDocument();
   });
 

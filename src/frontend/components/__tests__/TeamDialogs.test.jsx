@@ -180,7 +180,7 @@ describe('TeamsDialog', () => {
 });
 
 const formProps = (overrides = {}) => ({
-  open: true, form: { team_name: 'Alpha', team_status: 'Active' }, onFormChange: () => {}, onClose: () => {},
+  open: true, form: { team_name: 'Team 1', team_status: 'Active' }, onFormChange: () => {}, onClose: () => {},
   ...overrides,
 });
 
@@ -193,15 +193,15 @@ describe('EditTeamDialog', () => {
   test('shows the team\'s name and status', () => {
     render(<EditTeamDialog {...formProps({ onSave: () => {} })} />);
     expect(screen.getByRole('heading', { name: 'Edit Team' })).toBeInTheDocument();
-    expect(screen.getByLabelText(/Team Name/)).toHaveValue('Alpha');
+    expect(screen.getByLabelText(/Team Name/)).toHaveValue('Team 1');
     expect(screen.getByRole('combobox')).toHaveTextContent('Active');
   });
 
   test('typing a name reports the whole form with the new name', () => {
     const onFormChange = vi.fn();
     render(<EditTeamDialog {...formProps({ onFormChange, onSave: () => {} })} />);
-    fireEvent.change(screen.getByLabelText(/Team Name/), { target: { value: 'Alpha Squad' } });
-    expect(onFormChange).toHaveBeenCalledWith({ team_name: 'Alpha Squad', team_status: 'Active' });
+    fireEvent.change(screen.getByLabelText(/Team Name/), { target: { value: 'Team 7' } });
+    expect(onFormChange).toHaveBeenCalledWith({ team_name: 'Team 7', team_status: 'Active' });
   });
 
   test('choosing a status reports the whole form with the new status', async () => {
@@ -209,7 +209,7 @@ describe('EditTeamDialog', () => {
     render(<EditTeamDialog {...formProps({ onFormChange, onSave: () => {} })} />);
     await user.click(screen.getByRole('combobox'));
     await user.click(screen.getByRole('option', { name: 'Inactive' }));
-    expect(onFormChange).toHaveBeenCalledWith({ team_name: 'Alpha', team_status: 'Inactive' });
+    expect(onFormChange).toHaveBeenCalledWith({ team_name: 'Team 1', team_status: 'Inactive' });
   });
 
   test('Save Changes is off while the name is empty or only spaces', () => {
@@ -254,8 +254,8 @@ describe('CreateTeamDialog', () => {
     const onFormChange = vi.fn();
     render(<CreateTeamDialog {...createProps({ onFormChange })} />);
 
-    fireEvent.change(screen.getByLabelText(/Team Name/), { target: { value: 'Gamma' } });
-    expect(onFormChange).toHaveBeenLastCalledWith({ team_name: 'Gamma', team_status: 'Active' });
+    fireEvent.change(screen.getByLabelText(/Team Name/), { target: { value: 'Team 3' } });
+    expect(onFormChange).toHaveBeenLastCalledWith({ team_name: 'Team 3', team_status: 'Active' });
 
     await user.click(screen.getByRole('combobox'));
     await user.click(screen.getByRole('option', { name: 'Inactive' }));
@@ -269,14 +269,14 @@ describe('CreateTeamDialog', () => {
     rerender(<CreateTeamDialog {...createProps({ form: { team_name: ' ', team_status: 'Active' } })} />);
     expect(screen.getByRole('button', { name: 'Create Team' })).toBeDisabled();
 
-    rerender(<CreateTeamDialog {...createProps({ form: { team_name: 'Gamma', team_status: 'Active' } })} />);
+    rerender(<CreateTeamDialog {...createProps({ form: { team_name: 'Team 3', team_status: 'Active' } })} />);
     expect(screen.getByRole('button', { name: 'Create Team' })).toBeEnabled();
   });
 
   test('Cancel and Create Team call the page\'s handlers', async () => {
     const onClose = vi.fn();
     const onCreate = vi.fn();
-    render(<CreateTeamDialog {...createProps({ form: { team_name: 'Gamma', team_status: 'Active' }, onClose, onCreate })} />);
+    render(<CreateTeamDialog {...createProps({ form: { team_name: 'Team 3', team_status: 'Active' }, onClose, onCreate })} />);
 
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(onClose).toHaveBeenCalledTimes(1);
@@ -287,15 +287,15 @@ describe('CreateTeamDialog', () => {
 });
 
 const IN_TEAM = [
-  { _id: 's1', name: 'Ann Archer', student_id: '1001', email: 'ann@example.edu', group_assignment: 'Alpha' },
+  { _id: 's1', name: 'Ann Archer', student_id: '1001', email: 'ann@example.edu', group_assignment: 'Team 1' },
 ];
 const AVAILABLE = [
-  { _id: 's3', name: 'Cy Cole', student_id: '1003', email: 'cy@example.edu', group_assignment: 'Beta' },
+  { _id: 's3', name: 'Cy Cole', student_id: '1003', email: 'cy@example.edu', group_assignment: 'Team 2' },
   { _id: 's5', name: 'Eve Evans', student_id: '2001', email: 'eve@example.edu', group_assignment: '' },
 ];
 
 const studentsProps = (overrides = {}) => ({
-  open: true, team: { _id: 't1', team_name: 'Alpha' }, teamStudents: IN_TEAM, availableStudents: AVAILABLE,
+  open: true, team: { _id: 't1', team_name: 'Team 1' }, teamStudents: IN_TEAM, availableStudents: AVAILABLE,
   onAdd: () => {}, onRemove: () => {}, onClose: () => {}, ...overrides,
 });
 
@@ -307,7 +307,7 @@ describe('TeamStudentsDialog', () => {
 
   test('names the team in its title and counts both lists', () => {
     render(<TeamStudentsDialog {...studentsProps()} />);
-    expect(screen.getByRole('heading', { name: 'Manage Students in Alpha' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Manage Students in Team 1' })).toBeInTheDocument();
     expect(screen.getByText('Students in Team (1)')).toBeInTheDocument();
     expect(screen.getByText('Available Students (2)')).toBeInTheDocument();
   });
@@ -322,7 +322,7 @@ describe('TeamStudentsDialog', () => {
   test('tells where an available student already is, and says nothing for one without a team', () => {
     render(<TeamStudentsDialog {...studentsProps()} />);
     expect(screen.getAllByText(/Currently in:/)).toHaveLength(1);
-    expect(screen.getByText('Currently in: Beta')).toBeInTheDocument();
+    expect(screen.getByText('Currently in: Team 2')).toBeInTheDocument();
   });
 
   test('says so when either list is empty', () => {

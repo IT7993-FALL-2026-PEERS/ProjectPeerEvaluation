@@ -63,9 +63,9 @@ test('TC-17-21: the course summary counts students and grades from the same numb
 test('TC-17-22: team averages are the mean of the members\' scores (regular method)', async () => {
   const { teams } = (await app.request('GET', course('?gradingMethod=mean'), { token: ada })).body;
   const byTeam = Object.fromEntries(teams.map((t) => [t.team_name, t]));
-  near(byTeam.Alpha.averageScore, 88.335, 'Alpha');
-  near(byTeam.Beta.averageScore, 73.335, 'Beta');
-  assert.equal(byTeam.Alpha.students.length, 2);
+  near(byTeam['Team 1'].averageScore, 88.335, 'Team 1');
+  near(byTeam['Team 2'].averageScore, 73.335, 'Team 2');
+  assert.equal(byTeam['Team 1'].students.length, 2);
 });
 
 test('TC-17-23: the team report matches the course report for that team', async () => {
@@ -129,8 +129,8 @@ test('TC-19-20: the CSV export has one row per student with the same scores as t
   const lines = (await res.text()).split('\n');
   assert.equal(lines[0], 'Student ID,Name,Email,Team,Original Score,Final Score,Letter Grade,Evaluations Received,Improvement');
   assert.equal(lines.length, 5);
-  assert.ok(lines.includes('1002,Ben Baker,ben@example.edu,Alpha,76.67,76.67,C,1,0'));
-  assert.ok(lines.includes('1004,Di Diaz,di@example.edu,Beta,56.67,56.67,F,1,0'));
+  assert.ok(lines.includes('1002,Ben Baker,ben@example.edu,Team 1,76.67,76.67,C,1,0'));
+  assert.ok(lines.includes('1004,Di Diaz,di@example.edu,Team 2,56.67,56.67,F,1,0'));
 });
 
 test('TC-19-22: the CSV export applies the grading method like the report does: curved unless the query says otherwise', async () => {

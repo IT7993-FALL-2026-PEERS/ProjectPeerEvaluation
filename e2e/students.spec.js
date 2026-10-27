@@ -48,7 +48,7 @@ test('E2E-18: editing a student saves the change, and Save is off while a requir
   await expect(alertWith(page, 'Student updated successfully')).toBeVisible();
   await expect(page.getByRole('row', { name: /Ann Archer-Reyes/ })).toBeVisible();
   // The team is kept (CICD-45).
-  await expect(page.getByRole('row', { name: /Ann Archer-Reyes/ })).toContainText('Alpha');
+  await expect(page.getByRole('row', { name: /Ann Archer-Reyes/ })).toContainText('Team 1');
 });
 
 test('E2E-19: the roster upload inside Manage Students shows the server\'s reason for a bad file, then adds a good one', async ({ page }) => {

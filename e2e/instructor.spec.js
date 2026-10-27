@@ -75,11 +75,11 @@ test('E2E-05: the Create Team dialog creates a team (CICD-52)', async ({ page })
   await loginAsAda(page, passwords);
   await courseAction(page, 'Manage Teams').click();
   await page.getByRole('button', { name: 'Create Team' }).click();
-  await page.getByRole('dialog').last().getByLabel(/team name/i).fill('Gamma');
+  await page.getByRole('dialog').last().getByLabel(/team name/i).fill('Team 3');
   await page.getByRole('dialog').last().getByRole('button', { name: /^create/i }).click();
 
   await expect(alertWith(page, 'created successfully')).toBeVisible();
-  await expect(page.getByRole('cell', { name: 'Gamma', exact: true })).toBeVisible();
+  await expect(page.getByRole('cell', { name: 'Team 3', exact: true })).toBeVisible();
 });
 
 test('E2E-06: sending invitations emails every student a link and opens the status, with nobody done yet', async ({ page }) => {
@@ -125,10 +125,10 @@ test('E2E-07: the report is curved by default (mean 85, deviation 20): it shows 
   const lines = Buffer.concat(chunks).toString('utf8').trim().split(/\r?\n/);
   expect(lines[0]).toBe('Student ID,Name,Email,Team,Original Score,Final Score,Letter Grade,Evaluations Received,Improvement');
   expect(lines.slice(1).sort()).toEqual([
-    '1001,Ann Archer,ann@example.edu,Alpha,100,100,A,1,0',
-    '1002,Ben Baker,ben@example.edu,Alpha,76.67,79.86,C,1,3.19',
-    '1003,Cy Cole,cy@example.edu,Beta,90,96.3,A,1,6.3',
-    '1004,Di Diaz,di@example.edu,Beta,56.67,55.21,F,1,-1.46',
+    '1001,Ann Archer,ann@example.edu,Team 1,100,100,A,1,0',
+    '1002,Ben Baker,ben@example.edu,Team 1,76.67,79.86,C,1,3.19',
+    '1003,Cy Cole,cy@example.edu,Team 2,90,96.3,A,1,6.3',
+    '1004,Di Diaz,di@example.edu,Team 2,56.67,55.21,F,1,-1.46',
   ]);
 });
 
@@ -137,45 +137,45 @@ test('E2E-07: the report is curved by default (mean 85, deviation 20): it shows 
 test('E2E-08: renaming a team shows the new name in the team list straight away', async ({ page }) => {
   await loginAsAda(page, passwords);
   await courseAction(page, 'Manage Teams').click();
-  await page.getByRole('row', { name: /Alpha/ }).getByTitle('Edit Team').click();
-  await page.getByRole('dialog').last().getByLabel(/team name/i).fill('Alpha Squad');
+  await page.getByRole('row', { name: /Team 1/ }).getByTitle('Edit Team').click();
+  await page.getByRole('dialog').last().getByLabel(/team name/i).fill('Team 7');
   await page.getByRole('dialog').last().getByRole('button', { name: /save|update/i }).click();
 
   await expect(alertWith(page, 'updated successfully')).toBeVisible();
-  await expect(page.getByRole('cell', { name: 'Alpha Squad', exact: true })).toBeVisible();
-  await expect(page.getByRole('cell', { name: 'Alpha', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('cell', { name: 'Team 7', exact: true })).toBeVisible();
+  await expect(page.getByRole('cell', { name: 'Team 1', exact: true })).toHaveCount(0);
 });
 
 test('E2E-09: deleting an empty team removes it from the team list straight away', async ({ page }) => {
   await loginAsAda(page, passwords);
   await courseAction(page, 'Manage Teams').click();
   await page.getByRole('button', { name: 'Create Team' }).click();
-  await page.getByRole('dialog').last().getByLabel(/team name/i).fill('Gamma');
+  await page.getByRole('dialog').last().getByLabel(/team name/i).fill('Team 3');
   await page.getByRole('dialog').last().getByRole('button', { name: /^create/i }).click();
-  await expect(page.getByRole('cell', { name: 'Gamma', exact: true })).toBeVisible();
+  await expect(page.getByRole('cell', { name: 'Team 3', exact: true })).toBeVisible();
 
   page.once('dialog', (confirm) => confirm.accept()); // the page asks with the browser's own confirm box
-  await page.getByRole('row', { name: /Gamma/ }).getByTitle('Delete Team').click();
+  await page.getByRole('row', { name: /Team 3/ }).getByTitle('Delete Team').click();
   await expect(alertWith(page, 'deleted successfully')).toBeVisible();
-  await expect(page.getByRole('cell', { name: 'Gamma', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('cell', { name: 'Team 3', exact: true })).toHaveCount(0);
 });
 
 test('E2E-15: if the team list cannot be refreshed after a delete, the delete still shows as done and the team is gone', async ({ page }) => {
   await loginAsAda(page, passwords);
   await courseAction(page, 'Manage Teams').click();
   await page.getByRole('button', { name: 'Create Team' }).click();
-  await page.getByRole('dialog').last().getByLabel(/team name/i).fill('Gamma');
+  await page.getByRole('dialog').last().getByLabel(/team name/i).fill('Team 3');
   await page.getByRole('dialog').last().getByRole('button', { name: /^create/i }).click();
-  await expect(page.getByRole('cell', { name: 'Gamma', exact: true })).toBeVisible();
+  await expect(page.getByRole('cell', { name: 'Team 3', exact: true })).toBeVisible();
 
   // From now on the team list request fails; the delete itself still goes through.
   await page.route('**/api/courses/*/teams', (route) => (route.request().method() === 'GET' ? route.abort() : route.continue()));
   page.once('dialog', (confirm) => confirm.accept());
-  await page.getByRole('row', { name: /Gamma/ }).getByTitle('Delete Team').click();
+  await page.getByRole('row', { name: /Team 3/ }).getByTitle('Delete Team').click();
 
   await expect(alertWith(page, 'deleted successfully')).toBeVisible();
   await expect(alertWith(page, 'Failed to delete team')).toHaveCount(0);
-  await expect(page.getByRole('cell', { name: 'Gamma', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('cell', { name: 'Team 3', exact: true })).toHaveCount(0);
 });
 
 test('E2E-41: when the login has expired the page says so, and Use the login page goes back to the login page', async ({ page }) => {

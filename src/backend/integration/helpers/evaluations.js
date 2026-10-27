@@ -11,7 +11,7 @@ const { IDS } = require('./seed');
 //   Di   received {3,3,3,3,3,2}  ->  17 / 6 * 20 = 56.67   (F)   from Cy
 //   Cy   received {4,5,4,5,4,5}  ->  27 / 6 * 20 = 90.00   (A)   from Di
 //
-// Team Alpha (Ann, Ben) averages 88.335; team Beta (Cy, Di) averages 73.335.
+// Team 1 (Ann, Ben) averages 88.335; Team 2 (Cy, Di) averages 73.335.
 const ratings = (professionalism, communication, work_ethic, content_knowledge_skills, overall_contribution, participation) => (
   { professionalism, communication, work_ethic, content_knowledge_skills, overall_contribution, participation }
 );

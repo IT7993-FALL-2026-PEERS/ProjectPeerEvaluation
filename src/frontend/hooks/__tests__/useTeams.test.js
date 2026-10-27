@@ -14,11 +14,11 @@ vi.mock('../../services/api', () => ({
 // reset; the hook owns the teams and what the professor does with them, and hands back the props
 // each dialog takes.
 const COURSE = { _id: 'c1', course_name: 'Capstone' };
-const ALPHA = { _id: 't1', team_name: 'Alpha', team_status: 'Active' };
-const BETA = { _id: 't2', team_name: 'Beta', team_status: 'Active' };
-const ANN = { _id: 's1', student_id: '1001', name: 'Ann Archer', team_id: 't1', group_assignment: 'Alpha' };
+const ALPHA = { _id: 't1', team_name: 'Team 1', team_status: 'Active' };
+const BETA = { _id: 't2', team_name: 'Team 2', team_status: 'Active' };
+const ANN = { _id: 's1', student_id: '1001', name: 'Ann Archer', team_id: 't1', group_assignment: 'Team 1' };
 const BEN = { _id: 's2', student_id: '1002', name: 'Ben Baker', team_id: null, group_assignment: '' };
-const CY = { _id: 's3', student_id: '1003', name: 'Cy Cole', team_id: 't2', group_assignment: 'Beta' };
+const CY = { _id: 's3', student_id: '1003', name: 'Cy Cole', team_id: 't2', group_assignment: 'Team 2' };
 const NO_SEARCH = { team_name: '', team_status: '' };
 
 let routes;
@@ -107,7 +107,7 @@ describe('useTeams: opening the list', () => {
   test('forgets an earlier search, and hides the search fields, each time it opens', async () => {
     const view = await opened();
     act(() => view.result.current.teamsDialog.onToggleSearch());
-    act(() => view.result.current.teamsDialog.onSearchChange('team_name', 'alp'));
+    act(() => view.result.current.teamsDialog.onSearchChange('team_name', 'team 1'));
 
     await act(() => view.result.current.openTeams(COURSE));
 
@@ -222,7 +222,7 @@ describe('useTeams: deleting one team', () => {
 
     await act(() => view.result.current.teamsDialog.onDelete(ALPHA));
 
-    expect(confirm.mock.calls[0][0]).toBe('Are you sure you want to delete "Alpha"? This will unlink all students from this team.');
+    expect(confirm.mock.calls[0][0]).toBe('Are you sure you want to delete "Team 1"? This will unlink all students from this team.');
     expect(api.delete).not.toHaveBeenCalled();
   });
 
@@ -233,7 +233,7 @@ describe('useTeams: deleting one team', () => {
     await act(() => view.result.current.teamsDialog.onDelete(ALPHA));
 
     expect(api.delete).toHaveBeenCalledWith('/courses/c1/teams/t1');
-    expect(setAlert).toHaveBeenCalledWith({ severity: 'success', message: 'Team "Alpha" deleted successfully' });
+    expect(setAlert).toHaveBeenCalledWith({ severity: 'success', message: 'Team "Team 1" deleted successfully' });
     expect(view.result.current.teamsDialog.teams).toEqual([BETA]);
     expect(refreshCourses).toHaveBeenCalledTimes(1);
   });
@@ -252,7 +252,7 @@ describe('useTeams: deleting one team', () => {
 
     await act(() => view.result.current.teamsDialog.onDelete(ALPHA));
 
-    expect(setAlert).toHaveBeenCalledWith({ severity: 'success', message: 'Team "Alpha" deleted successfully' });
+    expect(setAlert).toHaveBeenCalledWith({ severity: 'success', message: 'Team "Team 1" deleted successfully' });
     expect(view.result.current.teamsDialog.teams).toEqual([BETA]);
   });
 
@@ -262,7 +262,7 @@ describe('useTeams: deleting one team', () => {
 
     await act(() => view.result.current.teamsDialog.onDelete(ALPHA));
 
-    expect(setAlert).toHaveBeenCalledWith({ severity: 'error', message: 'Failed to delete team "Alpha"' });
+    expect(setAlert).toHaveBeenCalledWith({ severity: 'error', message: 'Failed to delete team "Team 1"' });
     expect(view.result.current.teamsDialog.teams).toEqual([ALPHA, BETA]);
     expect(refreshCourses).not.toHaveBeenCalled();
   });
@@ -287,10 +287,10 @@ describe('useTeams: editing a team', () => {
     expect(view.result.current.editTeamDialog).toMatchObject({ open: false, form: { team_name: '', team_status: 'Active' } });
 
     act(() => view.result.current.teamsDialog.onEdit(BETA));
-    expect(view.result.current.editTeamDialog).toMatchObject({ open: true, form: { team_name: 'Beta', team_status: 'Active' } });
+    expect(view.result.current.editTeamDialog).toMatchObject({ open: true, form: { team_name: 'Team 2', team_status: 'Active' } });
 
     act(() => view.result.current.teamsDialog.onEdit({ ...ALPHA, team_status: 'Inactive' }));
-    expect(view.result.current.editTeamDialog.form).toEqual({ team_name: 'Alpha', team_status: 'Inactive' });
+    expect(view.result.current.editTeamDialog.form).toEqual({ team_name: 'Team 1', team_status: 'Inactive' });
 
     act(() => view.result.current.editTeamDialog.onClose());
     expect(view.result.current.editTeamDialog.open).toBe(false);
@@ -311,33 +311,33 @@ describe('useTeams: editing a team', () => {
   test('saves the change, says so, shows the server\'s list, closes and empties the form', async () => {
     const view = await opened();
     act(() => view.result.current.teamsDialog.onEdit(ALPHA));
-    change(view, { team_name: 'Alpha 2', team_status: 'Inactive' });
-    routes['/courses/c1/teams'] = [{ ...ALPHA, team_name: 'Alpha 2', team_status: 'Inactive' }, BETA];
+    change(view, { team_name: 'Team 1 2', team_status: 'Inactive' });
+    routes['/courses/c1/teams'] = [{ ...ALPHA, team_name: 'Team 1 2', team_status: 'Inactive' }, BETA];
 
     await act(() => view.result.current.editTeamDialog.onSave());
 
-    expect(api.put).toHaveBeenCalledWith('/courses/c1/teams/t1', { team_name: 'Alpha 2', team_status: 'Inactive' });
-    expect(setAlert).toHaveBeenCalledWith({ severity: 'success', message: 'Team "Alpha 2" updated successfully' });
-    expect(view.result.current.teamsDialog.teams[0]).toMatchObject({ team_name: 'Alpha 2', team_status: 'Inactive' });
+    expect(api.put).toHaveBeenCalledWith('/courses/c1/teams/t1', { team_name: 'Team 1 2', team_status: 'Inactive' });
+    expect(setAlert).toHaveBeenCalledWith({ severity: 'success', message: 'Team "Team 1 2" updated successfully' });
+    expect(view.result.current.teamsDialog.teams[0]).toMatchObject({ team_name: 'Team 1 2', team_status: 'Inactive' });
     expect(view.result.current.editTeamDialog).toMatchObject({ open: false, form: { team_name: '', team_status: 'Active' } });
   });
 
   test('when only the refresh fails, shows the change in the list it already had', async () => {
     const view = await opened();
     act(() => view.result.current.teamsDialog.onEdit(ALPHA));
-    change(view, { team_name: 'Alpha 2', team_status: 'Active' });
+    change(view, { team_name: 'Team 1 2', team_status: 'Active' });
     delete routes['/courses/c1/teams'];
 
     await act(() => view.result.current.editTeamDialog.onSave());
 
-    expect(setAlert).toHaveBeenCalledWith({ severity: 'success', message: 'Team "Alpha 2" updated successfully' });
-    expect(view.result.current.teamsDialog.teams).toEqual([{ ...ALPHA, team_name: 'Alpha 2' }, BETA]);
+    expect(setAlert).toHaveBeenCalledWith({ severity: 'success', message: 'Team "Team 1 2" updated successfully' });
+    expect(view.result.current.teamsDialog.teams).toEqual([{ ...ALPHA, team_name: 'Team 1 2' }, BETA]);
   });
 
   test('a renamed team makes the page reload its students, which show the team name', async () => {
     const view = await opened();
     act(() => view.result.current.teamsDialog.onEdit(ALPHA));
-    change(view, { team_name: 'Alpha 2', team_status: 'Active' });
+    change(view, { team_name: 'Team 1 2', team_status: 'Active' });
 
     await act(() => view.result.current.editTeamDialog.onSave());
 
@@ -348,7 +348,7 @@ describe('useTeams: editing a team', () => {
   test('a change of status alone does not reload the students', async () => {
     const view = await opened();
     act(() => view.result.current.teamsDialog.onEdit(ALPHA));
-    change(view, { team_name: 'Alpha', team_status: 'Inactive' });
+    change(view, { team_name: 'Team 1', team_status: 'Inactive' });
 
     await act(() => view.result.current.editTeamDialog.onSave());
 
@@ -360,7 +360,7 @@ describe('useTeams: editing a team', () => {
     students = [];
     const view = await opened();
     act(() => view.result.current.teamsDialog.onEdit(ALPHA));
-    change(view, { team_name: 'Alpha 2', team_status: 'Active' });
+    change(view, { team_name: 'Team 1 2', team_status: 'Active' });
 
     await act(() => view.result.current.editTeamDialog.onSave());
 
@@ -370,7 +370,7 @@ describe('useTeams: editing a team', () => {
   test('a failed students reload does not fail the save', async () => {
     const view = await opened();
     act(() => view.result.current.teamsDialog.onEdit(ALPHA));
-    change(view, { team_name: 'Alpha 2', team_status: 'Active' });
+    change(view, { team_name: 'Team 1 2', team_status: 'Active' });
     delete routes['/courses/c1/students'];
 
     await act(() => view.result.current.editTeamDialog.onSave());
@@ -424,15 +424,15 @@ describe('useTeams: creating a team', () => {
 
   test('creates the team with a trimmed name, says so, shows the new list, closes, empties the form and refreshes the counts', async () => {
     const view = await opened();
-    fill(view, { team_name: ' Gamma ', team_status: 'Active' });
+    fill(view, { team_name: ' Team 3 ', team_status: 'Active' });
     act(() => view.result.current.teamsDialog.onCreate());
-    const GAMMA = { _id: 't3', team_name: 'Gamma', team_status: 'Active' };
+    const GAMMA = { _id: 't3', team_name: 'Team 3', team_status: 'Active' };
     routes['/courses/c1/teams'] = [ALPHA, BETA, GAMMA];
 
     await act(() => view.result.current.createTeamDialog.onCreate());
 
-    expect(api.post).toHaveBeenCalledWith('/courses/c1/teams', { teams: [{ team_name: 'Gamma', team_status: 'Active' }] });
-    expect(setAlert).toHaveBeenCalledWith({ severity: 'success', message: 'Team " Gamma " created successfully' });
+    expect(api.post).toHaveBeenCalledWith('/courses/c1/teams', { teams: [{ team_name: 'Team 3', team_status: 'Active' }] });
+    expect(setAlert).toHaveBeenCalledWith({ severity: 'success', message: 'Team " Team 3 " created successfully' });
     expect(view.result.current.teamsDialog.teams).toHaveLength(3);
     expect(view.result.current.createTeamDialog).toMatchObject({ open: false, form: { team_name: '', team_status: 'Active' } });
     expect(refreshCourses).toHaveBeenCalledTimes(1);
@@ -440,7 +440,7 @@ describe('useTeams: creating a team', () => {
 
   test('shows the server\'s reason when it refuses the team, and keeps the dialog open', async () => {
     const view = await opened();
-    fill(view, { team_name: 'Alpha', team_status: 'Active' });
+    fill(view, { team_name: 'Team 1', team_status: 'Active' });
     act(() => view.result.current.teamsDialog.onCreate());
     api.post.mockRejectedValue({ response: { data: { error: { message: 'Team name already used' } } } });
 
@@ -452,7 +452,7 @@ describe('useTeams: creating a team', () => {
 
   test('says "Failed to create team" when the server gives no reason', async () => {
     const view = await opened();
-    fill(view, { team_name: 'Gamma', team_status: 'Active' });
+    fill(view, { team_name: 'Team 3', team_status: 'Active' });
     api.post.mockRejectedValue(new Error('network'));
 
     await act(() => view.result.current.createTeamDialog.onCreate());
@@ -462,7 +462,7 @@ describe('useTeams: creating a team', () => {
 
   test('does nothing before a course has been opened', async () => {
     const view = render();
-    fill(view, { team_name: 'Gamma', team_status: 'Active' });
+    fill(view, { team_name: 'Team 3', team_status: 'Active' });
 
     await act(() => view.result.current.createTeamDialog.onCreate());
 
@@ -485,7 +485,7 @@ describe('useTeams: a team\'s students', () => {
   });
 
   test('puts a student in the team by its name when the student has no team id (existing behaviour)', async () => {
-    const byName = { _id: 's4', student_id: '1004', name: 'Di Doe', team_id: undefined, group_assignment: 'Alpha' };
+    const byName = { _id: 's4', student_id: '1004', name: 'Di Doe', team_id: undefined, group_assignment: 'Team 1' };
     routes['/courses/c1/students'] = [ANN, byName];
     const view = await managing();
 
@@ -495,7 +495,7 @@ describe('useTeams: a team\'s students', () => {
   });
 
   test('puts a student in the team by its id even when the student carries an old team name', async () => {
-    const renamed = { _id: 's5', student_id: '1005', name: 'Ed Eng', team_id: 't1', group_assignment: 'Alpha (old name)' };
+    const renamed = { _id: 's5', student_id: '1005', name: 'Ed Eng', team_id: 't1', group_assignment: 'Team 1 (old name)' };
     routes['/courses/c1/students'] = [renamed, BEN];
     const view = await managing();
 
@@ -523,14 +523,14 @@ describe('useTeams: a team\'s students', () => {
 
   test('adds a student to the team, shows the new lists and the team counts, and says so', async () => {
     const view = await managing();
-    const DI = { _id: 's4', student_id: '1004', name: 'Di Doe', team_id: 't1', group_assignment: 'Alpha' };
-    routes['/courses/c1/students'] = [{ ...ANN }, { ...BEN, team_id: 't1', group_assignment: 'Alpha' }, DI, CY];
+    const DI = { _id: 's4', student_id: '1004', name: 'Di Doe', team_id: 't1', group_assignment: 'Team 1' };
+    routes['/courses/c1/students'] = [{ ...ANN }, { ...BEN, team_id: 't1', group_assignment: 'Team 1' }, DI, CY];
     routes['/courses/c1/teams'] = [{ ...ALPHA, student_count: 3 }, BETA];
 
     await act(() => view.result.current.teamStudentsDialog.onAdd('s2'));
 
     expect(api.post).toHaveBeenCalledWith('/courses/c1/teams/t1/students/s2');
-    expect(setAlert).toHaveBeenCalledWith({ severity: 'success', message: 'Student added to Alpha' });
+    expect(setAlert).toHaveBeenCalledWith({ severity: 'success', message: 'Student added to Team 1' });
     // Whatever the server now says, including a student who joined from somewhere else.
     expect(view.result.current.teamStudentsDialog.teamStudents.map((s) => s._id)).toEqual(['s1', 's2', 's4']);
     expect(view.result.current.teamStudentsDialog.availableStudents).toEqual([CY]);
@@ -545,7 +545,7 @@ describe('useTeams: a team\'s students', () => {
     await act(() => view.result.current.teamStudentsDialog.onRemove('s1'));
 
     expect(api.delete).toHaveBeenCalledWith('/courses/c1/teams/t1/students/s1');
-    expect(setAlert).toHaveBeenCalledWith({ severity: 'success', message: 'Student removed from Alpha' });
+    expect(setAlert).toHaveBeenCalledWith({ severity: 'success', message: 'Student removed from Team 1' });
     expect(view.result.current.teamStudentsDialog.teamStudents).toEqual([]);
     expect(view.result.current.teamStudentsDialog.availableStudents.map((s) => s._id)).toEqual(['s1', 's2', 's3']);
     expect(view.result.current.teamsDialog.teams[0]).toMatchObject({ student_count: 0 });
@@ -684,7 +684,7 @@ describe('useTeams: sending the evaluations to one team', () => {
     await act(async () => { release({ data: { emails_sent: 2, total_students: 2, failed: [] } }); await sending; });
 
     expect(api.post).toHaveBeenCalledWith('/courses/c1/teams/t1/evaluations/send', WITH_DEADLINE);
-    expect(setAlert).toHaveBeenCalledWith({ severity: 'success', message: 'Evaluation invitations sent to team "Alpha".' });
+    expect(setAlert).toHaveBeenCalledWith({ severity: 'success', message: 'Evaluation invitations sent to team "Team 1".' });
     expect(refreshCourses).toHaveBeenCalledTimes(1);
     expect(view.result.current.teamsDialog.sendingTeamIds).toEqual({ t1: false });
   });
@@ -710,7 +710,7 @@ describe('useTeams: sending the evaluations to one team', () => {
 
     api.post.mockRejectedValueOnce(new Error('network'));
     await sendTo(view, ALPHA);
-    expect(setAlert).toHaveBeenLastCalledWith({ severity: 'error', message: 'Failed to send evaluations to team "Alpha".' });
+    expect(setAlert).toHaveBeenLastCalledWith({ severity: 'error', message: 'Failed to send evaluations to team "Team 1".' });
     expect(view.result.current.teamsDialog.sendingTeamIds).toEqual({ t1: false });
     expect(refreshCourses).not.toHaveBeenCalled();
   });
@@ -743,7 +743,7 @@ describe('useTeams: the team send asks for a deadline (CICD-67)', () => {
     const view = await opened();
     act(() => view.result.current.teamsDialog.onSend(ALPHA));
     expect(view.result.current.teamSendDialog.open).toBe(true);
-    expect(view.result.current.teamSendDialog.title).toMatch(/Alpha/);
+    expect(view.result.current.teamSendDialog.title).toMatch(/Team 1/);
     expect(api.post).not.toHaveBeenCalled();
   });
 
@@ -761,7 +761,7 @@ describe('useTeams: the team send asks for a deadline (CICD-67)', () => {
     const view = await opened();
     act(() => view.result.current.teamsDialog.onSend(ALPHA));
     await act(() => view.result.current.teamSendDialog.onConfirm(toLocalInputValue(used)));
-    expect(setAlert).toHaveBeenCalledWith({ severity: 'success', message: 'Evaluation invitations sent to team "Alpha". 1 already had a link.' });
+    expect(setAlert).toHaveBeenCalledWith({ severity: 'success', message: 'Evaluation invitations sent to team "Team 1". 1 already had a link.' });
     act(() => view.result.current.teamsDialog.onSend(ALPHA));
     expect(view.result.current.teamSendDialog.initialValue).toBe(toLocalInputValue(used));
   });

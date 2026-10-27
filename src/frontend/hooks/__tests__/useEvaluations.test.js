@@ -425,8 +425,8 @@ describe('useEvaluations: asking for a deadline before sending (CICD-67)', () =>
 
 describe('useEvaluations: extend and resubmit (CICD-68)', () => {
   const ROWS = [
-    { id: 's1', name: 'Ann Archer', team: 'Alpha', team_id: 't1', completed: false },
-    { id: 's2', name: 'Ben Baker', team: 'Alpha', team_id: 't1', completed: true },
+    { id: 's1', name: 'Ann Archer', team: 'Team 1', team_id: 't1', completed: false },
+    { id: 's2', name: 'Ben Baker', team: 'Team 1', team_id: 't1', completed: true },
     { id: 's3', name: 'Cy Cole', team: 'No Team', team_id: null, completed: false },
   ];
 
@@ -437,11 +437,11 @@ describe('useEvaluations: extend and resubmit (CICD-68)', () => {
     const dialog = view.result.current.extendDialog;
     expect(dialog.open).toBe(true);
     expect(dialog.students).toEqual([{ id: 's1', name: 'Ann Archer' }, { id: 's3', name: 'Cy Cole' }]);
-    expect(dialog.teams).toEqual([{ id: 't1', name: 'Alpha' }]);
+    expect(dialog.teams).toEqual([{ id: 't1', name: 'Team 1' }]);
   });
 
   test('the extend dialog does not offer a student with nobody to rate (CICD-72: an extension would skip them)', async () => {
-    statusBody = { ...SENT, students: [...ROWS, { id: 's4', name: 'Di Diaz', team: 'Beta', team_id: 't2', completed: false, nobody_to_rate: true }] };
+    statusBody = { ...SENT, students: [...ROWS, { id: 's4', name: 'Di Diaz', team: 'Team 2', team_id: 't2', completed: false, nobody_to_rate: true }] };
     const view = await opened();
     act(() => view.result.current.evaluationStatusDialog.onExtend());
     expect(view.result.current.extendDialog.students.map((student) => student.name)).toEqual(['Ann Archer', 'Cy Cole']);

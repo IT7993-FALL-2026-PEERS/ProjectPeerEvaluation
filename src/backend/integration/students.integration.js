@@ -6,7 +6,7 @@ const Evaluation = require('../models/Evaluation');
 const { startDatabase, stopDatabase, clearDatabase } = require('./helpers/db');
 const { startApp } = require('./helpers/app');
 const { seed, IDS } = require('./helpers/seed');
-const { assertCourseConsistent } = require('./helpers/consistency');
+const { assertCourseConsistent } = require('./helpers/consistency');
 const { ORDINARY_RATINGS: RATINGS } = require('./helpers/evaluations');
 
 // CW-04 roster management by hand: add, edit and remove students one at a time or in bulk. Each
@@ -39,9 +39,9 @@ test.beforeEach(async (t) => {
 });
 
 test('TC-06-30: a student added to a new team creates the team and is a member on both sides', async () => {
-  const res = await app.request('POST', students(), { token: ada, body: { ...NEW_STUDENT, group_assignment: 'Gamma' } });
+  const res = await app.request('POST', students(), { token: ada, body: { ...NEW_STUDENT, group_assignment: 'Team 3' } });
   assert.equal(res.status, 201);
-  const gamma = await Team.findOne({ course_id: IDS.courseAda, team_name: 'Gamma' });
+  const gamma = await Team.findOne({ course_id: IDS.courseAda, team_name: 'Team 3' });
   assert.ok(gamma);
   assert.deepEqual(gamma.students.map(String), [String(res.body.student._id)]);
   await assertCourseConsistent(IDS.courseAda);
@@ -74,7 +74,7 @@ test('TC-06-33: a missing name, ID or email is refused and nothing is saved', as
 });
 
 test('TC-06-34: moving a student to another team by editing keeps both teams consistent', async () => {
-  const res = await app.request('PUT', `${students()}/${IDS.ann}`, { token: ada, body: { group_assignment: 'Beta' } });
+  const res = await app.request('PUT', `${students()}/${IDS.ann}`, { token: ada, body: { group_assignment: 'Team 2' } });
   assert.equal(res.status, 200);
   const ann = await Student.findById(IDS.ann);
   assert.equal(String(ann.team_id), String(IDS.teamBeta));
@@ -84,8 +84,8 @@ test('TC-06-34: moving a student to another team by editing keeps both teams con
 });
 
 test('TC-06-35: editing a student to a new team name creates that team', async () => {
-  await app.request('PUT', `${students()}/${IDS.ann}`, { token: ada, body: { group_assignment: 'Gamma' } });
-  assert.ok(await Team.findOne({ course_id: IDS.courseAda, team_name: 'Gamma' }));
+  await app.request('PUT', `${students()}/${IDS.ann}`, { token: ada, body: { group_assignment: 'Team 3' } });
+  assert.ok(await Team.findOne({ course_id: IDS.courseAda, team_name: 'Team 3' }));
   await assertCourseConsistent(IDS.courseAda);
 });
 
