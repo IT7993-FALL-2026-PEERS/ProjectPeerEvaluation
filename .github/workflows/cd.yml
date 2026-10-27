@@ -1,5 +1,9 @@
 name: CD
 
+# A manual rollback run is titled with its tag, so Manual Rollback (manual-rollback.yml, CICD-78) can find the run it
+# started and the Actions list says what each run is for. Any other run gets the default title (the empty string).
+run-name: "${{ inputs.rollback_to != '' && format('CD: roll back to {0}', inputs.rollback_to) || '' }}"
+
 # Delivery pipeline for staging (backlog CICD-12 and CICD-28). Runs after CI passes on a push to main:
 #
 #   prepare -> images -> deploy -> smoke -> release           (and rollback if deploy or smoke fails)
@@ -36,7 +40,8 @@ name: CD
 # A hook URL works like a password: anyone who has it can deploy. Regenerate it in Render if it leaks.
 #
 # By hand (Actions > CD > Run workflow, on main): redeploy main, with "force" to deploy even when nothing
-# changed, or set "rollback_to" to an rc-* tag to redeploy that release instead.
+# changed, or set "rollback_to" to an rc-* tag to redeploy that release instead. The easier way to roll back is
+# Actions > Manual Rollback (manual-rollback.yml, CICD-78): paste the tag and click Run; it starts this workflow.
 
 on:
   workflow_run:

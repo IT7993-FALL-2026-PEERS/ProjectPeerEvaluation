@@ -107,18 +107,31 @@ const image = (c) => (c.image ? `\`${c.image}\`${c.digest ? ` (\`${c.digest}\`)`
 
 function formatMarkdown(record) {
   const { backend, frontend } = record.components;
+  const digestLine = (how) => (backend.digest
+    ? [`The backend of this release is the image \`${backend.digest}\`: to redeploy its image by digest, ${how}, which reads the digest from this record.`]
+    : []);
+  const steps = (tag) => [
+    'Open **Actions > Manual Rollback** on GitHub, click **Run workflow**, paste the tag into the box and click the green',
+    `**Run workflow** button. Paste the tag \`${tag}\` exactly as written.`,
+  ];
   const recovery = record.previousRelease
     ? [
-      'CD rolls back by itself when a deploy or the smoke tests fail. To go back to a release by hand, run',
-      `**Actions > CD > Run workflow** on \`main\` with **rollback_to** set to its tag (the one before this is`,
-      `\`${record.previousRelease}\`), or redeploy its commits from the Render dashboard (each service > Manual Deploy >`,
-      'Deploy a specific commit).',
-      ...(backend.digest ? [`The backend of this release is the image \`${backend.digest}\`: to redeploy its image by digest, use the same rollback_to run, which reads the digest from this record.`] : []),
+      `**If this version is wrong, roll back to \`${record.previousRelease}\`.**`,
+      ...steps(record.previousRelease),
+      '',
+      'CD also rolls back by itself when a deploy or the smoke tests fail. A release can be redeployed from the Render dashboard too',
+      '(each service > Manual Deploy > Deploy a specific commit).',
+      ...digestLine('use the same Manual Rollback run'),
+      '',
+      'After a rollback, the newest release is not the good one: choose the newest release made before the problem started.',
+      'Going back past a database change (a new index, for example) is not safe: check the notes of the releases in between first.',
     ]
     : [
-      'This is the first release candidate, so there is nothing older to roll back to. To go back to this one later, run',
-      `**Actions > CD > Run workflow** on \`main\` with **rollback_to** set to \`${record.tag}\`.`,
-      ...(backend.digest ? [`The backend of this release is the image \`${backend.digest}\`: to redeploy its image by digest, use that rollback_to run, which reads the digest from this record.`] : []),
+      'This is the first release candidate, so there is nothing older to roll back to. To go back to this one later, use',
+      `**Actions > Manual Rollback** and paste \`${record.tag}\` into the box.`,
+      ...digestLine('use that Manual Rollback run'),
+      '',
+      'Going back past a database change (a new index, for example) is not safe: check the notes of the releases in between first.',
     ];
   return [
     `## Release candidate ${record.tag}`,

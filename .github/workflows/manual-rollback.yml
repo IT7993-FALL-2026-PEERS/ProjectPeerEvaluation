@@ -1,0 +1,151 @@
+name: Manual Rollback
+
+# Staging rollback by hand (backlog CICD-78). For a problem that no test caught, so CD's automatic rollback
+# did not run: a person pastes the known-good release tag into the box and clicks Run workflow.
+#
+#   Actions > Manual Rollback > Run workflow > "Use workflow from" must say main > paste the tag > Run workflow
+#
+# The tag is on the release notes of the version that is wrong, on the line "If this version is wrong, roll back
+# to ...", and in the summary of the CD run that deployed it. Releases are listed under Releases (rc-* tags).
+#
+# This workflow checks the tag, refuses to start while a CD run is in progress, starts CD in rollback mode
+# (cd.yml with rollback_to), links that exact CD run and waits for it, so the result is shown here too. CD's
+# `prepare` job decides whether the release can really be rolled back to (a record the pipeline made, a backend
+# image that is still in ghcr.io), before anything is changed, and does the redeploy, the health check and the
+# smoke tests. The rules live in one place on purpose: a copy here would drift.
+#
+# Why it refuses while CD is busy: cd.yml queues runs in one group that keeps a single pending run, so a rollback
+# that waited behind a deploy could be replaced by a later run without anyone noticing (Codex review, CICD-78).
+# The check and the dispatch are two steps, so a CD run that starts in the few seconds between them can still
+# displace the rollback. That is no longer silent: this workflow follows the run and ends red, so the person runs
+# it again. Closing the gap for good would mean changing how cd.yml queues runs, which is out of scope here.
+# The CD run is found by its title (cd.yml's run-name, "CD: roll back to <tag>"), on main, started after this step.
+#
+# GitHub only offers "Run workflow" to people with Write access or higher, and only for a workflow that is on
+# the default branch.
+
+on:
+  workflow_dispatch:
+    inputs:
+      release:
+        description: "Paste the known-good release tag, like rc-20261105-1432-1a2b3c4 (release notes: 'roll back to')"
+        type: string
+        required: true
+
+# One manual rollback at a time. It holds the group until the CD run it started has finished.
+concurrency:
+  group: manual-rollback
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  rollback:
+    name: Start the rollback
+    # Manual runs only from main, like cd.yml: its prepare job skips any other ref.
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    # CD waits up to 20 minutes for each service, then runs the checks.
+    timeout-minutes: 60
+    # actions: write is what lets this job start another workflow with the job's own token.
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      # The box is typed or pasted by a person: spaces and a trailing newline are removed, the rest must be an
+      # rc-<date>-<time>-<sha7> tag that exists as a release. The value reaches the shell only through env.
+      - name: Check the tag
+        id: tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE: ${{ inputs.release }}
+        run: |
+          tag="${RELEASE//[[:space:]]/}"
+          if ! [[ "$tag" =~ ^rc-[0-9]{8}-[0-9]{4}-[0-9a-f]{7}$ ]]; then
+            echo "::error::'${tag}' is not a release tag. Paste a tag like rc-20261105-1432-1a2b3c4 from the release notes (the line 'roll back to') or from the Releases page."
+            exit 1
+          fi
+          if ! gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::error::There is no release named ${tag}. Check it against the Releases page."
+            exit 1
+          fi
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+
+      # A CD run that is queued or in progress could replace a rollback that waited behind it, so wait until it is done.
+      - name: Check that CD is not busy
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          busy=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow cd.yml --limit 20 --json status --jq '[.[] | select(.status != "completed")] | length')
+          if [ "$busy" != "0" ]; then
+            echo "::error::A CD run is in progress or waiting (Actions > CD). Wait until it has finished, then run Manual Rollback again."
+            exit 1
+          fi
+
+      # --ref main: cd.yml's prepare job only runs a manual run from main. cd.yml titles a rollback run
+      # "CD: roll back to <tag>" (its run-name), so the new run is the one on main with exactly that title, started
+      # after this step began. It is followed to the end: this step fails when the CD run does not succeed, or when
+      # its Roll back job did not.
+      - name: Start CD in rollback mode and follow it
+        id: cd
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          before=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          gh workflow run cd.yml --repo "$GITHUB_REPOSITORY" --ref main -f rollback_to="$TAG"
+          id=""
+          for _ in $(seq 1 18); do
+            sleep 5
+            id=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow cd.yml --event workflow_dispatch --limit 10 \
+              --json databaseId,createdAt,displayTitle,headBranch \
+              --jq "[.[] | select(.createdAt >= \"${before}\" and .headBranch == \"main\" and .displayTitle == \"CD: roll back to ${TAG}\")] | sort_by(.createdAt) | .[0].databaseId // empty")
+            [ -n "$id" ] && break
+          done
+          if [ -z "$id" ]; then
+            echo "::error::CD did not start within 90 seconds. Look at Actions > CD."
+            exit 1
+          fi
+          echo "run_id=${id}" >> "$GITHUB_OUTPUT"
+          echo "CD run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${id}"
+          gh run watch "$id" --repo "$GITHUB_REPOSITORY" --interval 30 --exit-status
+          # A green run is not enough: the Roll back job itself must have run and succeeded.
+          jobs=$(gh run view "$id" --repo "$GITHUB_REPOSITORY" --json jobs \
+            --jq '[.jobs[] | select(.name | startswith("Roll back")) | .conclusion] | if length == 0 then "missing" elif all(. == "success") then "success" else "failed" end')
+          if [ "$jobs" != "success" ]; then
+            echo "::error::The CD run finished, but its Roll back job did not succeed (${jobs}). Open the CD run above."
+            exit 1
+          fi
+
+      - name: Summary
+        if: ${{ always() && steps.tag.outcome == 'success' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.tag.outputs.tag }}
+          RUN_ID: ${{ steps.cd.outputs.run_id }}
+          CD_STEP: ${{ steps.cd.outcome }}
+          CD_RUNS: ${{ github.server_url }}/${{ github.repository }}/actions/workflows/cd.yml
+        run: |
+          {
+            if [ "$CD_STEP" = success ]; then
+              echo "### Staging was rolled back to \`${TAG}\`"
+            else
+              echo "### Rollback to \`${TAG}\` did not finish OK"
+            fi
+            echo ""
+            if [ -n "$RUN_ID" ]; then
+              echo "The CD run that did the work: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}"
+            else
+              echo "CD did not start. Look at [CD](${CD_RUNS})."
+            fi
+            echo ""
+            if [ "$CD_STEP" = success ]; then
+              echo "The \`Roll back\`, \`rollback-report\` and \`rollback-smoke\` jobs passed. Check \`/api/health\` and \`/version.txt\` if you want to see the commits."
+            else
+              echo "- Red \`Prepare\` in that run: this release cannot be rolled back to (no record the pipeline made, or its backend image is gone). Nothing was changed. Pick an earlier release."
+              echo "- Any other red job: open it for the reason, and see [Rollback and recovery](https://github.com/${GITHUB_REPOSITORY}/blob/main/docs/operations/rollback-and-recovery.md)."
+            fi
+            echo ""
+            echo "A rollback does not change \`main\`: the next merge deploys \`main\` again. Fix or revert the cause."
+          } >> "$GITHUB_STEP_SUMMARY"

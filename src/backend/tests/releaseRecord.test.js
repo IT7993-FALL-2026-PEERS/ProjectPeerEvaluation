@@ -84,7 +84,7 @@ test('the release notes state the real smoke result instead of a fixed "passed"'
   assert.match(md, /\*\*Smoke tests:\*\* passed: 3 @staging tests/);
   assert.match(md, /\*\*Coverage \(CI\):\*\* backend not available; frontend not available/);
   assert.match(md, /### How to recover/);
-  assert.match(md, /rollback_to.*\n?.*rc-20261101-0900-bbbbbbb/);
+  assert.match(md, /Manual Rollback[\s\S]*rc-20261101-0900-bbbbbbb/);
 });
 
 test('the first release says there is nothing older to roll back to', () => {
@@ -260,4 +260,27 @@ test('TC-29-71: the recovery text names the image digest for a component that ha
   const md = formatMarkdown(rec);
   assert.match(md, new RegExp(`Backend.*${D1}`));
   assert.match(md, /redeploy its image by digest/);
+});
+
+// CICD-78: the notes tell a person which tag to paste into Actions > Manual Rollback, so nobody has to find it.
+test('TC-29-75: the notes name the previous release as the one to paste into Manual Rollback', () => {
+  const md = formatMarkdown(pipelineRecord({ PREVIOUS_TAG: 'rc-20261101-0900-bbbbbbb' }));
+  assert.match(md, /If this version is wrong, roll back to `rc-20261101-0900-bbbbbbb`/);
+  assert.match(md, /Actions > Manual Rollback/);
+  assert.match(md, /Paste the tag/);
+});
+
+test('TC-29-76: the first release has nothing older to roll back to, and does not name a previous tag', () => {
+  const rec = pipelineRecord();
+  const md = formatMarkdown(rec);
+  assert.match(md, /first release candidate/);
+  assert.doesNotMatch(md, /If this version is wrong, roll back to/);
+  assert.match(md, /Actions > Manual Rollback/);
+  assert.ok(md.includes(`\`${rec.tag}\``));
+});
+
+test('TC-29-77: the notes warn that after a rollback the newest release may not be the good one, and about database changes', () => {
+  const md = formatMarkdown(pipelineRecord({ PREVIOUS_TAG: 'rc-20261101-0900-bbbbbbb' }));
+  assert.match(md, /newest release made before the problem started/);
+  assert.match(md, /database change/);
 });

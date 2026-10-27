@@ -22,14 +22,27 @@ Releases, whose `release-record.json` lists both services' commits.
 
 The app misbehaves, but `/api/health` still answers.
 
-**Option A: roll back to a release candidate** (needs an `rc-*` release the pipeline made, so `CD_RELEASE=on` and
-at least one release since then).
-1. Actions > **CD** > Run workflow > branch `main` > **rollback_to** = the last good `rc-…` tag.
-2. The `Roll back` jobs redeploy each service to the commit in that release's record, in rollback mode, and wait
+**Option A: roll back to a release candidate with Manual Rollback** (needs an `rc-*` release the pipeline made, so
+`CD_RELEASE=on` and at least one release since then; whoever runs it needs Write access to the repository).
+1. Find the tag. Open the release of the version that is wrong (Releases, the newest `rc-*` pre-release, or the CD run
+   that deployed it): its notes say "If this version is wrong, roll back to `rc-…`". Copy that tag. If a rollback
+   already happened, or the problem started earlier, pick the newest release made **before the problem started**
+   instead: the "roll back to" line only names the release before the one you are looking at.
+2. Open <https://github.com/IT7993-FALL-2026-PEERS/ProjectPeerEvaluation/actions/workflows/manual-rollback.yml> (Actions > **Manual Rollback**), click **Run workflow**, check that **Use workflow from** says
+   `main`, paste the tag into the box and click the green **Run workflow** button.
+3. The Manual Rollback run checks the tag (an unknown tag is refused at once) and refuses to start while a CD run is
+   in progress: wait for that run to finish, then run Manual Rollback again. Otherwise it starts CD in rollback mode,
+   links that CD run (titled "CD: roll back to rc-…") and waits for it. Its summary says "Staging was rolled back to …"
+   or "did not finish OK", with the link. This takes several minutes. If it says "did not finish OK" and the CD run
+   shows **cancelled** (another run started at the same moment and replaced it), just run Manual Rollback again.
+4. In that CD run, the `Roll back` jobs redeploy each service to the commit in that release's record, in rollback mode, and wait
    until staging reports it. The backend goes back to the **image digest** in the record (`prepare` has already checked
    that it still resolves in ghcr.io). `rollback-report` then checks health, and `rollback-smoke` runs the smoke tests;
    `rollback-pointer` then moves `backend:staging` back to that digest.
-3. Confirm: both checks are green, and `/api/health` and `/version.txt` show the release's commits.
+5. Confirm: both checks are green, and `/api/health` and `/version.txt` show the release's commits.
+
+**Do not roll back past a database change.** A rollback only changes the code that runs. A release that added a
+database index or changed what is stored can leave data that the older code cannot use. Read the notes of every release between the one you roll back to and the live one first.
 
 A hand-made release (like the #147 test candidate) is refused as a target. So is a release made before the
 backend image carried its commit (CICD-73), and one whose image is no longer in ghcr.io: the run stops with the reason
@@ -54,7 +67,9 @@ Open the run and find the first red job.
 | Failed job | Meaning | Do |
 |---|---|---|
 | Prepare: "No successful CI run on main for …" | A manual run for a commit whose CI on `main` failed or hasn't finished | Wait for CI (or re-run it if an outage cancelled it), then run CD again |
-| Prepare: rollback_to errors | Bad `rollback_to` value, or the tag isn't a release the pipeline made | Use an exact `rc-…` tag name from Releases, of a pipeline release |
+| Manual Rollback: "is not a release tag" or "There is no release named …" | The pasted text isn't an `rc-…` tag of an existing release | Copy the tag again from the release notes or the Releases page |
+| Manual Rollback: "A CD run is in progress or waiting" | A deploy is running (or waiting), and a rollback queued behind it could be replaced by a later run | Wait until that CD run has finished, then run Manual Rollback again |
+| Prepare: rollback_to errors | The tag isn't a release the pipeline made, or its backend image is gone from ghcr.io (nothing was changed) | Use an exact `rc-…` tag name from Releases, of a pipeline release, and pick an earlier one if its image is gone |
 | images | The images didn't build or weren't healthy in Compose | Same as a red `Containers` check in CI: reproduce with `npm run docker:up` |
 | Prepare: "BACKEND_DEPLOY must be exactly source or image" | The repository variable is unset or misspelled | Settings > Secrets and variables > Actions > Variables: set it to `image` (or `source`, the way back) |
 | Deploy: "the images job did not succeed" (image mode) | The backend is deployed as an image, and there is none | Fix `images` first. Nothing was deployed, and it never falls back to a source deploy |
@@ -95,7 +110,7 @@ When CD does **not** roll back by itself:
 | The earlier release's image is gone from ghcr.io | `prepare` skips that release. If none remains, no rollback | As above. Never delete the images behind `rc-*` releases |
 | `CD_RELEASE` is off | Only the deploy runs, with no rollback | Switch `CD_RELEASE` back on |
 | Deploy and smoke pass, but the release or `staging` tag step fails | No rollback, by design: staging stays on the new, working version, untagged | Run CD again |
-| A problem is found later that no test caught | Nothing notices it | Run CD by hand with `rollback_to` set to the good release's tag, then fix `main` |
+| A problem is found later that no test caught | Nothing notices it | Run **Manual Rollback** with the good release's tag (R1, option A), then fix `main` |
 | `BACKEND_DEPLOY` is unset or misspelled | `prepare` fails before anything is deployed, so there is nothing to roll back | Set the variable to `source` or `image` |
 
 ## R3. Staging doesn't answer
