@@ -167,3 +167,22 @@ test('E2E-47: a student alone on a team is skipped by Send Evaluations and shown
   await expect(top(page).getByText('Progress: 0/3 evaluations completed')).toBeVisible();
   await expect(top(page).getByText('No teammates to rate. Add a teammate to their team, then send again.')).toBeVisible();
 });
+
+test('E2E-51: a team name must be numbered: Alpha cannot be created, team 4 becomes Team 4, and an Edit cannot rename a team to Alpha', async ({ page }) => {
+  await openTeams(page);
+  await page.getByRole('button', { name: 'Create Team' }).click();
+  await expect(top(page).getByText('Create New Team')).toBeVisible();
+
+  await top(page).getByLabel(/Team Name/).fill('Alpha');
+  await expect(top(page).getByText('Team names are numbered: Team 1, Team 2, Team 3, ...')).toBeVisible();
+  await expect(top(page).getByRole('button', { name: 'Create Team' })).toBeDisabled();
+
+  await top(page).getByLabel(/Team Name/).fill('team 4');
+  await expect(top(page).getByRole('button', { name: 'Create Team' })).toBeEnabled();
+  await top(page).getByRole('button', { name: 'Create Team' }).click();
+  await expect(teamRow(page, 'Team 4')).toBeVisible();
+
+  await teamRow(page, 'Team 4').getByTitle('Edit Team').click();
+  await top(page).getByLabel(/Team Name/).fill('Alpha');
+  await expect(top(page).getByRole('button', { name: 'Save Changes' })).toBeDisabled();
+});

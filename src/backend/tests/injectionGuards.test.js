@@ -178,7 +178,7 @@ test('TC-05-09: updating a course rejects a field that is not text, before any u
 test('TC-07-02: adding a student rejects a field that is not text, before the duplicate check', async (t) => {
   const find = t.mock.method(Student, 'findOne', async () => { throw new Error('must not be queried'); });
   const courseId = String(new mongoose.Types.ObjectId());
-  const good = { student_id: 'S1', name: 'Alice', email: 'alice@example.com', group_assignment: 'Team A' };
+  const good = { student_id: 'S1', name: 'Alice', email: 'alice@example.com', group_assignment: 'Team 1' };
   for (const field of Object.keys(good)) {
     assertRejected(await call(students.addStudent, { params: { course_id: courseId }, body: { ...good, [field]: OPERATOR } }), field);
   }

@@ -4,6 +4,7 @@ import { describeInvitationResult } from '../services/emailResult';
 import { prefillDeadline, toDeadlinePayload } from '../services/deadline';
 import { getErrorMessage } from '../services/apiError';
 import { buildCreateTeamBody } from '../services/teamRequest';
+import { isTeamName, TEAM_NAME_HELP } from '../services/teamName';
 
 const EMPTY_TEAM_SEARCH = { team_name: '', team_status: '' };
 const EMPTY_TEAM_FORM = { team_name: '', team_status: 'Active' };
@@ -176,6 +177,11 @@ export default function useTeams({ setAlert, refreshCourses, students, setStuden
       setAlert({ severity: 'error', message: 'Team name is required' });
       return;
     }
+    // A team named before the numbered-name rule keeps its name while it is edited; any new name is numbered
+    if (editTeamData.team_name !== teamToEdit.team_name && !isTeamName(editTeamData.team_name)) {
+      setAlert({ severity: 'error', message: `Team name "${editTeamData.team_name.trim()}" is not valid. ${TEAM_NAME_HELP}` });
+      return;
+    }
 
     try {
       await api.put(`/courses/${teamsCourse._id}/teams/${teamToEdit._id}`, editTeamData);
@@ -214,6 +220,10 @@ export default function useTeams({ setAlert, refreshCourses, students, setStuden
     // Validation
     if (!newTeamData.team_name.trim()) {
       setAlert({ severity: 'error', message: 'Team name is required' });
+      return;
+    }
+    if (!isTeamName(newTeamData.team_name)) {
+      setAlert({ severity: 'error', message: `Team name "${newTeamData.team_name.trim()}" is not valid. ${TEAM_NAME_HELP}` });
       return;
     }
 
@@ -423,6 +433,7 @@ export default function useTeams({ setAlert, refreshCourses, students, setStuden
     editTeamDialog: {
       open: editTeamDialogOpen,
       form: editTeamData,
+      originalName: teamToEdit ? teamToEdit.team_name : undefined,
       onFormChange: setEditTeamData,
       onClose: () => setEditTeamDialogOpen(false),
       onSave: handleSaveTeamEdit,

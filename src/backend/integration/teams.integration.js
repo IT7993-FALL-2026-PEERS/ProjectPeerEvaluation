@@ -33,6 +33,48 @@ test.beforeEach(async (t) => {
   await seed();
 });
 
+test('TC-08-61: a team is created only with a numbered name: Team 4, team 5 and 6 are Team 4, Team 5 and Team 6; Alpha is refused', async () => {
+  const before = await Team.countDocuments({ course_id: IDS.courseAda });
+  for (const name of ['Alpha', 'Team A', 'Team 0', '']) {
+    const res = await app.request('POST', teams(), { token: ada, body: { teams: [{ team_name: name }] } });
+    assert.equal(res.status, 400, JSON.stringify(name));
+  }
+  // One bad name in a list refuses the whole list.
+  assert.equal((await app.request('POST', teams(), { token: ada, body: { teams: [{ team_name: 'Team 8' }, { team_name: 'Beta' }] } })).status, 400);
+  assert.equal(await Team.countDocuments({ course_id: IDS.courseAda }), before);
+
+  const res = await app.request('POST', teams(), { token: ada, body: { teams: [{ team_name: 'Team 4' }, { team_name: 'team 5' }, { team_name: '6' }] } });
+  assert.equal(res.status, 201);
+  const names = (await Team.find({ course_id: IDS.courseAda })).map((team) => team.team_name).sort();
+  assert.deepEqual(names, ['Team 1', 'Team 2', 'Team 4', 'Team 5', 'Team 6']);
+});
+
+test('TC-08-62: a team can be renamed only to a numbered name, and its students follow', async () => {
+  const refused = await app.request('PUT', `${teams()}/${IDS.teamAlpha}`, { token: ada, body: { team_name: 'Alpha Squad' } });
+  assert.equal(refused.status, 400);
+  assert.match(refused.body.error.message, /Team 1, Team 2, Team 3/);
+  assert.equal((await Team.findById(IDS.teamAlpha)).team_name, 'Team 1');
+
+  const renamed = await app.request('PUT', `${teams()}/${IDS.teamAlpha}`, { token: ada, body: { team_name: 'team 7' } });
+  assert.equal(renamed.status, 200);
+  assert.equal((await Team.findById(IDS.teamAlpha)).team_name, 'Team 7');
+  assert.ok((await Student.find({ team_id: IDS.teamAlpha })).every((student) => student.group_assignment === 'Team 7'));
+  await assertCourseConsistent(IDS.courseAda);
+});
+
+test('TC-08-63: a team named before the rule (Alpha) can still be edited, as long as its name is left alone', async () => {
+  const legacy = await Team.create({ team_name: 'Alpha', course_id: IDS.courseAda, students: [], student_count: 0 });
+
+  const status = await app.request('PUT', `${teams()}/${legacy._id}`, { token: ada, body: { team_status: 'Inactive' } });
+  assert.equal(status.status, 200);
+  const same = await app.request('PUT', `${teams()}/${legacy._id}`, { token: ada, body: { team_name: 'Alpha', team_status: 'Active' } });
+  assert.equal(same.status, 200);
+  assert.equal((await Team.findById(legacy._id)).team_name, 'Alpha');
+
+  assert.equal((await app.request('PUT', `${teams()}/${legacy._id}`, { token: ada, body: { team_name: 'Beta' } })).status, 400);
+  assert.equal((await app.request('PUT', `${teams()}/${legacy._id}`, { token: ada, body: { team_name: 'Team 9' } })).status, 200);
+});
+
 test('TC-08-20: the seeded course is consistent to begin with', async () => {
   await assertCourseConsistent(IDS.courseAda);
   await assertCourseConsistent(IDS.courseBo);

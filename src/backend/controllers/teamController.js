@@ -1,6 +1,7 @@
 const Team = require('../models/Team');
 const Student = require('../models/Student');
 const mongoose = require('mongoose');
+const { normalizeTeamName, TEAM_NAME_HELP } = require('../utils/teamName');
 
 // A team request body is untrusted input: the URL's :course_id is checked by the
 // course ownership middleware, but nothing in the body is. Only the team name and
@@ -17,7 +18,8 @@ function validationError(message) {
 }
 
 // Returns { fields } with the allowed, validated fields that were present, or { error }.
-function readTeamFields(input, { nameRequired }) {
+// With `checkName` the name must be a numbered one (Team 1, Team 2, ...) and is returned written that way.
+function readTeamFields(input, { nameRequired, checkName = false }) {
   const body = input && typeof input === 'object' && !Array.isArray(input) ? input : {};
   const fields = {};
   if (body.team_name !== undefined || nameRequired) {
@@ -25,6 +27,11 @@ function readTeamFields(input, { nameRequired }) {
       return { error: 'Team name is required.' };
     }
     fields.team_name = body.team_name.trim();
+    if (checkName) {
+      const teamName = normalizeTeamName(fields.team_name);
+      if (!teamName) return { error: `Team name "${fields.team_name}" is not valid. ${TEAM_NAME_HELP}` };
+      fields.team_name = teamName;
+    }
   }
   if (body.team_status !== undefined) {
     if (!TEAM_STATUSES.includes(body.team_status)) {
@@ -70,7 +77,7 @@ exports.createTeams = async (req, res, next) => {
 
     const docs = [];
     for (const t of teams) {
-      const { fields, error } = readTeamFields(t, { nameRequired: true });
+      const { fields, error } = readTeamFields(t, { nameRequired: true, checkName: true });
       if (error) return next(validationError(error));
       // A list of students here used to be saved as sent: it accepted students of
       // other courses and wrote only Team.students, never Student.team_id.
@@ -119,6 +126,13 @@ exports.updateTeam = async (req, res, next) => {
       return next(err);
     }
     
+    // A rename takes a numbered name only; a team named before that rule keeps its name while it is edited
+    if (updates.team_name !== undefined && updates.team_name !== currentTeam.team_name) {
+      const teamName = normalizeTeamName(updates.team_name);
+      if (!teamName) return next(validationError(`Team name "${updates.team_name}" is not valid. ${TEAM_NAME_HELP}`));
+      updates.team_name = teamName;
+    }
+
     const team = await Team.findOneAndUpdate({ _id: team_id, course_id }, updates, { new: true });
     
     // If team name was updated, update all students' group_assignment field

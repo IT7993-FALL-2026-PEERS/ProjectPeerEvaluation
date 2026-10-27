@@ -308,36 +308,61 @@ describe('useTeams: editing a team', () => {
     expect(view.result.current.editTeamDialog.open).toBe(true);
   });
 
-  test('saves the change, says so, shows the server\'s list, closes and empties the form', async () => {
+  test('refuses a name that is not numbered (Alpha Squad), says what a team name looks like, and sends nothing', async () => {
     const view = await opened();
     act(() => view.result.current.teamsDialog.onEdit(ALPHA));
-    change(view, { team_name: 'Team 1 2', team_status: 'Inactive' });
-    routes['/courses/c1/teams'] = [{ ...ALPHA, team_name: 'Team 1 2', team_status: 'Inactive' }, BETA];
+    change(view, { team_name: ' Alpha Squad ', team_status: 'Active' });
 
     await act(() => view.result.current.editTeamDialog.onSave());
 
-    expect(api.put).toHaveBeenCalledWith('/courses/c1/teams/t1', { team_name: 'Team 1 2', team_status: 'Inactive' });
-    expect(setAlert).toHaveBeenCalledWith({ severity: 'success', message: 'Team "Team 1 2" updated successfully' });
-    expect(view.result.current.teamsDialog.teams[0]).toMatchObject({ team_name: 'Team 1 2', team_status: 'Inactive' });
+    expect(setAlert).toHaveBeenCalledWith({ severity: 'error', message: 'Team name "Alpha Squad" is not valid. Team names are numbered: Team 1, Team 2, Team 3, ...' });
+    expect(api.put).not.toHaveBeenCalled();
+    expect(view.result.current.editTeamDialog.open).toBe(true);
+  });
+
+  test('a team named before the rule (Group A) can be saved while its name is left alone, and the dialog knows the name it had', async () => {
+    const view = await opened();
+    const OLD = { _id: 't9', team_name: 'Group A', team_status: 'Active' };
+    act(() => view.result.current.teamsDialog.onEdit(OLD));
+    expect(view.result.current.editTeamDialog.originalName).toBe('Group A');
+    change(view, { team_name: 'Group A', team_status: 'Inactive' });
+    api.put.mockResolvedValue({});
+
+    await act(() => view.result.current.editTeamDialog.onSave());
+
+    expect(api.put).toHaveBeenCalledWith('/courses/c1/teams/t9', { team_name: 'Group A', team_status: 'Inactive' });
+  });
+
+  test('saves the change, says so, shows the server\'s list, closes and empties the form', async () => {
+    const view = await opened();
+    act(() => view.result.current.teamsDialog.onEdit(ALPHA));
+    change(view, { team_name: 'Team 7', team_status: 'Inactive' });
+    routes['/courses/c1/teams'] = [{ ...ALPHA, team_name: 'Team 7', team_status: 'Inactive' }, BETA];
+
+    await act(() => view.result.current.editTeamDialog.onSave());
+
+    expect(api.put).toHaveBeenCalledWith('/courses/c1/teams/t1', { team_name: 'Team 7', team_status: 'Inactive' });
+    expect(setAlert).toHaveBeenCalledWith({ severity: 'success', message: 'Team "Team 7" updated successfully' });
+    expect(view.result.current.teamsDialog.teams[0]).toMatchObject({ team_name: 'Team 7', team_status: 'Inactive' });
     expect(view.result.current.editTeamDialog).toMatchObject({ open: false, form: { team_name: '', team_status: 'Active' } });
   });
 
   test('when only the refresh fails, shows the change in the list it already had', async () => {
     const view = await opened();
     act(() => view.result.current.teamsDialog.onEdit(ALPHA));
-    change(view, { team_name: 'Team 1 2', team_status: 'Active' });
+    change(view, { team_name: 'Team 7', team_status: 'Active' });
     delete routes['/courses/c1/teams'];
 
     await act(() => view.result.current.editTeamDialog.onSave());
 
-    expect(setAlert).toHaveBeenCalledWith({ severity: 'success', message: 'Team "Team 1 2" updated successfully' });
-    expect(view.result.current.teamsDialog.teams).toEqual([{ ...ALPHA, team_name: 'Team 1 2' }, BETA]);
+    expect(setAlert).toHaveBeenCalledWith({ severity: 'success', message: 'Team "Team 7" updated successfully' });
+    expect(view.result.current.teamsDialog.teams).toEqual([{ ...ALPHA, team_name: 'Team 7' }, BETA]);
   });
 
   test('a renamed team makes the page reload its students, which show the team name', async () => {
     const view = await opened();
     act(() => view.result.current.teamsDialog.onEdit(ALPHA));
-    change(view, { team_name: 'Team 1 2', team_status: 'Active' });
+    change(view, { team_name: 'Team 7', team_status: 'Active' });
 
     await act(() => view.result.current.editTeamDialog.onSave());
 
@@ -360,7 +385,7 @@ describe('useTeams: editing a team', () => {
     students = [];
     const view = await opened();
     act(() => view.result.current.teamsDialog.onEdit(ALPHA));
-    change(view, { team_name: 'Team 1 2', team_status: 'Active' });
+    change(view, { team_name: 'Team 7', team_status: 'Active' });
 
     await act(() => view.result.current.editTeamDialog.onSave());
 
@@ -370,7 +395,7 @@ describe('useTeams: editing a team', () => {
   test('a failed students reload does not fail the save', async () => {
     const view = await opened();
     act(() => view.result.current.teamsDialog.onEdit(ALPHA));
-    change(view, { team_name: 'Team 1 2', team_status: 'Active' });
+    change(view, { team_name: 'Team 7', team_status: 'Active' });
     delete routes['/courses/c1/students'];
 
     await act(() => view.result.current.editTeamDialog.onSave());
@@ -419,6 +444,16 @@ describe('useTeams: creating a team', () => {
     await act(() => view.result.current.createTeamDialog.onCreate());
 
     expect(setAlert).toHaveBeenCalledWith({ severity: 'error', message: 'Team name is required' });
+    expect(api.post).not.toHaveBeenCalled();
+  });
+
+  test('refuses a name that is not numbered (Alpha), says what a team name looks like, and sends nothing', async () => {
+    const view = await opened();
+    fill(view, { team_name: ' Alpha ', team_status: 'Active' });
+
+    await act(() => view.result.current.createTeamDialog.onCreate());
+
+    expect(setAlert).toHaveBeenCalledWith({ severity: 'error', message: 'Team name "Alpha" is not valid. Team names are numbered: Team 1, Team 2, Team 3, ...' });
     expect(api.post).not.toHaveBeenCalled();
   });
 

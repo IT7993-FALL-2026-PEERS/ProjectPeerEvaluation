@@ -23,6 +23,9 @@ describe('CsvUploadDialog', () => {
     render(<CsvUploadDialog {...csvProps()} />);
     expect(screen.getByRole('heading', { name: 'Upload Student Roster (CSV)' })).toBeInTheDocument();
     expect(screen.getByText('student_id,name,email,team_name')).toBeInTheDocument();
+    // The format guide: required columns and numbered team names.
+    expect(screen.getByText('student_id, name and email are required on every row.')).toBeInTheDocument();
+    expect(screen.getByText(/Team names are numbered: Team 1, Team 2, Team 3/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Upload' })).toBeDisabled();
     expect(screen.queryByText(/Selected:/)).not.toBeInTheDocument();
   });

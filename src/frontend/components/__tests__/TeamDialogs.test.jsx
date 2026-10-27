@@ -220,6 +220,27 @@ describe('EditTeamDialog', () => {
     expect(screen.getByRole('button', { name: 'Save Changes' })).toBeDisabled();
   });
 
+  test('a name that is not numbered (Alpha) turns Save Changes off and says what a team name looks like', () => {
+    const { rerender } = render(<EditTeamDialog {...formProps({ form: { team_name: 'Alpha', team_status: 'Active' }, originalName: 'Team 1', onSave: () => {} })} />);
+    expect(screen.getByRole('button', { name: 'Save Changes' })).toBeDisabled();
+    expect(screen.getByLabelText(/Team Name/)).toBeInvalid();
+    expect(screen.getByText('Team names are numbered: Team 1, Team 2, Team 3, ...')).toBeInTheDocument();
+
+    for (const name of ['Team 4', 'team 4', '4']) {
+      rerender(<EditTeamDialog {...formProps({ form: { team_name: name, team_status: 'Active' }, originalName: 'Team 1', onSave: () => {} })} />);
+      expect(screen.getByRole('button', { name: 'Save Changes' })).toBeEnabled();
+      expect(screen.getByLabelText(/Team Name/)).toBeValid();
+    }
+  });
+
+  test('a team named before the rule (Group A) can still be saved while its name is left alone, but not renamed to another unnumbered name', () => {
+    const { rerender } = render(<EditTeamDialog {...formProps({ form: { team_name: 'Group A', team_status: 'Inactive' }, originalName: 'Group A', onSave: () => {} })} />);
+    expect(screen.getByRole('button', { name: 'Save Changes' })).toBeEnabled();
+
+    rerender(<EditTeamDialog {...formProps({ form: { team_name: 'Group B', team_status: 'Inactive' }, originalName: 'Group A', onSave: () => {} })} />);
+    expect(screen.getByRole('button', { name: 'Save Changes' })).toBeDisabled();
+  });
+
   test('Cancel and Save Changes call the page\'s handlers', async () => {
     const onClose = vi.fn();
     const onSave = vi.fn();
@@ -271,6 +292,24 @@ describe('CreateTeamDialog', () => {
 
     rerender(<CreateTeamDialog {...createProps({ form: { team_name: 'Team 3', team_status: 'Active' } })} />);
     expect(screen.getByRole('button', { name: 'Create Team' })).toBeEnabled();
+  });
+
+  test('a name that is not numbered (Alpha) turns Create Team off and says what a team name looks like; Team 4, team 4 and 4 are fine', () => {
+    const { rerender } = render(<CreateTeamDialog {...createProps({ form: { team_name: 'Alpha', team_status: 'Active' } })} />);
+    expect(screen.getByRole('button', { name: 'Create Team' })).toBeDisabled();
+    expect(screen.getByLabelText(/Team Name/)).toBeInvalid();
+    expect(screen.getByText('Team names are numbered: Team 1, Team 2, Team 3, ...')).toBeInTheDocument();
+
+    for (const name of ['Team 4', 'team 4', '4']) {
+      rerender(<CreateTeamDialog {...createProps({ form: { team_name: name, team_status: 'Active' } })} />);
+      expect(screen.getByRole('button', { name: 'Create Team' })).toBeEnabled();
+      expect(screen.getByLabelText(/Team Name/)).toBeValid();
+    }
+  });
+
+  test('an empty name is not flagged as wrong, only waiting', () => {
+    render(<CreateTeamDialog {...createProps()} />);
+    expect(screen.getByLabelText(/Team Name/)).toHaveAttribute('aria-invalid', 'false');
   });
 
   test('Cancel and Create Team call the page\'s handlers', async () => {

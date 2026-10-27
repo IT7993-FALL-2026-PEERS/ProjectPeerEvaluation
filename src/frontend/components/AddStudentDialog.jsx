@@ -1,44 +1,46 @@
 import React from 'react';
 import { Dialog, DialogTitle, DialogContent, DialogActions, TextField, Typography, Button } from '@mui/material';
+import TeamSelect from './TeamSelect';
 
 // The Add Student dialog, moved out of CourseManagement.js (CICD-57, step 2). It holds no state: the
-// page owns the form, the error and the request, and passes the handlers in.
-function AddStudentDialog({ open, form, error, onFormChange, onClose, onSubmit }) {
+// page owns the form, the error and the request, and passes the handlers in. All four fields are required.
+function AddStudentDialog({ open, form, error, teamNames, onFormChange, onClose, onSubmit }) {
   return (
     <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
       <DialogTitle>Add Student</DialogTitle>
       <DialogContent>
         <TextField
+          required
           fullWidth
           margin="normal"
           label="Student ID"
           value={form.student_id}
           onChange={e => onFormChange({ ...form, student_id: e.target.value })}
-          error={!!error && !form.student_id}
+          error={!!error && !form.student_id.trim()}
         />
         <TextField
+          required
           fullWidth
           margin="normal"
           label="Name"
           value={form.name}
           onChange={e => onFormChange({ ...form, name: e.target.value })}
-          error={!!error && !form.name}
+          error={!!error && !form.name.trim()}
         />
         <TextField
+          required
           fullWidth
           margin="normal"
           label="Email"
           value={form.email}
           onChange={e => onFormChange({ ...form, email: e.target.value })}
-          error={!!error && !form.email}
+          error={!!error && !form.email.trim()}
         />
-        <TextField
-          fullWidth
-          margin="normal"
-          label="Team Assignment (Optional)"
+        <TeamSelect
           value={form.group_assignment}
-          onChange={e => onFormChange({ ...form, group_assignment: e.target.value })}
-          helperText="Enter team name or identifier for this student"
+          onChange={team => onFormChange({ ...form, group_assignment: team })}
+          error={!!error}
+          existingTeams={teamNames}
         />
         {error && (
           <Typography color="error" variant="body2" sx={{ mt: 1 }}>{error}</Typography>

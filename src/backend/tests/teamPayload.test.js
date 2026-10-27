@@ -44,7 +44,7 @@ test('TC-08-01: creating a team with students of another course is rejected and 
   const inserted = stubCreate(t);
   const { error } = await call(createTeams, {
     params: { course_id: courseId },
-    body: { teams: [{ team_name: 'Team A', students: [mine[0], foreign] }] },
+    body: { teams: [{ team_name: 'Team 1', students: [mine[0], foreign] }] },
   });
   assert.equal(error.status, 400);
   assert.equal(error.code, 'VALIDATION_ERROR');
@@ -56,7 +56,7 @@ test('TC-08-02: a team cannot be created with members at all, even from this cou
   const inserted = stubCreate(t);
   const { error } = await call(createTeams, {
     params: { course_id: courseId },
-    body: { teams: [{ team_name: 'Team A', students: [mine[0], mine[1]] }] },
+    body: { teams: [{ team_name: 'Team 1', students: [mine[0], mine[1]] }] },
   });
   assert.equal(error.status, 400);
   assert.equal(inserted.length, 0);
@@ -66,13 +66,13 @@ test('TC-08-03: only the team name and status are taken from a created team', as
   const inserted = stubCreate(t);
   const { error, status } = await call(createTeams, {
     params: { course_id: courseId },
-    body: { teams: [{ team_name: ' Team B ', team_status: 'Inactive', students: [], course_id: otherCourseId, student_count: 99, _id: String(foreign), created_at: '2001-01-01' }] },
+    body: { teams: [{ team_name: ' Team 2 ', team_status: 'Inactive', students: [], course_id: otherCourseId, student_count: 99, _id: String(foreign), created_at: '2001-01-01' }] },
   });
   assert.equal(error, undefined);
   assert.equal(status, 201);
   assert.deepEqual(Object.keys(inserted[0]).sort(), ['course_id', 'team_name', 'team_status']);
   assert.equal(String(inserted[0].course_id), courseId);
-  assert.equal(inserted[0].team_name, 'Team B');
+  assert.equal(inserted[0].team_name, 'Team 2');
   assert.equal(inserted[0].team_status, 'Inactive');
 });
 
@@ -80,8 +80,8 @@ for (const [label, team] of [
   ['a missing name', { team_status: 'Active' }],
   ['a blank name', { team_name: '   ' }],
   ['a name that is not a string', { team_name: { $ne: null } }],
-  ['an unknown status', { team_name: 'Team C', team_status: 'Deleted' }],
-  ['student IDs that are not IDs', { team_name: 'Team C', students: ['not-an-id'] }],
+  ['an unknown status', { team_name: 'Team 3', team_status: 'Deleted' }],
+  ['student IDs that are not IDs', { team_name: 'Team 3', students: ['not-an-id'] }],
 ]) {
   test(`TC-08-04: a team with ${label} is rejected and nothing is saved`, async (t) => {
     const inserted = stubCreate(t);
@@ -93,7 +93,7 @@ for (const [label, team] of [
 
 function stubUpdate(t) {
   const seen = {};
-  const current = { team_name: 'Old name', team_status: 'Active' };
+  const current = { team_name: 'Team 8', team_status: 'Active' };
   t.mock.method(Team, 'findOne', async () => current);
   t.mock.method(Team, 'findOneAndUpdate', async (filter, update) => {
     seen.filter = filter;
@@ -110,12 +110,12 @@ test('TC-08-05: updating a team changes only its name and status, never its cour
   const teamId = String(new mongoose.Types.ObjectId());
   const { error } = await call(updateTeam, {
     params: { course_id: courseId, team_id: teamId },
-    body: { team_name: 'New name', team_status: 'Inactive', course_id: otherCourseId, students: [foreign], student_count: 50, created_at: '2001-01-01' },
+    body: { team_name: 'Team 7', team_status: 'Inactive', course_id: otherCourseId, students: [foreign], student_count: 50, created_at: '2001-01-01' },
   });
   assert.equal(error, undefined);
-  assert.deepEqual(seen.update, { team_name: 'New name', team_status: 'Inactive' });
+  assert.deepEqual(seen.update, { team_name: 'Team 7', team_status: 'Inactive' });
   assert.equal(String(seen.filter.course_id), courseId, 'the team is still looked up in the URL course');
-  assert.deepEqual(seen.renamed, { group_assignment: 'New name' }, 'a rename still updates the members');
+  assert.deepEqual(seen.renamed, { group_assignment: 'Team 7' }, 'a rename still updates the members');
 });
 
 test('TC-08-06: updating a team with an unknown status or a blank name is rejected', async (t) => {

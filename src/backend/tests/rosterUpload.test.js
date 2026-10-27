@@ -81,11 +81,11 @@ function assertNothingDestroyed(calls) {
 const rejectedFiles = [
   ['TC-06-01', 'an empty file', ''],
   ['TC-06-02', 'a file with only a header row', HEADER],
-  ['TC-06-03', 'a file where every row is missing a required field', `${HEADER}S1,Alice,,Team A\nS2,,bob@example.com,Team A\n`],
+  ['TC-06-03', 'a file where every row is missing a required field', `${HEADER}S1,Alice,,Team 1\nS2,,bob@example.com,Team 1\n`],
   ['TC-06-04', 'a file with the wrong column names', 'ID,Full Name,Mail\nS1,Alice,alice@example.com\n'],
   // A space is truthy, so it used to pass the required-field check, then fail schema
   // validation on insert and get swallowed, and the wipe still ran.
-  ['TC-06-07', 'a file where the required fields are only spaces', `${HEADER}S1, ,alice@example.com,Team A\n  ,Bob,bob@example.com,\n`],
+  ['TC-06-07', 'a file where the required fields are only spaces', `${HEADER}S1, ,alice@example.com,Team 1\n  ,Bob,bob@example.com,\n`],
 ];
 
 for (const [id, label, csvText] of rejectedFiles) {
@@ -102,7 +102,7 @@ for (const [id, label, csvText] of rejectedFiles) {
 }
 
 test('the rejection quotes the problem rows so the professor can fix the file', async (t) => {
-  const { error } = await upload(t, `${HEADER}S1,Alice,,Team A\nS2,,bob@example.com,\n`);
+  const { error } = await upload(t, `${HEADER}S1,Alice,,Team 1\nS2,,bob@example.com,\n`);
   assert.match(error.message, /Missing required fields in row: .*"student_id":"S1"/);
   assert.match(error.message, /"student_id":"S2"/);
 });
@@ -115,13 +115,13 @@ test('the rejection shows at most three problem rows', async (t) => {
 });
 
 test('TC-06-05: a database error while applying the roster leaves evaluations and links untouched', async (t) => {
-  const { body, calls } = await upload(t, `${HEADER}S1,Alice,alice@example.com,Team A\n`, { findFails: true });
+  const { body, calls } = await upload(t, `${HEADER}S1,Alice,alice@example.com,Team 1\n`, { findFails: true });
   assert.match(body.message, /errors/i);
   assertNothingDestroyed(calls);
 });
 
 test('TC-06-08: if no student can be saved, evaluations and links are left alone', async (t) => {
-  const { body, calls } = await upload(t, `${HEADER}S1,Alice,alice@example.com,Team A\n`, { insertFails: true });
+  const { body, calls } = await upload(t, `${HEADER}S1,Alice,alice@example.com,Team 1\n`, { insertFails: true });
   assert.match(body.message, /errors/i);
   assert.equal(body.evaluation_state_reset, undefined);
   assertNothingDestroyed(calls);
@@ -130,7 +130,7 @@ test('TC-06-08: if no student can be saved, evaluations and links are left alone
 // Sponsor decision (12 Oct 2026): previously submitted evaluations must be saved, and professors must be able to
 // upload or update rosters without losing existing data. A valid upload therefore never clears links or evaluations.
 test('TC-06-06: a valid roster is applied, and evaluations and links are not touched', async (t) => {
-  const { body, calls } = await upload(t, `${HEADER}S1,Alice,alice@example.com,Team A\nS2,Bob,bob@example.com,Team A\n`);
+  const { body, calls } = await upload(t, `${HEADER}S1,Alice,alice@example.com,Team 1\nS2,Bob,bob@example.com,Team 1\n`);
   assert.deepEqual(body.students.sort(), ['S1', 'S2']);
   assert.ok(calls.includes('insert-students'), 'the students are saved');
   assertNothingDestroyed(calls);
@@ -141,7 +141,7 @@ test('TC-06-06: a valid roster is applied, and evaluations and links are not tou
 
 test('TC-06-83: a roster of students who are all already in the course changes no evaluation or link either', async (t) => {
   const existing = [{ _id: new mongoose.Types.ObjectId(), student_id: 'S1', name: 'Alice', email: 'alice@example.com' }];
-  const { body, calls } = await upload(t, `${HEADER}S1,Alice,alice@example.com,Team A\n`, { existing });
+  const { body, calls } = await upload(t, `${HEADER}S1,Alice,alice@example.com,Team 1\n`, { existing });
   assert.deepEqual(body.students_updated, ['S1']);
   assertNothingDestroyed(calls);
 });
@@ -177,7 +177,7 @@ test('TC-06-90: when every new student is saved there is no failed list and the 
 // A bad row is reported (FR-07) and the rest are added; only a file with no usable
 // rows is rejected (FR-06).
 test('TC-07-01: bad rows are reported and the good rows are still added', async (t) => {
-  const csv = `${HEADER}S1,Alice,alice@example.com,Team A\nS2,Bob,,Team A\nS3,Carol,carol@example.com,\n`;
+  const csv = `${HEADER}S1,Alice,alice@example.com,Team 1\nS2,Bob,,Team 1\nS3,Carol,carol@example.com,\n`;
   const { body, error, calls } = await upload(t, csv);
   assert.equal(error, undefined);
   assert.deepEqual(body.students.sort(), ['S1', 'S3']);
@@ -191,7 +191,7 @@ test('TC-07-01: bad rows are reported and the good rows are still added', async 
 // makes no claim that the address can receive mail. Each case is its own test with its ID
 // written out, so scripts/check-rtm.js can find it.
 async function assertBadEmailReported(t, email) {
-  const csv = `${HEADER}S1,Alice,alice@example.com,Team A\nS2,Bob,${email},Team A\nS3,Carol,carol@example.com,\n`;
+  const csv = `${HEADER}S1,Alice,alice@example.com,Team 1\nS2,Bob,${email},Team 1\nS3,Carol,carol@example.com,\n`;
   const { body, error } = await upload(t, csv);
   assert.equal(error, undefined);
   assert.deepEqual(body.students.sort(), ['S1', 'S3']);

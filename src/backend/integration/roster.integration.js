@@ -68,6 +68,35 @@ test('TC-06-20: a roster adds students and a new team, and membership matches on
   assert.equal(gamma.student_count, 2);
 });
 
+test('TC-06-55: a roster row with a team that is not numbered (Alpha) is reported and skipped; team 4 and 5 become Team 4 and Team 5', async () => {
+  const csv = [
+    'student_id,name,email,team_name',
+    '1005,Fay Foster,fay@example.edu,Alpha',
+    '1006,Gus Green,gus@example.edu,Team 3',
+    '1007,Hal Hill,hal@example.edu,team 4',
+    '1008,Ivy Ives,ivy@example.edu,5',
+    '1009,Jo Jones,jo@example.edu,',
+    '',
+  ].join('\n');
+  const res = await app.uploadCsv(uploadPath(IDS.courseAda), csv, { token: ada });
+
+  assert.equal(res.status, 200);
+  assert.deepEqual(res.body.students.sort(), ['1006', '1007', '1008', '1009']);
+  assert.ok(res.body.errors.some((message) => /Alpha/.test(message) && /Team 1, Team 2, Team 3/.test(message) && /1005/.test(message)), JSON.stringify(res.body.errors));
+  assert.equal(await Student.countDocuments({ course_id: IDS.courseAda, student_id: '1005' }), 0);
+  assert.deepEqual((await Team.find({ course_id: IDS.courseAda })).map((team) => team.team_name).sort(), ['Team 1', 'Team 2', 'Team 3', 'Team 4', 'Team 5']);
+  assert.equal((await Student.findOne({ course_id: IDS.courseAda, student_id: '1009' })).team_id, null);
+});
+
+test('TC-06-56: a roster with only unnumbered team names changes nothing', async () => {
+  const csv = ['student_id,name,email,team_name', '1005,Fay Foster,fay@example.edu,Alpha', '1006,Gus Green,gus@example.edu,Beta', ''].join('\n');
+  const res = await app.uploadCsv(uploadPath(IDS.courseAda), csv, { token: ada });
+
+  assert.equal(res.status, 400);
+  assert.equal(await Student.countDocuments({ course_id: IDS.courseAda }), 4);
+  assert.equal(await Team.countDocuments({ course_id: IDS.courseAda }), 2);
+});
+
 test('TC-06-21: the course counts follow the roster', async () => {
   await app.uploadCsv(uploadPath(IDS.courseAda), ROSTER, { token: ada });
   const course = await Course.findById(IDS.courseAda);
