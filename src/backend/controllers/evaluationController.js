@@ -13,14 +13,12 @@ const { rotateLink } = require('../utils/linkRotation');
 const { loadSubmitters, hasSubmitted } = require('../utils/submitted');
 const { countPeers, hasNobodyToRate } = require('../utils/peers');
 
-// The students an evaluator rates: the rest of their team, or the rest of the
-// course when they have no team. The form and the submission both use this, so
-// a student can only submit for the people the form showed them.
+// The students an evaluator rates: the rest of their team, and nobody when they have no team (CICD-79: the
+// instructor is told about such a student, who is not sent a form). The form and the submission both use
+// this, so a student can only submit for the people the form showed them.
 function findTeammates(student) {
-  const scope = student.team_id
-    ? { team_id: student.team_id._id || student.team_id }
-    : { course_id: student.course_id._id };
-  return Student.find({ ...scope, _id: { $ne: student._id } }).select('_id name student_id');
+  if (!student.team_id) return [];
+  return Student.find({ team_id: student.team_id._id || student.team_id, _id: { $ne: student._id } }).select('_id name student_id');
 }
 
 function validationError(message) {
@@ -357,7 +355,7 @@ exports.allowResubmission = async (req, res, next) => {
     }
     // CICD-72: a new link would open a form with nobody to rate
     if (hasNobodyToRate(student, countPeers(await Student.find({ course_id })))) {
-      const err = new Error('This student has no teammates to rate, so a new link would be of no use. Add a teammate to their team first.');
+      const err = new Error('This student has no one to rate (alone on their team, or no team assigned), so a new link would be of no use. Add a teammate or assign a team first.');
       err.code = 'NO_TEAMMATES';
       err.status = 409;
       return next(err);

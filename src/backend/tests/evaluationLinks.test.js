@@ -38,6 +38,9 @@ function query(result) {
   return q;
 }
 
+// One team for every student built here: a student with no team has nobody to rate and is not invited (CICD-79).
+const TEAM = new mongoose.Types.ObjectId();
+
 function linkHolder(expiresAt) {
   return {
     _id: new mongoose.Types.ObjectId(),
@@ -46,7 +49,7 @@ function linkHolder(expiresAt) {
     evaluation_token: 'tok',
     evaluation_token_expires_at: expiresAt,
     course_id: { _id: new mongoose.Types.ObjectId(), course_name: 'Capstone' },
-    team_id: null,
+    team_id: TEAM,
   };
 }
 

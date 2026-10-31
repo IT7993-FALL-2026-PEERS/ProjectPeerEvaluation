@@ -142,7 +142,7 @@ function StudentsDialog({
                       {student.group_assignment ? (
                         <Chip label={student.group_assignment} size="small" variant="outlined" />
                       ) : (
-                        <Typography variant="body2" color="text.secondary">Not assigned</Typography>
+                        <Chip label="No team assigned" size="small" color="warning" variant="outlined" />
                       )}
                     </TableCell>
                     <TableCell align="center">

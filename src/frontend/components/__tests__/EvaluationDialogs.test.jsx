@@ -182,7 +182,7 @@ describe('EvaluationStatusDialog', () => {
   test('before anything is sent, students alone on their team are named, because a send cannot invite them', () => {
     render(<EvaluationStatusDialog {...statusProps({ status: { evaluations_sent: false, no_teammates: ['Ann Archer', 'Eve Evans'] } })} />);
     expect(screen.getByText('Evaluations Have Not Been Sent')).toBeInTheDocument();
-    expect(screen.getByText('Alone on their team, so a send will not invite them: Ann Archer, Eve Evans.')).toBeInTheDocument();
+    expect(screen.getByText('A send will not invite students alone on their team or with no team assigned: Ann Archer, Eve Evans.')).toBeInTheDocument();
   });
 
   // CICD-72: a student with nobody to rate is listed with the reason, not as a missing submission
@@ -193,7 +193,7 @@ describe('EvaluationStatusDialog', () => {
       { id: 's3', student_id: '1004', name: 'Di Diaz', team: 'Team 2', completed: true, ratings_on_file: true, nobody_to_rate: false },
     ];
     render(<EvaluationStatusDialog {...statusProps({ status: { evaluations_sent: true, completed_count: 2, total_count: 2, students } })} />);
-    expect(screen.getAllByText('No teammates to rate. Add a teammate to their team, then send again.')).toHaveLength(1);
+    expect(screen.getAllByText('No one to rate: alone on their team or no team assigned. Add a teammate or assign a team, then send again.')).toHaveLength(1);
     expect(screen.getByText('No teammates')).toBeInTheDocument();
     expect(screen.queryByText('Pending')).not.toBeInTheDocument();
     expect(screen.queryByText('0/1')).not.toBeInTheDocument();

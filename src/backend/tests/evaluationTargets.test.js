@@ -111,13 +111,14 @@ test('a student_id sent as an array is rejected before any other check', async (
   assert.equal(saved.length, 0);
 });
 
-test('without a team, the rest of the course counts as teammates, as on the form', async (t) => {
+test('without a team there is nobody to rate: the submission is refused and no student is looked up (CICD-79)', async (t) => {
   const { team_id: _unused, ...noTeam } = evaluator;
   t.mock.method(Student, 'findOne', () => ({ populate: async () => noTeam }));
-  let filter;
-  t.mock.method(Student, 'find', (f) => { filter = f; return { select: async () => [{ _id: bob }] }; });
+  let looked = false;
+  t.mock.method(Student, 'find', () => { looked = true; return { select: async () => [{ _id: bob }] }; });
   t.mock.method(Evaluation, 'findOne', async () => null);
-  t.mock.method(evaluationStore, 'saveEvaluations', async () => {});
+  const saved = [];
+  t.mock.method(evaluationStore, 'saveEvaluations', async (rows) => { saved.push(rows); });
 
   let error;
   await submitEvaluation(
@@ -125,6 +126,8 @@ test('without a team, the rest of the course counts as teammates, as on the form
     { status() { return this; }, json() {} },
     (err) => { error = err; },
   );
-  assert.equal(error, undefined);
-  assert.equal(String(filter.course_id), String(evaluator.course_id._id));
+  assert.equal(error.status, 409);
+  assert.equal(error.code, 'NO_TEAMMATES');
+  assert.equal(looked, false, 'a student with no team does not rate the rest of the course');
+  assert.equal(saved.length, 0);
 });

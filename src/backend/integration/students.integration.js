@@ -197,6 +197,35 @@ test('TC-06-43: clearing the team on purpose (group_assignment null or empty) re
   }
 });
 
+// CICD-79: the team is optional again (the sponsor's answer). The Add and Edit Student dialogs send an empty
+// team when "No team assigned" is chosen, so the server must read an empty team as no team.
+test('TC-06-95: a student added with an empty team (what the dialog sends for "No team assigned") has no team and no team is made', async () => {
+  const teams = await Team.countDocuments({ course_id: IDS.courseAda });
+  const res = await app.request('POST', students(), { token: ada, body: { ...NEW_STUDENT, group_assignment: '' } });
+  assert.equal(res.status, 201);
+
+  const saved = await Student.findById(res.body.student._id);
+  assert.equal(saved.team_id, null);
+  assert.ok(!saved.group_assignment);
+  assert.equal(await Team.countDocuments({ course_id: IDS.courseAda }), teams);
+  await assertCourseConsistent(IDS.courseAda);
+});
+
+test('TC-06-96: editing a student with an empty team takes them out of their team, and the team count follows', async () => {
+  const before = await Student.findById(IDS.ann);
+  assert.ok(before.team_id, 'the seeded student starts in a team');
+  const teamBefore = await Team.findById(before.team_id);
+
+  const res = await app.request('PUT', `${students()}/${IDS.ann}`, { token: ada, body: { name: 'Ann Archer', group_assignment: '' } });
+  assert.equal(res.status, 200);
+
+  const after = await Student.findById(IDS.ann);
+  assert.equal(after.team_id, null);
+  assert.ok(!after.group_assignment);
+  assert.equal((await Team.findById(before.team_id)).student_count, teamBefore.student_count - 1);
+  await assertCourseConsistent(IDS.courseAda);
+});
+
 test('TC-06-44: a student with no team stays without one when only their name is edited', async () => {
   const res = await app.request('PUT', `${students()}/${IDS.ann}`, { token: ada, body: { group_assignment: null } });
   assert.equal(res.status, 200);

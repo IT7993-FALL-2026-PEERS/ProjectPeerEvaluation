@@ -11,6 +11,7 @@ const { submitEvaluation } = require('../controllers/evaluationController');
 const evaluator = {
   _id: new mongoose.Types.ObjectId(),
   course_id: { _id: new mongoose.Types.ObjectId() },
+  team_id: new mongoose.Types.ObjectId(), // a student with no team rates nobody (CICD-79)
   evaluation_token_expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000),
 };
 

@@ -49,13 +49,13 @@ describe('StudentsDialog', () => {
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
   });
 
-  test('lists each student with ID, name, email and team, or "Not assigned"', () => {
+  test('lists each student with ID, name, email and team, or "No team assigned"', () => {
     render(<StudentsDialog {...studentsProps()} />);
     expect(studentNames()).toEqual(['Ann Archer', 'Ben Baker', 'Eve Evans']);
     expect(screen.getByRole('row', { name: /Ann Archer/ })).toHaveTextContent('1001');
     expect(screen.getByRole('row', { name: /Ann Archer/ })).toHaveTextContent('ann@example.edu');
     expect(screen.getByRole('row', { name: /Ann Archer/ })).toHaveTextContent('Team 1');
-    expect(screen.getByRole('row', { name: /Eve Evans/ })).toHaveTextContent('Not assigned');
+    expect(screen.getByRole('row', { name: /Eve Evans/ })).toHaveTextContent('No team assigned');
   });
 
   test('says there are no students when the course has none', () => {

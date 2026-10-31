@@ -42,13 +42,13 @@ describe('AddStudentDialog', () => {
     expect(teamField()).toHaveTextContent('Team 3');
   });
 
-  test('all four fields are required', () => {
+  test('the student ID, name and email are required, the team is optional', () => {
     render(<AddStudentDialog open form={EMPTY} error="" onFormChange={() => {}} onClose={() => {}} onSubmit={() => {}} />);
 
     expect(screen.getByLabelText(STUDENT_ID)).toBeRequired();
     expect(screen.getByLabelText(NAME)).toBeRequired();
     expect(screen.getByLabelText(EMAIL)).toBeRequired();
-    expect(teamField()).toBeRequired();
+    expect(teamField()).not.toBeRequired();
   });
 
   test('+ Add another team picks the next numbered team, continuing from the course\'s own teams', async () => {
@@ -57,7 +57,7 @@ describe('AddStudentDialog', () => {
 
     await user.click(teamField());
     expect(screen.getAllByRole('option').map(option => option.textContent)).toEqual([
-      'Team 1', 'Team 2', 'Team 3', 'Team 4', 'Team 5', 'Team 6', 'Team 7', 'Team 8', 'Team 9', 'Team 10', 'Team 11', '+ Add another team',
+      'No team assigned', 'Team 1', 'Team 2', 'Team 3', 'Team 4', 'Team 5', 'Team 6', 'Team 7', 'Team 8', 'Team 9', 'Team 10', 'Team 11', '+ Add another team',
     ]);
     await user.click(screen.getByRole('option', { name: '+ Add another team' }));
 
@@ -76,18 +76,28 @@ describe('AddStudentDialog', () => {
     expect(onFormChange).toHaveBeenLastCalledWith({ ...EMPTY, name: 'Zed', group_assignment: 'Team 7' });
   });
 
-  test('shows the error and marks only the empty required fields, the team included', () => {
-    render(<AddStudentDialog open form={{ ...EMPTY, name: 'Zed' }} error="Student ID, name, email, and team are required." onFormChange={() => {}} onClose={() => {}} onSubmit={() => {}} />);
+  test('shows the error and marks only the empty required fields, never the team', () => {
+    render(<AddStudentDialog open form={{ ...EMPTY, name: 'Zed' }} error="Student ID, name, and email are required." onFormChange={() => {}} onClose={() => {}} onSubmit={() => {}} />);
 
-    expect(screen.getByText('Student ID, name, email, and team are required.')).toBeInTheDocument();
+    expect(screen.getByText('Student ID, name, and email are required.')).toBeInTheDocument();
     expect(screen.getByLabelText(STUDENT_ID)).toHaveAttribute('aria-invalid', 'true');
     expect(screen.getByLabelText(EMAIL)).toHaveAttribute('aria-invalid', 'true');
-    expect(teamField()).toBeInvalid();
+    expect(teamField()).not.toBeInvalid();
     expect(screen.getByLabelText(NAME)).toHaveAttribute('aria-invalid', 'false');
   });
 
+  test('with no team chosen a small alert says that no team is assigned; choosing a team removes it', async () => {
+    render(<Page Dialog={AddStudentDialog} error="" onClose={() => {}} onSubmit={() => {}} />);
+    expect(teamField()).toHaveTextContent('No team assigned');
+    expect(screen.getByRole('alert')).toHaveTextContent(/No team assigned/);
+
+    await user.click(teamField());
+    await user.click(screen.getByRole('option', { name: 'Team 3' }));
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
   test('a field with only spaces counts as empty', () => {
-    render(<AddStudentDialog open form={{ student_id: '  ', name: 'Zed', email: 'z@example.edu', group_assignment: 'Team 1' }} error="Student ID, name, email, and team are required." onFormChange={() => {}} onClose={() => {}} onSubmit={() => {}} />);
+    render(<AddStudentDialog open form={{ student_id: '  ', name: 'Zed', email: 'z@example.edu', group_assignment: 'Team 1' }} error="Student ID, name, and email are required." onFormChange={() => {}} onClose={() => {}} onSubmit={() => {}} />);
 
     expect(screen.getByLabelText(STUDENT_ID)).toHaveAttribute('aria-invalid', 'true');
     expect(teamField()).not.toBeInvalid();
@@ -132,13 +142,13 @@ describe('EditStudentDialog', () => {
     expect(screen.getByLabelText(NAME)).toHaveValue('Ann Archer-Reyes');
   });
 
-  test('all four fields are required', () => {
+  test('the student ID, name and email are required, the team is optional', () => {
     render(<EditStudentDialog open form={STUDENT} onFormChange={() => {}} onClose={() => {}} onSave={() => {}} />);
 
     expect(screen.getByLabelText(STUDENT_ID)).toBeRequired();
     expect(screen.getByLabelText(NAME)).toBeRequired();
     expect(screen.getByLabelText(EMAIL)).toBeRequired();
-    expect(teamField()).toBeRequired();
+    expect(teamField()).not.toBeRequired();
   });
 
   test('+ Add another team picks the next numbered team, continuing from the course\'s own teams', async () => {
@@ -161,18 +171,24 @@ describe('EditStudentDialog', () => {
     expect(onFormChange).toHaveBeenLastCalledWith({ ...STUDENT, group_assignment: 'Team 2' });
   });
 
-  test('Save is off while the student ID, name, email or team is empty', () => {
+  test('Save is off while the student ID, name or email is empty, and stays on with no team', () => {
     const { rerender } = render(<EditStudentDialog open form={STUDENT} onFormChange={() => {}} onClose={() => {}} onSave={() => {}} />);
     expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled();
 
-    for (const field of ['student_id', 'name', 'email', 'group_assignment']) {
+    for (const field of ['student_id', 'name', 'email']) {
       rerender(<EditStudentDialog open form={{ ...STUDENT, [field]: '' }} onFormChange={() => {}} onClose={() => {}} onSave={() => {}} />);
       expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
     }
     // Spaces alone are not an entry.
-    for (const field of ['student_id', 'name', 'email', 'group_assignment']) {
+    for (const field of ['student_id', 'name', 'email']) {
       rerender(<EditStudentDialog open form={{ ...STUDENT, [field]: '   ' }} onFormChange={() => {}} onClose={() => {}} onSave={() => {}} />);
       expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+    }
+    // The team is optional: a student can be saved with no team, and a small alert says so.
+    for (const team of ['', '   ']) {
+      rerender(<EditStudentDialog open form={{ ...STUDENT, group_assignment: team }} onFormChange={() => {}} onClose={() => {}} onSave={() => {}} />);
+      expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled();
+      expect(screen.getByRole('alert')).toHaveTextContent(/No team assigned/);
     }
   });
 

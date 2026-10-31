@@ -6,9 +6,10 @@ import { getErrorMessage } from '../services/apiError';
 const EMPTY_STUDENT_FORM = { student_id: '', name: '', email: '', group_assignment: '' };
 const EMPTY_STUDENT_SEARCH = { student_id: '', name: '', email: '', team: '' };
 
-// All four fields of the add and edit forms are required, and spaces alone are not an entry. The team name
-// is sent without the spaces around it, since the server finds the team by its exact name.
-const hasBlankField = (form) => [form.student_id, form.name, form.email, form.group_assignment].some((value) => !value.trim());
+// The student ID, name and email of the add and edit forms are required, and spaces alone are not an entry.
+// The team is optional (CICD-79): an empty team means no team. The team name is sent without the spaces
+// around it, since the server finds the team by its exact name.
+const hasBlankField = (form) => [form.student_id, form.name, form.email].some((value) => !value.trim());
 const withTrimmedTeam = (form) => ({ ...form, group_assignment: form.group_assignment.trim() });
 
 // The Manage Students dialog and the four dialogs that open from it (add, edit, roster upload and
@@ -81,7 +82,7 @@ export default function useStudents({ setAlert, refreshCourses, onAllStudentsDel
     setStudentFormError('');
     if (!studentsCourse) return;
     if (hasBlankField(studentForm)) {
-      setStudentFormError('Student ID, name, email, and team are required.');
+      setStudentFormError('Student ID, name, and email are required.');
       return;
     }
     try {
