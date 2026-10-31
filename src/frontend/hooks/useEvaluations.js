@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import api from '../services/api';
 import { getApiBaseUrl } from '../services/apiUrl';
 import { describeExtendResult, describeInvitationResult, describeReminderResult } from '../services/emailResult';
 import { prefillDeadline, toDeadlinePayload } from '../services/deadline';
 import { getErrorMessage } from '../services/apiError';
+import { describeNobodyToRate, fetchNobodyToRate } from '../services/sendPreview';
 
 // The evaluations of a course, moved out of CourseManagement.js (CICD-57, step 6b-4): sending the
 // invitations, sending reminders, the Evaluation Status dialog, and resetting the evaluation state.
@@ -30,6 +31,10 @@ export default function useEvaluations({ setAlert }) {
 
   // The course a deadline is being chosen for (CICD-67); nothing is sent until the instructor confirms.
   const [sendRequest, setSendRequest] = useState(null);
+  // CICD-80: who the send cannot reach, said in the deadline dialog; an answer for an earlier request is ignored
+  const [sendWarning, setSendWarning] = useState('');
+  const [sendChecking, setSendChecking] = useState(false); // Send stays off until the answer is in
+  const warningRequest = useRef(0);
   // The deadline each course was last sent with in this session, to prefill the next send: the course
   // list is not reloaded after a send, so its copy of the last deadline would be out of date.
   const [lastDeadlines, setLastDeadlines] = useState({});
@@ -163,12 +168,25 @@ export default function useEvaluations({ setAlert }) {
     }
   };
 
-  const requestSend = (course) => setSendRequest(course);
+  const clearSendWarning = () => { warningRequest.current += 1; setSendWarning(''); setSendChecking(false); };
+  const requestSend = (course) => {
+    setSendRequest(course);
+    const request = warningRequest.current + 1;
+    warningRequest.current = request;
+    setSendWarning('');
+    setSendChecking(true);
+    fetchNobodyToRate(`/courses/${course._id || course.id}/evaluations/send-preview`).then((names) => {
+      if (warningRequest.current !== request) return;
+      setSendWarning(describeNobodyToRate(names));
+      setSendChecking(false);
+    });
+  };
   const lastDeadlineFor = (course) => course && (lastDeadlines[course._id || course.id] || course.last_evaluation_deadline);
   const confirmSend = async (localValue) => {
     const course = sendRequest;
     const payload = toDeadlinePayload(localValue, { keep: lastDeadlineFor(course) });
     setSendRequest(null);
+    clearSendWarning();
     if (!course || !payload) return;
     await handleSendInvitations(course._id || course.id, payload);
   };
@@ -239,10 +257,12 @@ export default function useEvaluations({ setAlert }) {
       open: sendRequest !== null,
       title: 'Send evaluations',
       description: 'Students must submit their evaluations by this deadline; after it their links stop working. Students who already have a working link, or have submitted, are not emailed again.',
+      warning: sendRequest ? sendWarning : '',
+      checking: sendRequest ? sendChecking : false,
       initialValue: prefillDeadline(lastDeadlineFor(sendRequest)),
       busy: false,
       onConfirm: confirmSend,
-      onClose: () => setSendRequest(null),
+      onClose: () => { setSendRequest(null); clearSendWarning(); },
     },
     sendInvitations: handleSendInvitations,
     viewStatus: handleViewEvaluationStatus,

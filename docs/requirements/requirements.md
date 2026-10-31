@@ -292,6 +292,12 @@ deadline, and students who already have a working link or have submitted are not
 could never be accepted), the instructor is told who was skipped, the student's own page says there is nobody to
 rate yet, and a submission is refused with that reason. The sponsor has not set a minimum team size (open question).
 
+**Given** a course with a student who is alone on their team, or has no team assigned (the sponsor's answer of
+Oct 30, CICD-80),
+**when** the instructor opens the Send evaluations dialog (for the course, for one team, or from the status screen),
+**then** the dialog names those students and says nobody will be sent an evaluation for them, before a deadline is
+chosen, so the assignment can be checked; the instructor can still cancel, or send to everyone else.
+
 **Given** a student's link,
 **when** its deadline has passed,
 **then** the form, the status check and the submission all refuse it ("The deadline for this evaluation

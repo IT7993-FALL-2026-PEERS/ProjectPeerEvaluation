@@ -158,6 +158,8 @@ on 404 instead of this shape.
 | DELETE | `/courses/:course_id/teams/:team_id/students/:student_id` | 🔒 | Remove a student from a team |
 | POST | `/courses/:course_id/evaluations/send` | 🔒 | Email evaluation invitations to the course |
 | POST | `/courses/:course_id/teams/:team_id/evaluations/send` | 🔒 | Email invitations to one team |
+| GET | `/courses/:course_id/evaluations/send-preview` | 🔒 | What a course send would do: who it cannot reach (CICD-80) |
+| GET | `/courses/:course_id/teams/:team_id/evaluations/send-preview` | 🔒 | The same for one team |
 | GET | `/courses/:course_id/evaluations/status` | 🔒 | Who has and hasn't submitted |
 | POST | `/courses/:course_id/evaluations/remind` | 🔒 | Email reminders to students who haven't submitted |
 | POST | `/courses/:course_id/evaluations/extend` | 🔒 | Extend the deadline with a new link (one student, one team, or everyone not submitted) |
@@ -486,6 +488,15 @@ keeps `last_evaluation_deadline` and `last_evaluation_deadline_zone`, which pref
 ```
 `total_students` counts the recipients. When nobody needs an invitation the answer is still **200**,
 with a message saying so and `emails_sent: 0`. Partial failures still answer 200: check `failed`, a list of `"Name (email): error"` strings. **404** no students in the course or team.
+
+### `GET .../evaluations/send-preview` and `GET /courses/:course_id/teams/:team_id/evaluations/send-preview`
+
+What the send above would do, without doing it (CICD-80): **200** `{ "no_teammates": ["<names>"], "will_invite": <count> }`.
+`no_teammates` names the students the send cannot reach because they have nobody to rate (alone on their team, or with
+no team assigned); `will_invite` is how many students it would email (no active link, not submitted, someone to rate).
+It uses the same students and the same rule as the send (`planInvitations`), and changes nothing: no link is issued and
+no email is sent. The Send dialogs call it when they open and warn the instructor, who can then check the assignment
+before choosing a deadline. **404** for a course that is not the caller's, or a team that is not in the course.
 
 ### `GET .../evaluations/status`
 

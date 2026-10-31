@@ -207,3 +207,44 @@ test('TC-11-38: before anything is sent, the status names a student with no team
   assert.equal(body.evaluations_sent, false);
   assert.deepEqual(body.no_teammates, ['Ann Archer']);
 });
+
+// CICD-80: the instructor is told BEFORE sending who a send cannot reach (alone on a team, or no team), so the
+// assignment can be checked. A preview changes nothing: no link is issued and no email goes out.
+const preview = (path = 'evaluations/send-preview', token = ada) => app.request('GET', course(path), { token });
+
+test('TC-10-84: the send preview names the students a course send cannot reach and counts the others, and sends nothing', async () => {
+  const { status, body } = await preview();
+  assert.equal(status, 200);
+  assert.deepEqual(body.no_teammates, ['Ann Archer']);
+  assert.equal(body.will_invite, 3);
+  assert.equal(sentEmails.length, 0);
+  assert.equal(await Student.countDocuments({ evaluation_token: { $ne: null } }), 0, 'no link was issued');
+
+  // A student with no team is named too (CICD-79), and a student who already has a link is not counted again.
+  await Student.updateOne({ _id: IDS.ben }, { team_id: null, group_assignment: null });
+  await Student.updateOne({ _id: IDS.cy }, { evaluation_token: generateEvaluationToken(), evaluation_token_expires_at: new Date(Date.now() + 3600 * 1000) });
+  const again = await preview();
+  assert.deepEqual([...again.body.no_teammates].sort(), ['Ann Archer', 'Ben Baker']);
+  assert.equal(again.body.will_invite, 1);
+});
+
+test('TC-10-85: the team send preview names a student alone on the team, and is empty for a team of three', async () => {
+  const alone = await preview(`teams/${IDS.teamAlpha}/evaluations/send-preview`);
+  assert.equal(alone.status, 200);
+  assert.deepEqual(alone.body.no_teammates, ['Ann Archer']);
+  assert.equal(alone.body.will_invite, 0);
+
+  const three = await preview(`teams/${IDS.teamBeta}/evaluations/send-preview`);
+  assert.deepEqual(three.body.no_teammates, []);
+  assert.equal(three.body.will_invite, 3);
+  assert.equal(sentEmails.length, 0);
+});
+
+test('TC-10-86: the send previews are for the course\'s own professor, and a team of another course is not found', async () => {
+  const bo = app.tokenFor(IDS.bo, 'bo@example.edu');
+  assert.equal((await preview('evaluations/send-preview', bo)).status, 404, 'another professor, course');
+  assert.equal((await preview(`teams/${IDS.teamAlpha}/evaluations/send-preview`, bo)).status, 404, 'another professor, team');
+  const wrongCourse = await app.request('GET', `/api/courses/${IDS.courseBo}/teams/${IDS.teamAlpha}/evaluations/send-preview`, { token: bo });
+  assert.equal(wrongCourse.status, 404, 'a team of another course');
+  assert.equal((await preview('evaluations/send-preview', '')).status, 401, 'not logged in');
+});

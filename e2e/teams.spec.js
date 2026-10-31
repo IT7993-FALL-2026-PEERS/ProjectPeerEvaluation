@@ -149,6 +149,8 @@ test('E2E-47: a student alone on a team is skipped by Send Evaluations and shown
 
   // Sending to Team 1 reaches nobody and says why
   await teamRow(page, 'Team 1').getByTitle('Send Evaluations to Team').click();
+  // CICD-80: the dialog names Ann before anything is sent
+  await expect(top(page).getByRole('alert')).toContainText('No evaluation will be sent to Ann Archer');
   await sendWithDeadline(page);
   await expect(alertWith(page, 'No one to rate (alone on their team, or no team assigned): Ann Archer. Add a teammate or assign a team, then send again.')).toBeVisible();
   expect(await capturedEmails()).toHaveLength(0);
@@ -157,6 +159,7 @@ test('E2E-47: a student alone on a team is skipped by Send Evaluations and shown
   await top(page).getByRole('button', { name: 'Close' }).click();
   await expect(page.locator('[role=dialog]')).toHaveCount(0);
   await page.getByTitle('Send Evaluations', { exact: true }).click();
+  await expect(top(page).getByRole('alert')).toContainText('No evaluation will be sent to Ann Archer');
   await sendWithDeadline(page);
   await expect(alertWith(page, 'No one to rate (alone on their team, or no team assigned): Ann Archer. Add a teammate or assign a team, then send again.')).toBeVisible();
   // the first alert may still be on screen, so wait for the emails themselves

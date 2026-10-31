@@ -50,6 +50,9 @@ router.post('/:course_id/evaluations/send', authenticateToken, evaluationControl
 // Send evaluations to a specific team
 router.post('/:course_id/teams/:team_id/evaluations/send', authenticateToken, evaluationController.sendTeamEvaluations);
 router.get('/:course_id/evaluations/status', authenticateToken, evaluationController.evaluationStatus);
+// What a send would do (who it cannot reach, how many it would email), without sending: for the Send dialogs (CICD-80)
+router.get('/:course_id/evaluations/send-preview', authenticateToken, evaluationController.previewCourseSend);
+router.get('/:course_id/teams/:team_id/evaluations/send-preview', authenticateToken, evaluationController.previewTeamSend);
 router.post('/:course_id/evaluations/remind', authenticateToken, evaluationController.remindEvaluations);
 // Extend the deadline with a new link (CICD-68)
 router.post('/:course_id/evaluations/extend', authenticateToken, evaluationController.extendEvaluations);

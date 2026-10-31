@@ -16,6 +16,30 @@ describe('DeadlineDialog', () => {
     expect(screen.getByText((text) => text.includes(`Time zone: ${browserZone()}`))).toBeInTheDocument();
   });
 
+  test('shows a warning above the deadline when the page passes one (CICD-80), and none otherwise', () => {
+    const { rerender } = render(<DeadlineDialog {...base} />);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+
+    rerender(<DeadlineDialog {...base} warning="No evaluation will be sent to Ann Archer." />);
+    expect(screen.getByRole('alert')).toHaveTextContent('No evaluation will be sent to Ann Archer.');
+    // It is a heads-up, not a block: Send still works once a deadline is chosen.
+    fireEvent.change(screen.getByLabelText('Deadline'), { target: { value: future } });
+    expect(screen.getByRole('button', { name: 'Send' })).toBeEnabled();
+  });
+
+  test('while the page is checking who the send cannot reach, Send stays off even with a deadline prefilled (CICD-80)', async () => {
+    const onConfirm = vi.fn();
+    const { rerender } = render(<DeadlineDialog {...base} initialValue={future} checking onConfirm={onConfirm} />);
+    expect(screen.getByText('Checking who can be reached...')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Send' })).toBeDisabled();
+    // Cancel still works while it checks
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeEnabled();
+
+    rerender(<DeadlineDialog {...base} initialValue={future} checking={false} onConfirm={onConfirm} />);
+    expect(screen.queryByText('Checking who can be reached...')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Send' })).toBeEnabled();
+  });
+
   test('Send is disabled until a deadline is chosen, and sends the value that was chosen', async () => {
     const onConfirm = vi.fn();
     render(<DeadlineDialog {...base} onConfirm={onConfirm} />);

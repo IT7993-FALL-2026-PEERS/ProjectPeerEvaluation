@@ -176,6 +176,44 @@ function notFound(message) {
   return err;
 }
 
+// What a send would do, without doing it (CICD-80): who it cannot reach (alone on their team, or no team: nobody
+// to rate) and how many students it would email. The Send dialogs show this first, so the instructor can check
+// the assignment before anything goes out. Same students and same rule (planInvitations) as the send itself;
+// nothing is changed, no link is issued and no email is sent.
+function previewAnswer(plan) {
+  return { no_teammates: plan.noTeammates, will_invite: plan.recipients.length };
+}
+
+exports.previewTeamSend = async (req, res, next) => {
+  try {
+    const { course_id, team_id } = req.params;
+    const team = await Team.findById(team_id);
+    if (!team || String(team.course_id) !== String(course_id)) {
+      return next(notFound('Team not found or does not belong to this course.'));
+    }
+    const students = await Student.find({ course_id, team_id });
+    res.status(200).json(previewAnswer(await planInvitations(students, course_id)));
+  } catch (err) {
+    console.error('Error previewing a team send:', err);
+    err.code = err.code || 'SERVER_ERROR';
+    err.status = err.status || 500;
+    next(err);
+  }
+};
+
+exports.previewCourseSend = async (req, res, next) => {
+  try {
+    const { course_id } = req.params;
+    const students = await Student.find({ course_id }).populate('team_id');
+    res.status(200).json(previewAnswer(await planInvitations(students, course_id)));
+  } catch (err) {
+    console.error('Error previewing a course send:', err);
+    err.code = err.code || 'SERVER_ERROR';
+    err.status = err.status || 500;
+    next(err);
+  }
+};
+
 /**
  * Send evaluation invitations to the students of one team (CICD-67: with a deadline)
  */
