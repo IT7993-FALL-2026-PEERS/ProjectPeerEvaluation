@@ -2,6 +2,14 @@
 
 Decisions and outcomes from sponsor meetings. Earlier weekly updates are in the team's weekly log documents.
 
+## Oct 30, 2026 — the sponsor's answers to our Milestone 2 questions
+
+- **Outcome:** the sponsor approved the Milestone 2 deliverables.
+- **A team of one:** the instructor should be notified *before* the evaluation about a single-member team, so they can verify the assignment; sending the form to a single member does not make sense. Today the instructor is told only after clicking Send. Not built yet.
+- **Team assignment:** stays optional, with a small alert that a student has no team, so the system handles both situations. Not built yet: the Add and Edit Student dialogs have required a team since PR #244 (Oct 27); the numbered team names (Team 1, Team 2, ...) stay.
+- **Curved grading:** a curve overall, and a standard deviation of 20 in particular, is not serving the purpose; a standard deviation of 10 would not be a good choice either. The sponsor suggested a "Contribution Multiplier" and asked the team to research it and finalize it at the next capstone meeting. The team's proposal and its reasons are in [contribution-multiplier-proposal.md](../requirements/contribution-multiplier-proposal.md). Until the meeting the report keeps its regular and curved methods.
+- **Recorded by:** Khoa Ho (M4), from the sponsor's written answers.
+
 ## 5 October 2026 — team decisions for Milestone 2
 
 Two decisions the team owed by 5 October, recorded here on 8 October with the reasons.
