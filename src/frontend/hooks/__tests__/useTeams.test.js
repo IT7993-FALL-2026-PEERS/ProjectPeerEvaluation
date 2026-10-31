@@ -705,6 +705,48 @@ describe('useTeams: sending the evaluations to one team', () => {
   };
   const WITH_DEADLINE = { deadline: new Date(CHOSEN).toISOString(), deadline_zone: expect.any(String) };
 
+  // CICD-80: the dialog says first who a send to this team cannot reach (a student alone on the team)
+  test('the team send dialog warns about students who have nobody to rate, before the deadline is chosen', async () => {
+    routes['/courses/c1/teams/t1/evaluations/send-preview'] = { no_teammates: ['Ann Archer'], will_invite: 0 };
+    const view = await opened();
+
+    await act(async () => { view.result.current.teamsDialog.onSend(ALPHA); });
+
+    expect(api.get).toHaveBeenCalledWith('/courses/c1/teams/t1/evaluations/send-preview');
+    expect(view.result.current.teamSendDialog.warning).toContain('Ann Archer');
+    expect(api.post).not.toHaveBeenCalled();
+
+    act(() => view.result.current.teamSendDialog.onClose());
+    expect(view.result.current.teamSendDialog.warning).toBe('');
+  });
+
+  test('the team send dialog is checking until the preview answers, so Send cannot be used before the warning is known', async () => {
+    let answer;
+    api.get.mockImplementation((url) => {
+      if (url === '/courses/c1/teams/t1/evaluations/send-preview') return new Promise((resolve) => { answer = () => resolve({ data: { no_teammates: ['Ann Archer'] } }); });
+      if (url in routes) return Promise.resolve({ data: routes[url] });
+      return Promise.reject(new Error('unknown'));
+    });
+    const view = await opened();
+    act(() => { view.result.current.teamsDialog.onSend(ALPHA); });
+    expect(view.result.current.teamSendDialog.checking).toBe(true);
+
+    await act(async () => { answer(); });
+    expect(view.result.current.teamSendDialog.checking).toBe(false);
+    expect(view.result.current.teamSendDialog.warning).toContain('Ann Archer');
+  });
+
+  test('the team send dialog has no warning when nobody is affected or the preview fails', async () => {
+    routes['/courses/c1/teams/t1/evaluations/send-preview'] = { no_teammates: [], will_invite: 2 };
+    const view = await opened();
+    await act(async () => { view.result.current.teamsDialog.onSend(ALPHA); });
+    expect(view.result.current.teamSendDialog.warning).toBe('');
+
+    delete routes['/courses/c1/teams/t1/evaluations/send-preview']; // an unknown url fails, like a server that is down
+    await act(async () => { view.result.current.teamsDialog.onSend(ALPHA); });
+    expect(view.result.current.teamSendDialog.warning).toBe('');
+  });
+
   test('emails the team, says so, refreshes the counts, and is busy only while it runs', async () => {
     const view = await opened();
     let release;

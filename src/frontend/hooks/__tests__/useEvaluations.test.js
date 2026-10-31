@@ -496,3 +496,101 @@ describe('useEvaluations: extend and resubmit (CICD-68)', () => {
     expect(api.post).not.toHaveBeenCalled();
   });
 });
+
+// CICD-80: before the deadline is chosen, the dialog says who the send cannot reach (alone on a team, or no
+// team), so the instructor can check the assignment first.
+describe('useEvaluations: telling the instructor who a send cannot reach (CICD-80)', () => {
+  const previewTo = (names) => api.get.mockImplementation(async (url) => (
+    url === '/courses/c1/evaluations/send-preview' ? { data: { no_teammates: names, will_invite: 3 } } : { data: statusBody }
+  ));
+
+  test('requestSend asks the preview endpoint and the dialog carries a warning naming the students', async () => {
+    previewTo(['Ann Archer']);
+    const view = render();
+    await act(async () => { view.result.current.requestSend(COURSE); });
+
+    expect(api.get).toHaveBeenCalledWith('/courses/c1/evaluations/send-preview');
+    expect(view.result.current.sendDeadlineDialog.warning).toContain('Ann Archer');
+    expect(view.result.current.sendDeadlineDialog.warning).toContain('nobody to rate');
+    expect(api.post).not.toHaveBeenCalled();
+  });
+
+  test('there is no warning when nobody is affected, or when the preview cannot be loaded', async () => {
+    previewTo([]);
+    const view = render();
+    await act(async () => { view.result.current.requestSend(COURSE); });
+    expect(view.result.current.sendDeadlineDialog.warning).toBe('');
+
+    api.get.mockRejectedValue(new Error('offline'));
+    await act(async () => { view.result.current.requestSend(COURSE); });
+    expect(view.result.current.sendDeadlineDialog.warning).toBe('');
+  });
+
+  test('closing or confirming clears the warning, so the next send does not show an old one', async () => {
+    previewTo(['Ann Archer']);
+    const view = render();
+    await act(async () => { view.result.current.requestSend(COURSE); });
+    act(() => view.result.current.sendDeadlineDialog.onClose());
+    expect(view.result.current.sendDeadlineDialog.warning).toBe('');
+
+    await act(async () => { view.result.current.requestSend(COURSE); });
+    expect(view.result.current.sendDeadlineDialog.warning).toContain('Ann Archer');
+    api.post.mockResolvedValue({ data: { emails_sent: 3, total_students: 3, failed: [] } });
+    await act(() => view.result.current.sendDeadlineDialog.onConfirm(CHOSEN));
+    expect(view.result.current.sendDeadlineDialog.warning).toBe('');
+  });
+
+  test('a slow answer for an earlier request does not show up on a later one', async () => {
+    let releaseFirst;
+    api.get.mockImplementation((url) => {
+      if (url === '/courses/c1/evaluations/send-preview') return new Promise((resolve) => { releaseFirst = () => resolve({ data: { no_teammates: ['Ann Archer'] } }); });
+      if (url === '/courses/c2/evaluations/send-preview') return Promise.resolve({ data: { no_teammates: [] } });
+      return Promise.resolve({ data: statusBody });
+    });
+    const view = render();
+    act(() => { view.result.current.requestSend(COURSE); });
+    await act(async () => { view.result.current.requestSend({ _id: 'c2' }); });
+    await act(async () => { releaseFirst(); });
+
+    expect(view.result.current.sendDeadlineDialog.warning).toBe('');
+  });
+});
+
+// Codex review (CICD-80): a prefilled deadline makes Send click-able at once, so the dialog says it is still
+// checking, and keeps Send off until the preview has answered (or failed).
+describe('useEvaluations: Send waits for the check of who it cannot reach (CICD-80)', () => {
+  test('the dialog is checking while the preview is pending, and stops when it answers', async () => {
+    let answer;
+    api.get.mockImplementation((url) => (url === '/courses/c1/evaluations/send-preview'
+      ? new Promise((resolve) => { answer = () => resolve({ data: { no_teammates: ['Ann Archer'] } }); })
+      : Promise.resolve({ data: statusBody })));
+    const view = render();
+    act(() => { view.result.current.requestSend(COURSE); });
+    expect(view.result.current.sendDeadlineDialog.checking).toBe(true);
+
+    await act(async () => { answer(); });
+    expect(view.result.current.sendDeadlineDialog.checking).toBe(false);
+    expect(view.result.current.sendDeadlineDialog.warning).toContain('Ann Archer');
+  });
+
+  test('a failed preview also stops the checking, with no warning', async () => {
+    api.get.mockRejectedValue(new Error('offline'));
+    const view = render();
+    await act(async () => { view.result.current.requestSend(COURSE); });
+    expect(view.result.current.sendDeadlineDialog.checking).toBe(false);
+    expect(view.result.current.sendDeadlineDialog.warning).toBe('');
+  });
+
+  test('closing while it is checking leaves nothing checking, and a late answer changes nothing', async () => {
+    let answer;
+    api.get.mockImplementation(() => new Promise((resolve) => { answer = () => resolve({ data: { no_teammates: ['Ann Archer'] } }); }));
+    const view = render();
+    act(() => { view.result.current.requestSend(COURSE); });
+    act(() => view.result.current.sendDeadlineDialog.onClose());
+    expect(view.result.current.sendDeadlineDialog.checking).toBe(false);
+
+    await act(async () => { answer(); });
+    expect(view.result.current.sendDeadlineDialog.warning).toBe('');
+    expect(view.result.current.sendDeadlineDialog.checking).toBe(false);
+  });
+});

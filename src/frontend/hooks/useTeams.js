@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import api from '../services/api';
 import { describeInvitationResult } from '../services/emailResult';
 import { prefillDeadline, toDeadlinePayload } from '../services/deadline';
 import { getErrorMessage } from '../services/apiError';
 import { buildCreateTeamBody } from '../services/teamRequest';
 import { isTeamName, TEAM_NAME_HELP } from '../services/teamName';
+import { describeNobodyToRate, fetchNobodyToRate } from '../services/sendPreview';
 
 const EMPTY_TEAM_SEARCH = { team_name: '', team_status: '' };
 const EMPTY_TEAM_FORM = { team_name: '', team_status: 'Active' };
@@ -24,6 +25,10 @@ export default function useTeams({ setAlert, refreshCourses, students, setStuden
   const [sendingTeamEvaluations, setSendingTeamEvaluations] = useState({});
   // The team a deadline is being chosen for (CICD-67); nothing is sent until the instructor confirms.
   const [teamSendRequest, setTeamSendRequest] = useState(null);
+  // CICD-80: who a send to the team cannot reach, said in the deadline dialog; an answer for an earlier request is ignored
+  const [teamSendWarning, setTeamSendWarning] = useState('');
+  const [teamSendChecking, setTeamSendChecking] = useState(false); // Send stays off until the answer is in
+  const teamWarningRequest = useRef(0);
   // The deadline last used for each course in this session, to prefill the next send (the opened
   // course object is not reloaded after a send).
   const [lastTeamDeadlines, setLastTeamDeadlines] = useState({});
@@ -389,11 +394,22 @@ export default function useTeams({ setAlert, refreshCourses, students, setStuden
   const requestTeamSend = (team) => {
     if (!teamsCourse || !team) return;
     setTeamSendRequest(team);
+    const request = teamWarningRequest.current + 1;
+    teamWarningRequest.current = request;
+    setTeamSendWarning('');
+    setTeamSendChecking(true);
+    fetchNobodyToRate(`/courses/${teamsCourse._id || teamsCourse.id}/teams/${team._id || team.id}/evaluations/send-preview`).then((names) => {
+      if (teamWarningRequest.current !== request) return;
+      setTeamSendWarning(describeNobodyToRate(names));
+      setTeamSendChecking(false);
+    });
   };
+  const clearTeamSendWarning = () => { teamWarningRequest.current += 1; setTeamSendWarning(''); setTeamSendChecking(false); };
   const confirmTeamSend = async (localValue) => {
     const team = teamSendRequest;
     const payload = toDeadlinePayload(localValue, { keep: lastTeamDeadline() });
     setTeamSendRequest(null);
+    clearTeamSendWarning();
     if (!team || !payload) return;
     await handleSendTeamEvaluations(team, payload);
   };
@@ -404,10 +420,12 @@ export default function useTeams({ setAlert, refreshCourses, students, setStuden
       open: teamSendRequest !== null,
       title: `Send evaluations to team "${teamSendRequest?.team_name || ''}"`,
       description: 'Students in this team who have no working link and have not submitted get one that works until this deadline.',
+      warning: teamSendRequest ? teamSendWarning : '',
+      checking: teamSendRequest ? teamSendChecking : false,
       initialValue: prefillDeadline(lastTeamDeadline()),
       busy: false,
       onConfirm: confirmTeamSend,
-      onClose: () => setTeamSendRequest(null),
+      onClose: () => { setTeamSendRequest(null); clearTeamSendWarning(); },
     },
     openTeams: handleViewTeams,
     clearTeamsState,
