@@ -140,8 +140,8 @@ fixture as the integration tests, with email captured, never sent) and the front
 static files. A small control server resets the data before each test and returns the captured
 email, so the student tests take the link from the invitation email. Specs: `e2e/instructor.spec.js`
 (E2E-01 to 09, 15 and 16: login, session, roster upload and its error message, one upload dialog,
-teams, invitations, reports, CSV download), `e2e/students.spec.js` (E2E-17 to 20: add, edit, CSV
-upload and delete-all on the Manage Students dialogs) and `e2e/evaluations.spec.js` (E2E-21 to 24: the
+teams, invitations, reports, CSV download), `e2e/students.spec.js` (E2E-17 to 20 and E2E-52: add, edit, CSV
+upload and delete-all on the Manage Students dialogs, and a student with no team) and `e2e/evaluations.spec.js` (E2E-21 to 24: the
 evaluation status dialog, reminders, resetting, and the "Evaluations Already Sent" confirmation), `e2e/teams.spec.js` (E2E-25 to 30: moving
 students in and out of a team, team search, editing a team, sending to one team, Clear All Teams,
 and one dialog, not one per course), `e2e/courses.spec.js` (E2E-31 to 38: the Manage Students list with its search and single delete, creating, editing and deleting a course, and what the roster upload dialog keeps when it closes) and `e2e/student.spec.js` (E2E-10 to 14: opening the link without a login, rating and

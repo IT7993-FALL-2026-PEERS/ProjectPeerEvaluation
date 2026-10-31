@@ -3,9 +3,9 @@ import { Dialog, DialogTitle, DialogContent, DialogActions, TextField, Button } 
 import TeamSelect from './TeamSelect';
 
 // The Edit Student dialog, moved out of CourseManagement.js (CICD-57, step 2). The page owns the
-// form and the request; Save stays off while the student ID, name, email or team is empty.
+// form and the request; Save stays off while the student ID, name or email is empty. The team is optional (CICD-79).
 function EditStudentDialog({ open, form, teamNames, onFormChange, onClose, onSave }) {
-  const incomplete = [form.student_id, form.name, form.email, form.group_assignment].some(value => !value.trim());
+  const incomplete = [form.student_id, form.name, form.email].some(value => !value.trim());
   return (
     <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
       <DialogTitle>Edit Student</DialogTitle>

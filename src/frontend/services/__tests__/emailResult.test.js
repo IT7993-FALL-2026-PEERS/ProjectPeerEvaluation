@@ -140,14 +140,14 @@ describe('describeExtendResult', () => {
 describe('students alone on their team', () => {
   test('a send names who was skipped because they have nobody to rate', () => {
     const result = describeInvitationResult({ emails_sent: 3, total_students: 3, failed: [], no_teammates: ['Ann Archer'], message: 'Evaluation invitations sent successfully.' });
-    expect(result.message).toContain('Alone on their team (add a teammate, then send again): Ann Archer.');
+    expect(result.message).toContain('No one to rate (alone on their team, or no team assigned): Ann Archer. Add a teammate or assign a team, then send again.');
   });
 
   test('a send that reached nobody still says who was skipped, as information', () => {
     const result = describeInvitationResult({ emails_sent: 0, total_students: 0, failed: [], no_teammates: ['Ann Archer'], message: 'Nobody was invited: the students left have nobody to rate.' });
     expect(result.severity).toBe('info');
     expect(result.message).toContain('Nobody was invited: the students left have nobody to rate.');
-    expect(result.message).toContain('Alone on their team (add a teammate, then send again): Ann Archer.');
+    expect(result.message).toContain('No one to rate (alone on their team, or no team assigned): Ann Archer. Add a teammate or assign a team, then send again.');
   });
 
   test('a failed email does not hide who was skipped, for a partial and a total failure', () => {
@@ -155,21 +155,21 @@ describe('students alone on their team', () => {
     const partial = describeInvitationResult({ ...base, emails_sent: 1, failed: ['Ben Baker (ben@example.edu): SMTP down'] });
     expect(partial.severity).toBe('warning');
     expect(partial.message).toContain('Not sent to: Ben Baker.');
-    expect(partial.message).toContain('Alone on their team (add a teammate, then send again): Ann Archer.');
+    expect(partial.message).toContain('No one to rate (alone on their team, or no team assigned): Ann Archer. Add a teammate or assign a team, then send again.');
     const total = describeInvitationResult({ ...base, total_students: 1, emails_sent: 0, failed: ['Ben Baker (ben@example.edu): SMTP down'] });
     expect(total.severity).toBe('error');
     expect(total.message).toContain('No emails were sent. Not sent to: Ben Baker.');
-    expect(total.message).toContain('Alone on their team (add a teammate, then send again): Ann Archer.');
+    expect(total.message).toContain('No one to rate (alone on their team, or no team assigned): Ann Archer. Add a teammate or assign a team, then send again.');
   });
 
   test('a reminder names them and does not treat them as not invited', () => {
     const result = describeReminderResult({ reminders_sent: 3, total_reminded: 3, failed: [], deadline_passed: [], not_invited: 0, no_teammates: ['Ann Archer'] });
-    expect(result.message).toContain('Alone on their team: Ann Archer.');
+    expect(result.message).toContain('No one to rate (alone on their team, or no team assigned): Ann Archer.');
     expect(result.message).not.toContain('not invited');
   });
 
   test('an extension counts them', () => {
     const result = describeExtendResult({ extended: ['Cy Cole'], failed: [], skipped: { submitted: 0, not_invited: 0, changed: 0, no_teammates: 1 } });
-    expect(result.message).toContain('1 alone on their team.');
+    expect(result.message).toContain('1 with no one to rate (alone on their team, or no team assigned).');
   });
 });

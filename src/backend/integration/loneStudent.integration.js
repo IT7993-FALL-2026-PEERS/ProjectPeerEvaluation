@@ -7,7 +7,8 @@ const { startApp, sentEmails, clearEmails, deadlineBody } = require('./helpers/a
 const { seed, IDS } = require('./helpers/seed');
 
 // CICD-72: a student alone on a team has nobody to rate, so send, reminders, extend, status and submit all
-// treat them the same way. Real database, emails captured at the transport.
+// treat them the same way. CICD-79: so does a student with no team (they do not rate the rest of the course).
+// Real database, emails captured at the transport.
 let replSet;
 let app;
 let ada;
@@ -171,4 +172,38 @@ test('TC-11-37: a course whose only student has no team and nobody to rate says 
   const { body } = await app.request('GET', `/api/courses/${IDS.courseBo}/evaluations/status`, { token: bo });
   assert.equal(body.evaluations_sent, false);
   assert.deepEqual(body.no_teammates, ['Eve Evans']);
+});
+
+// CICD-79: the team is optional, and a student without one is not asked to rate anybody (the instructor is
+// told instead). Before CICD-79 such a student rated the whole course.
+const takeAnnOutOfHerTeam = () => Student.updateOne({ _id: IDS.ann }, { team_id: null, group_assignment: null });
+
+test('TC-10-83: a course send skips a student with no team, names them, and emails the others', async () => {
+  await takeAnnOutOfHerTeam();
+  const { status, body } = await sendCourse();
+  assert.equal(status, 200);
+  assert.deepEqual(body.no_teammates, ['Ann Archer']);
+  assert.equal(body.emails_sent, 3);
+  assert.equal(sentEmails.some((mail) => mail.to === 'ann@example.edu'), false);
+  assert.ok(!(await Student.findById(IDS.ann)).evaluation_token, 'no link was issued');
+});
+
+test('TC-16-77: a student with no team gets an empty form, and a submit is refused with the no-teammates reason', async () => {
+  const token = await giveAnnALink();
+  await takeAnnOutOfHerTeam();
+
+  const form = await app.request('GET', `/api/evaluate/${token}`);
+  assert.equal(form.status, 200);
+  assert.deepEqual(form.body.teammates, []);
+
+  const submit = await app.request('POST', `/api/evaluate/${token}`, { body: { evaluations: [{ student_id: String(IDS.cy), ratings: {}, overall_feedback: 'x' }] } });
+  assert.equal(submit.status, 409);
+  assert.equal(submit.body.error.code, 'NO_TEAMMATES');
+});
+
+test('TC-11-38: before anything is sent, the status names a student with no team and marks them as having nobody to rate', async () => {
+  await takeAnnOutOfHerTeam();
+  const { body } = await status();
+  assert.equal(body.evaluations_sent, false);
+  assert.deepEqual(body.no_teammates, ['Ann Archer']);
 });

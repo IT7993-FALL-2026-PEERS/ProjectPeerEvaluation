@@ -3,7 +3,8 @@ import { Dialog, DialogTitle, DialogContent, DialogActions, TextField, Typograph
 import TeamSelect from './TeamSelect';
 
 // The Add Student dialog, moved out of CourseManagement.js (CICD-57, step 2). It holds no state: the
-// page owns the form, the error and the request, and passes the handlers in. All four fields are required.
+// page owns the form, the error and the request, and passes the handlers in. The student ID, name and email are
+// required; the team is optional (CICD-79).
 function AddStudentDialog({ open, form, error, teamNames, onFormChange, onClose, onSubmit }) {
   return (
     <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
@@ -39,7 +40,6 @@ function AddStudentDialog({ open, form, error, teamNames, onFormChange, onClose,
         <TeamSelect
           value={form.group_assignment}
           onChange={team => onFormChange({ ...form, group_assignment: team })}
-          error={!!error}
           existingTeams={teamNames}
         />
         {error && (

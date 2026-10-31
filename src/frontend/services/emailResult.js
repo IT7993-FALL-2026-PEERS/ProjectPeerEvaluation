@@ -20,7 +20,7 @@ export function describeInvitationResult(data, successText) {
     data.already_invited ? `${data.already_invited} already had a link.` : '',
     data.already_submitted ? `${data.already_submitted} already submitted.` : '',
     // CICD-72: a student alone on their team has nobody to rate, so they are not invited
-    (data.no_teammates || []).length ? `Alone on their team (add a teammate, then send again): ${data.no_teammates.join(', ')}.` : '',
+    (data.no_teammates || []).length ? `No one to rate (alone on their team, or no team assigned): ${data.no_teammates.join(', ')}. Add a teammate or assign a team, then send again.` : '',
   ].filter(Boolean).join(' ');
   if (!data.total_students) {
     return { severity: 'info', message: [data.message, skipped].filter(Boolean).join(' ') };
@@ -46,7 +46,7 @@ export function describeReminderResult(data) {
   const extra = [
     passed.length ? `Deadline passed: ${passed.join(', ')}. Use Extend Deadline.` : '',
     data.not_invited ? `${data.not_invited} not invited yet: use Send Evaluations.` : '',
-    (data.no_teammates || []).length ? `Alone on their team: ${data.no_teammates.join(', ')}.` : '',
+    (data.no_teammates || []).length ? `No one to rate (alone on their team, or no team assigned): ${data.no_teammates.join(', ')}.` : '',
   ].filter(Boolean).join(' ');
   const base = sent > 0 ? `Reminders sent to ${sent} ${sent === 1 ? 'student' : 'students'}.` : data.message;
   const result = describeEmailResult({ sent, total: data.total_reminded, failed: data.failed }, base);
@@ -64,7 +64,7 @@ export function describeExtendResult(data) {
   if (failedNames.length) parts.push(`Not sent to: ${failedNames.join(', ')}.`);
   if (skipped.submitted) parts.push(`${skipped.submitted} already submitted.`);
   if (skipped.not_invited) parts.push(`${skipped.not_invited} not invited yet.`);
-  if (skipped.no_teammates) parts.push(`${skipped.no_teammates} alone on their team.`);
+  if (skipped.no_teammates) parts.push(`${skipped.no_teammates} with no one to rate (alone on their team, or no team assigned).`);
   if (skipped.changed) parts.push(`${skipped.changed} changed while extending (submitted or extended elsewhere); their link was left as it was.`);
   const trouble = failedNames.length > 0 || Boolean(skipped.changed);
   let severity = extended.length ? 'success' : 'info';

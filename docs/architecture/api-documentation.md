@@ -86,7 +86,7 @@ takes the student's **university ID** string (for example `S0012345`).
 | 409 | `ALREADY_COMPLETED` | Student already submitted their evaluation |
 | 409 | `LINK_CHANGED` | The student's link was replaced, or its deadline passed, while the request ran; nothing was saved or activated |
 | 409 | `NOT_SUBMITTED` | A resubmission was asked for a student who has not submitted |
-| 409 | `NO_TEAMMATES` | A submission or a resubmission for a student with nobody to rate (alone on their team): "You have no teammates to rate yet. Ask your instructor to check your team." |
+| 409 | `NO_TEAMMATES` | A submission or a resubmission for a student with nobody to rate (alone on their team, or with no team): "You have no teammates to rate yet. Ask your instructor to check your team." |
 | 502 | `EMAIL_FAILED` | The resubmission email could not be sent; nothing was changed |
 | 429 | `RATE_LIMITED` | Too many requests from this address; `details.retry_after_seconds` and the `Retry-After` header say how long to wait |
 
@@ -372,7 +372,10 @@ its name is left alone, and renamed only to a numbered name (`backend/utils/team
 
 Body: `{ "student_id", "name", "email", "group_assignment"? }`. A non-empty
 `group_assignment` puts the student in that team, creating the team if needed; it must be a
-numbered team name (see [Team names](#team-names)), and `team 6` or `6` is `Team 6`.
+numbered team name (see [Team names](#team-names)), and `team 6` or `6` is `Team 6`. The team is optional: a
+missing or empty `group_assignment` adds the student with no team. A student with no team rates nobody and is
+not sent an evaluation: they are named as having nobody to rate (see `no_teammates` under the evaluation endpoints), so
+the instructor can assign a team (the Add and Edit Student dialogs show a small "No team assigned" alert).
 **201** `{ "message": "Student added.", "student": {...} }` · **400** missing field, or a team
 name that is not numbered · **409** `DUPLICATE` university ID already in this course.
 
@@ -466,7 +469,7 @@ deadline in emails. Anything else is **400** `VALIDATION_ERROR`, and nothing is 
 
 The send reaches only students who have **no active link and have not submitted**. Students with a
 working link keep it and its deadline, and get no new email; students who have submitted are skipped. A student with
-nobody to rate (alone on their team, or the only student of the course when they have no team: the form would be empty
+nobody to rate (alone on their team, or with no team assigned: the form would be empty
 and a submission could never be accepted) is not invited either and is named in `no_teammates` (CICD-72). When nobody is left to invite and `no_teammates` is not
 empty, the message is "Nobody was invited: the students left have nobody to rate." instead of "Nobody needs an invitation".
 Each recipient's link is claimed with one conditional update before its email goes out, so two sends at
@@ -501,7 +504,7 @@ reminders, extend and resubmit use the same rule (CICD-70). The mark survives th
 student wrote (which happens when the people they rated are deleted); only a reset clears it. `ratings_on_file`
 is `false` for a student who has the mark but no evaluations, and `last_activity` is then `null`. The counts are
 the enrolled students who submitted. For such a student **Allow resubmission** works, and the next submission
-fills in their ratings. A student who has not submitted and has nobody to rate (alone on their team) has
+fills in their ratings. A student who has not submitted and has nobody to rate (alone on their team, or with no team) has
 `nobody_to_rate: true` on their row and is left out of `total_count`, `completed_count`, `pending_count` and the
 rate, so the course can reach 100% (CICD-72); one who submitted before their team shrank still counts. Before anything
 is sent the answer has `evaluations_sent: false`, no rows, and `no_teammates: ["<names>"]` naming the students a send
@@ -515,7 +518,7 @@ link, and never changes it or its deadline (CICD-67); the email shows the deadli
 that invited the student. **200** `{ "message", "reminders_sent", "total_reminded", "failed": [...],
 "deadline_passed": ["<names>"], "not_invited": <count>, "no_teammates": ["<names>"] }`: students whose deadline
 has passed need an extension first, students never invited need a send, and students with nobody to rate (alone on
-their team) are named and never reminded or counted as not invited (CICD-72). A student marked as submitted is not reminded (CICD-70). `reminders_sent: 0` when everyone is done.
+their team, or with no team) are named and never reminded or counted as not invited (CICD-72). A student marked as submitted is not reminded (CICD-70). `reminders_sent: 0` when everyone is done.
 
 ### `POST .../evaluations/extend`
 
@@ -635,8 +638,8 @@ These are the only endpoints students use. The token comes from the invitation e
   "deadline": "2026-10-17T03:59:00.000Z"
 }
 ```
-Teammates are the other members of the student's team, or everyone else in the course if
-they have no team. If already submitted: **200** `{ "message": "Evaluation already
+Teammates are the other members of the student's team; a student with no team has none (the list is empty and a
+submission is refused with `NO_TEAMMATES`, CICD-79). If already submitted: **200** `{ "message": "Evaluation already
 completed.", "completed": true, "submitted_at": "...", "deadline": "..." }`. **404**
 `EVALUATION_CANCELLED` for an unknown or reset token. **410** `EVALUATION_LINK_EXPIRED`
 ("The deadline for this evaluation has passed. Ask your instructor for an extension.") once the deadline has passed; the token status (`GET /evaluate/:token/status`) and the
@@ -660,7 +663,7 @@ saved (FR-16), and they are saved together in one transaction (or, on a database
 transactions, one by one with a rollback if anything fails), so a submission is all-or-nothing. A
 unique index on evaluator, student and course makes two requests at the same moment save once:
 the second gets the 409 below. The `student_id`s must be exactly the
-teammates the form lists (the rest of the team, or the rest of the course without a team),
+teammates the form lists (the rest of the team; none without a team),
 each once: rating yourself, someone else, the same teammate twice, or leaving a teammate out
 is a **400** `VALIDATION_ERROR` (API-2). The save also checks, inside the same all-or-nothing step, that
 the link is still the student's and still before its deadline; if an extension replaced it or the

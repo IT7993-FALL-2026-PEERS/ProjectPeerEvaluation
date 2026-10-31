@@ -146,7 +146,7 @@ describe('useStudents: adding a student', () => {
     expect(view.result.current.addStudentDialog.open).toBe(true);
 
     await act(() => view.result.current.addStudentDialog.onSubmit());
-    expect(view.result.current.addStudentDialog.error).toBe('Student ID, name, email, and team are required.');
+    expect(view.result.current.addStudentDialog.error).toBe('Student ID, name, and email are required.');
     act(() => view.result.current.addStudentDialog.onClose());
     expect(view.result.current.addStudentDialog).toMatchObject({ open: false, error: '' });
   });
@@ -155,17 +155,31 @@ describe('useStudents: adding a student', () => {
     ['student id', { student_id: '', name: 'Cy', email: 'cy@example.edu', group_assignment: 'Team 1' }],
     ['name', { student_id: '3', name: '', email: 'cy@example.edu', group_assignment: 'Team 1' }],
     ['email', { student_id: '3', name: 'Cy', email: '', group_assignment: 'Team 1' }],
-    ['team', { student_id: '3', name: 'Cy', email: 'cy@example.edu', group_assignment: '' }],
     ['student id (spaces only)', { student_id: '  ', name: 'Cy', email: 'cy@example.edu', group_assignment: 'Team 1' }],
-    ['team (spaces only)', { student_id: '3', name: 'Cy', email: 'cy@example.edu', group_assignment: '   ' }],
   ])('refuses a student with no %s, and sends nothing', async (_field, form) => {
     const view = await opened();
     fill(view, form);
 
     await act(() => view.result.current.addStudentDialog.onSubmit());
 
-    expect(view.result.current.addStudentDialog.error).toBe('Student ID, name, email, and team are required.');
+    expect(view.result.current.addStudentDialog.error).toBe('Student ID, name, and email are required.');
     expect(api.post).not.toHaveBeenCalled();
+  });
+
+  test.each([
+    ['empty', ''],
+    ['spaces only', '   '],
+  ])('adds a student with no team (%s): the team is not required, and none is sent', async (_name, team) => {
+    const view = await opened();
+    fill(view, { student_id: '3', name: 'Cy', email: 'cy@example.edu', group_assignment: team });
+    api.post.mockResolvedValue({});
+
+    await act(() => view.result.current.addStudentDialog.onSubmit());
+
+    expect(view.result.current.addStudentDialog.error).toBe('');
+    expect(api.post).toHaveBeenCalledWith('/courses/c1/students', {
+      student_id: '3', name: 'Cy', email: 'cy@example.edu', group_assignment: '',
+    });
   });
 
   test('sends the team without the spaces around it', async () => {

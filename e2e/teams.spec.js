@@ -150,7 +150,7 @@ test('E2E-47: a student alone on a team is skipped by Send Evaluations and shown
   // Sending to Team 1 reaches nobody and says why
   await teamRow(page, 'Team 1').getByTitle('Send Evaluations to Team').click();
   await sendWithDeadline(page);
-  await expect(alertWith(page, 'Alone on their team (add a teammate, then send again): Ann Archer.')).toBeVisible();
+  await expect(alertWith(page, 'No one to rate (alone on their team, or no team assigned): Ann Archer. Add a teammate or assign a team, then send again.')).toBeVisible();
   expect(await capturedEmails()).toHaveLength(0);
 
   // Sending to the whole course reaches the other three
@@ -158,14 +158,14 @@ test('E2E-47: a student alone on a team is skipped by Send Evaluations and shown
   await expect(page.locator('[role=dialog]')).toHaveCount(0);
   await page.getByTitle('Send Evaluations', { exact: true }).click();
   await sendWithDeadline(page);
-  await expect(alertWith(page, 'Alone on their team (add a teammate, then send again): Ann Archer.')).toBeVisible();
+  await expect(alertWith(page, 'No one to rate (alone on their team, or no team assigned): Ann Archer. Add a teammate or assign a team, then send again.')).toBeVisible();
   // the first alert may still be on screen, so wait for the emails themselves
   await expect.poll(async () => (await capturedEmails()).map((e) => e.to).sort()).toEqual(['ben@example.edu', 'cy@example.edu', 'di@example.edu']);
 
   // The status screen lists Ann with the reason and counts only the three who can submit
   await courseAction(page, 'Evaluation Status').click();
   await expect(top(page).getByText('Progress: 0/3 evaluations completed')).toBeVisible();
-  await expect(top(page).getByText('No teammates to rate. Add a teammate to their team, then send again.')).toBeVisible();
+  await expect(top(page).getByText('No one to rate: alone on their team or no team assigned. Add a teammate or assign a team, then send again.')).toBeVisible();
 });
 
 test('E2E-51: a team name must be numbered: Alpha cannot be created, team 4 becomes Team 4, and an Edit cannot rename a team to Alpha', async ({ page }) => {

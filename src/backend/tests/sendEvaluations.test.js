@@ -25,11 +25,13 @@ test('course invitations are spaced out by EMAIL_SEND_INTERVAL_MS', async (t) =>
   t.after(() => { delete process.env.EMAIL_SEND_INTERVAL_MS; });
   t.mock.method(console, 'log', () => {});
 
+  const team = new mongoose.Types.ObjectId(); // a student with no team has nobody to rate and is not invited (CICD-79)
   const students = ['Alice', 'Bob', 'Carol'].map((name) => ({
     _id: new mongoose.Types.ObjectId(),
     name,
     email: `${name.toLowerCase()}@example.com`,
     evaluation_token: `token-${name}`,
+    team_id: team,
   }));
   t.mock.method(Course, 'findById', async () => ({ _id: 'course-1', course_name: 'Capstone' }));
   t.mock.method(Course, 'findByIdAndUpdate', async () => {});

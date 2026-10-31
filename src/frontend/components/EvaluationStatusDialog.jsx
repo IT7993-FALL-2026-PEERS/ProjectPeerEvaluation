@@ -40,10 +40,10 @@ function EvaluationStatusDialog({
                 <Typography variant="body1" sx={{ mb: 2 }}>
                   Send evaluations to students to begin tracking completion status.
                 </Typography>
-                {/* CICD-72: students alone on their team are never invited, so say so before the professor sends */}
+                {/* CICD-72, CICD-79: students alone on their team, or with no team, are never invited, so say so before the professor sends */}
                 {(status.no_teammates || []).length > 0 && (
                   <Typography variant="body2" sx={{ mb: 2 }}>
-                    Alone on their team, so a send will not invite them: {status.no_teammates.join(', ')}.
+                    A send will not invite students alone on their team or with no team assigned: {status.no_teammates.join(', ')}.
                   </Typography>
                 )}
                 <Button
@@ -153,10 +153,10 @@ function EvaluationStatusDialog({
                                     <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
                                       {student.last_activity ? new Date(student.last_activity).toLocaleDateString() : 'Never'}
                                     </Typography>
-                                    {/* CICD-72: nobody to rate (alone on their team): say why there is no submission */}
+                                    {/* CICD-72, CICD-79: nobody to rate (alone on their team, or no team): say why there is no submission */}
                                     {student.nobody_to_rate && (
                                       <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                                        No teammates to rate. Add a teammate to their team, then send again.
+                                        No one to rate: alone on their team or no team assigned. Add a teammate or assign a team, then send again.
                                       </Typography>
                                     )}
                                     {/* CICD-68: a student who has submitted can be allowed one more submission */}

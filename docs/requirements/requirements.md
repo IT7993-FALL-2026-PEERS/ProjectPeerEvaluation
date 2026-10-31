@@ -329,7 +329,7 @@ people the student rated),
 **then** all three treat the student as submitted, the status says there are no ratings on file, no reminder
 is sent to them, and the professor can allow a resubmission to collect their ratings again.
 
-**Given** a student who has not submitted and has nobody to rate (alone on their team),
+**Given** a student who has not submitted and has nobody to rate (alone on their team, or with no team assigned),
 **when** the professor views the status (CICD-72),
 **then** the student is listed with "No teammates to rate" and is left out of the counts, so the course can reach
 100% when everyone who can submit has.

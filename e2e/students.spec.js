@@ -19,30 +19,35 @@ test.beforeEach(async ({ page }) => {
 
 const top = (page) => page.getByRole('dialog').last();
 
-test('E2E-17: adding a student asks for all four required fields, then the student appears in the list in their team', async ({ page }) => {
+test('E2E-17: adding a student asks for the student ID, name and email; the team is optional, and a student without one is marked', async ({ page }) => {
   await page.getByRole('button', { name: 'Add Student' }).click();
 
   await top(page).getByRole('button', { name: 'Add', exact: true }).click();
-  await expect(top(page).getByText('Student ID, name, email, and team are required.')).toBeVisible();
+  await expect(top(page).getByText('Student ID, name, and email are required.')).toBeVisible();
 
-  // Everything but the team: still refused.
+  // No team chosen: a small alert says so, and the student can still be added (the sponsor's answer).
   await top(page).getByLabel('Student ID').fill('1007');
   await top(page).getByLabel('Name').fill('Zed Zimmer');
   await top(page).getByLabel('Email').fill('zed@example.edu');
-  await top(page).getByRole('button', { name: 'Add', exact: true }).click();
-  await expect(top(page).getByText('Student ID, name, email, and team are required.')).toBeVisible();
+  await expect(top(page).getByRole('combobox', { name: /Team Assignment/ })).toHaveText('No team assigned');
+  await expect(top(page).getByRole('alert')).toContainText('No team assigned');
 
-  // The team list is outside the dialog (a portal): Team 1 to Team 10, then "+ Add another team".
+  // The team list is outside the dialog (a portal): No team assigned, Team 1 to Team 10, then "+ Add another team".
   await top(page).getByRole('combobox', { name: /Team Assignment/ }).click();
-  await expect(page.getByRole('option')).toHaveCount(11);
-  await expect(page.getByRole('option').first()).toHaveText('Team 1');
+  await expect(page.getByRole('option')).toHaveCount(12);
+  await expect(page.getByRole('option').first()).toHaveText('No team assigned');
+  await expect(page.getByRole('option').nth(1)).toHaveText('Team 1');
   await expect(page.getByRole('option').last()).toHaveText('+ Add another team');
   await page.getByRole('option', { name: 'Team 3', exact: true }).click();
+  await expect(top(page).getByRole('alert')).toHaveCount(0);
+  await top(page).getByRole('combobox', { name: /Team Assignment/ }).click();
+  await page.getByRole('option', { name: 'No team assigned', exact: true }).click();
+  await expect(top(page).getByRole('alert')).toContainText('No team assigned');
   await top(page).getByRole('button', { name: 'Add', exact: true }).click();
 
   await expect(alertWith(page, 'Student added successfully')).toBeVisible();
   await expect(page.getByRole('row', { name: /Zed Zimmer/ })).toContainText('zed@example.edu');
-  await expect(page.getByRole('row', { name: /Zed Zimmer/ })).toContainText('Team 3');
+  await expect(page.getByRole('row', { name: /Zed Zimmer/ })).toContainText('No team assigned');
   await expect(page.getByRole('dialog', { name: /Add Student/ })).toHaveCount(0);
 });
 
@@ -59,8 +64,8 @@ test('E2E-48: "+ Add another team" adds Team 11 to the list and picks it, and th
   // Team 11 is picked and now in the list, before the add-another item.
   await expect(teamField()).toHaveText('Team 11');
   await teamField().click();
-  await expect(page.getByRole('option')).toHaveCount(12);
-  await expect(page.getByRole('option').nth(10)).toHaveText('Team 11');
+  await expect(page.getByRole('option')).toHaveCount(13);
+  await expect(page.getByRole('option').nth(11)).toHaveText('Team 11');
   await page.getByRole('option', { name: 'Team 11', exact: true }).click();
   await top(page).getByRole('button', { name: 'Add', exact: true }).click();
   await expect(page.getByRole('row', { name: /Yan Young/ })).toContainText('Team 11');
@@ -72,7 +77,7 @@ test('E2E-48: "+ Add another team" adds Team 11 to the list and picks it, and th
   await top(page).getByLabel('Name').fill('Xia Xu');
   await top(page).getByLabel('Email').fill('xia@example.edu');
   await teamField().click();
-  await expect(page.getByRole('option')).toHaveCount(12);
+  await expect(page.getByRole('option')).toHaveCount(13);
   await page.getByRole('option', { name: '+ Add another team' }).click();
   await expect(teamField()).toHaveText('Team 12');
   await top(page).getByRole('button', { name: 'Add', exact: true }).click();
@@ -95,6 +100,28 @@ test('E2E-18: editing a student saves the change, and Save is off while a requir
   await expect(page.getByRole('row', { name: /Ann Archer-Reyes/ })).toBeVisible();
   // The team is kept (CICD-45).
   await expect(page.getByRole('row', { name: /Ann Archer-Reyes/ })).toContainText('Team 1');
+});
+
+test('E2E-52: a student can be taken out of a team ("No team assigned") and put in one again, and the list shows which', async ({ page }) => {
+  const teamField = () => top(page).getByRole('combobox', { name: /Team Assignment/ });
+
+  await page.getByRole('row', { name: /Ann Archer/ }).getByTitle('Edit Student').click();
+  await expect(teamField()).toHaveText('Team 1');
+  await teamField().click();
+  await page.getByRole('option', { name: 'No team assigned', exact: true }).click();
+  await expect(top(page).getByRole('alert')).toContainText('No team assigned');
+  await expect(top(page).getByRole('button', { name: 'Save' })).toBeEnabled();
+  await top(page).getByRole('button', { name: 'Save' }).click();
+
+  await expect(alertWith(page, 'Student updated successfully')).toBeVisible();
+  await expect(page.getByRole('row', { name: /Ann Archer/ })).toContainText('No team assigned');
+
+  await page.getByRole('row', { name: /Ann Archer/ }).getByTitle('Edit Student').click();
+  await expect(teamField()).toHaveText('No team assigned');
+  await teamField().click();
+  await page.getByRole('option', { name: 'Team 2', exact: true }).click();
+  await top(page).getByRole('button', { name: 'Save' }).click();
+  await expect(page.getByRole('row', { name: /Ann Archer/ })).toContainText('Team 2');
 });
 
 test('E2E-19: the roster upload inside Manage Students shows the server\'s reason for a bad file, then adds a good one', async ({ page }) => {
