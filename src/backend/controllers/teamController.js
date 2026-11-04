@@ -172,7 +172,11 @@ exports.setTeamGrade = async (req, res, next) => {
       return next(validationError('Team grade must be a number from 0 to 100, or null to use the automatic grade.'));
     }
 
-    const team = await Team.findOneAndUpdate({ _id: team_id, course_id }, { team_grade: grade }, { new: true });
+    // The grade was checked above (a number from 0 to 100, or null). A plain typeof conditional is what CodeQL
+    // reads as a type check: the check in `isGrade` is not seen through the variable (js/sql-injection, #252).
+    const teamGrade = typeof grade === 'number' ? grade : null;
+
+    const team = await Team.findOneAndUpdate({ _id: team_id, course_id }, { team_grade: teamGrade }, { new: true });
     if (!team) {
       const err = new Error('Team not found.');
       err.code = 'NOT_FOUND';
@@ -180,7 +184,7 @@ exports.setTeamGrade = async (req, res, next) => {
       return next(err);
     }
     res.status(200).json({
-      message: grade === null ? `Team "${team.team_name}" uses the automatic grade.` : `Team "${team.team_name}" grade set to ${grade}.`,
+      message: teamGrade === null ? `Team "${team.team_name}" uses the automatic grade.` : `Team "${team.team_name}" grade set to ${teamGrade}.`,
       team
     });
   } catch (err) {
