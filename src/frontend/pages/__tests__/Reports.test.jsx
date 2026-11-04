@@ -7,7 +7,7 @@ import Reports from '../Reports';
 
 vi.mock('../../services/api', () => ({
   __esModule: true,
-  default: { get: vi.fn(), post: vi.fn() },
+  default: { get: vi.fn(), post: vi.fn(), put: vi.fn() },
 }));
 
 // The professor's report page (CW-08, CW-09): pick a course, generate the grades, read the comments,
@@ -39,6 +39,33 @@ const REPORT = {
     {
       _id: 's5', student_id: '1005', name: 'Eli Estes', team_id: null, evaluationsReceived: 1,
       originalScore: 96, finalScore: 93, letterGrade: 'A', improvement: -3, evaluationDetails: [],
+    },
+  ],
+};
+
+// CICD-81: the same report made with the Contribution Multiplier: a team grade for each team, and per student a score,
+// the team grade and the multiplier.
+const MULTIPLIER_REPORT = {
+  course: { _id: 'c1' },
+  gradingMethod: 'multiplier',
+  gradingSettings: { cap: 1, floor: 70 },
+  summary: { totalStudents: 3, studentsWithEvaluations: 2, averageScore: 88.34, gradeDistribution: { A: 1, B: 0, C: 1, F: 0 } },
+  teams: [{ _id: 't1', team_name: 'Team 1', teamGrade: 100, teamGradeSource: 'automatic', automaticTeamGrade: 100 }],
+  students: [
+    {
+      _id: 's1', student_id: '1001', name: 'Ann Archer', team_id: { team_name: 'Team 1' }, evaluationsReceived: 1,
+      originalScore: 100, finalScore: 100, letterGrade: 'A', improvement: 0, evaluationDetails: [],
+      contributionScore: 100, multiplier: 1, teamGrade: 100, teamGradeSource: 'automatic',
+    },
+    {
+      _id: 's2', student_id: '1002', name: 'Ben Baker', team_id: { team_name: 'Team 1' }, evaluationsReceived: 1,
+      originalScore: 76.67, finalScore: 76.67, letterGrade: 'C', improvement: 0, evaluationDetails: [],
+      contributionScore: 76.67, multiplier: 0.7667, teamGrade: 100, teamGradeSource: 'automatic',
+    },
+    {
+      _id: 's3', student_id: '1003', name: 'Cy Cole', team_id: { team_name: 'Team 1' }, evaluationsReceived: 0,
+      originalScore: 0, finalScore: 0, letterGrade: 'No evaluations', improvement: 0, evaluationDetails: [],
+      contributionScore: null, multiplier: null, teamGrade: 100, teamGradeSource: 'automatic',
     },
   ],
 };
@@ -167,6 +194,147 @@ describe('Reports', () => {
     expect(screen.queryByText('Original Score')).not.toBeInTheDocument();
     expect(screen.queryByText('Change')).not.toBeInTheDocument();
     expect(screen.queryByText('Curved Grading Statistics')).not.toBeInTheDocument();
+  });
+
+  test('the Contribution Multiplier is a choice: it asks for it, explains it, and shows the score, team grade and multiplier', async () => {
+    serve({ report: MULTIPLIER_REPORT });
+    renderReports();
+    await chooseCourse(/CS 4850 - Capstone/);
+    await user.click(screen.getByText(/^Curved \(mean 85/));
+    await user.click(await screen.findByRole('option', { name: 'Contribution Multiplier (proposal)' }));
+    expect(screen.getByText(/the team's proposal, not yet decided by the sponsor/)).toBeInTheDocument();
+    expect(screen.queryByText(/Curved grading \(the sponsor/)).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Generate Report' }));
+    await screen.findByText('Report generated successfully');
+
+    expect(reportRequest()).toBe('/courses/c1/reports?gradingMethod=multiplier');
+    expect(screen.getByText('Student Results (Contribution Multiplier Grading)')).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Multiplier' })).toBeInTheDocument();
+    // The team grades panel and the student table both have a Team Grade column.
+    expect(screen.getAllByRole('columnheader', { name: 'Team Grade' })).toHaveLength(2);
+    expect(screen.queryByText('Original Score')).not.toBeInTheDocument();
+    const ben = screen.getByRole('row', { name: /Ben Baker/ });
+    expect(ben).toHaveTextContent('76.67%');
+    expect(ben).toHaveTextContent('100%');
+    expect(ben).toHaveTextContent('0.77');
+    // A student nobody rated has no score, multiplier or grade: dashes, not zeros.
+    const cy = screen.getByRole('row', { name: /Cy Cole/ });
+    expect(cy).toHaveTextContent('No evaluations');
+    expect(cy.textContent.match(/–/g)).toHaveLength(2);
+    // The team grades are listed.
+    expect(screen.getByRole('heading', { name: 'Team Grades' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Edit the grade of Team 1' })).toBeInTheDocument();
+  });
+
+  test('the other methods do not show the team grades', async () => {
+    renderReports();
+    await chooseCourse(/CS 4850 - Capstone/);
+    await user.click(screen.getByRole('button', { name: 'Generate Report' }));
+    await screen.findByText('Report generated successfully');
+    expect(screen.queryByRole('heading', { name: 'Team Grades' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: 'Multiplier' })).not.toBeInTheDocument();
+  });
+
+  test('saving a team grade asks the server for it and makes the report again', async () => {
+    serve({ report: MULTIPLIER_REPORT });
+    api.put.mockResolvedValue({ data: {} });
+    renderReports('/reports?course=c1');
+    await user.click(await screen.findByText(/^Curved \(mean 85/));
+    await user.click(await screen.findByRole('option', { name: 'Contribution Multiplier (proposal)' }));
+    await user.click(await screen.findByRole('button', { name: /Regenerate Report/ }));
+    await user.click(await screen.findByRole('button', { name: 'Edit the grade of Team 1' }));
+    await user.type(screen.getByLabelText('Team grade (0 to 100)'), '90');
+    const before = api.get.mock.calls.filter(([url]) => url.includes('/reports?')).length;
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => expect(api.put).toHaveBeenCalledWith('/courses/c1/teams/t1/grade', { team_grade: 90 }));
+    await waitFor(() => expect(api.get.mock.calls.filter(([url]) => url.includes('/reports?')).length).toBeGreaterThan(before));
+  });
+
+  test('a team grade is saved for the course of the report on the screen, not for the course chosen since', async () => {
+    const other = { _id: 'c3', course_code: 'CS 2000', course_name: 'Other', course_section: '03', course_status: 'Active' };
+    serve({ courses: [...COURSES, other], report: MULTIPLIER_REPORT });
+    api.put.mockResolvedValue({ data: {} });
+    renderReports();
+    await chooseCourse(/CS 4850 - Capstone/);
+    await user.click(screen.getByText(/^Curved \(mean 85/));
+    await user.click(await screen.findByRole('option', { name: 'Contribution Multiplier (proposal)' }));
+    await user.click(screen.getByRole('button', { name: 'Generate Report' }));
+    await screen.findByRole('heading', { name: 'Team Grades' });
+
+    // Another course is chosen, but its report has not been made: the one on the screen is still the first course's.
+    await chooseCourse(/CS 2000 - Other/);
+    await user.click(screen.getByRole('button', { name: 'Edit the grade of Team 1' }));
+    await user.type(screen.getByLabelText('Team grade (0 to 100)'), '90');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => expect(api.put).toHaveBeenCalledWith('/courses/c1/teams/t1/grade', { team_grade: 90 }));
+    expect(api.put).not.toHaveBeenCalledWith(expect.stringContaining('/courses/c3/'), expect.anything());
+    // The report that is made again afterwards is the first course's too.
+    await waitFor(() => expect(api.get.mock.calls.filter(([url]) => url === '/courses/c1/reports?gradingMethod=multiplier').length).toBe(2));
+  });
+
+  test('saving a team grade shows the multiplier report again, even if another grading method was chosen in the box since', async () => {
+    serve({ report: MULTIPLIER_REPORT });
+    api.put.mockResolvedValue({ data: {} });
+    renderReports();
+    await chooseCourse(/CS 4850 - Capstone/);
+    await user.click(screen.getByText(/^Curved \(mean 85/));
+    await user.click(await screen.findByRole('option', { name: 'Contribution Multiplier (proposal)' }));
+    await user.click(screen.getByRole('button', { name: 'Generate Report' }));
+    await screen.findByRole('heading', { name: 'Team Grades' });
+
+    // The box is changed to the regular method but the report is not made again: the screen still shows the multiplier report.
+    await user.click(screen.getByText(/^Contribution Multiplier \(proposal\)/));
+    await user.click(await screen.findByRole('option', { name: 'Regular (mean of the ratings)' }));
+    await user.click(screen.getByRole('button', { name: 'Edit the grade of Team 1' }));
+    await user.type(screen.getByLabelText('Team grade (0 to 100)'), '90');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => expect(api.put).toHaveBeenCalledWith('/courses/c1/teams/t1/grade', { team_grade: 90 }));
+    await waitFor(() => expect(api.get.mock.calls.filter(([url]) => url === '/courses/c1/reports?gradingMethod=multiplier').length).toBe(2));
+    expect(api.get.mock.calls.some(([url]) => url === '/courses/c1/reports?gradingMethod=mean')).toBe(false);
+    // The dialog hides the page while it closes, so wait for the heading.
+    expect(await screen.findByRole('heading', { name: 'Team Grades' })).toBeInTheDocument();
+  });
+
+  test('Download CSV is for the report on the screen: its course and its method, not the ones chosen in the boxes since', async () => {
+    const other = { _id: 'c3', course_code: 'CS 2000', course_name: 'Other', course_section: '03', course_status: 'Active' };
+    serve({ courses: [...COURSES, other], report: MULTIPLIER_REPORT });
+    renderReports();
+    await chooseCourse(/CS 4850 - Capstone/);
+    await user.click(screen.getByText(/^Curved \(mean 85/));
+    await user.click(await screen.findByRole('option', { name: 'Contribution Multiplier (proposal)' }));
+    await user.click(screen.getByRole('button', { name: 'Generate Report' }));
+    await screen.findByRole('heading', { name: 'Team Grades' });
+
+    // Another method and another course are chosen, but no new report is made.
+    await user.click(screen.getByText(/^Contribution Multiplier \(proposal\)/));
+    await user.click(await screen.findByRole('option', { name: 'Regular (mean of the ratings)' }));
+    await chooseCourse(/CS 2000 - Other/);
+    window.URL.createObjectURL = vi.fn(() => 'blob:report');
+    window.URL.revokeObjectURL = vi.fn();
+    await user.click(screen.getByRole('button', { name: 'Download CSV' }));
+
+    expect(await screen.findByText('Report downloaded successfully')).toBeInTheDocument();
+    expect(api.get).toHaveBeenCalledWith('/courses/c1/reports/download?gradingMethod=multiplier', { responseType: 'blob' });
+    expect(api.get.mock.calls.some(([url]) => url.includes('/courses/c3/reports/download'))).toBe(false);
+  });
+
+  test('a multiplier report on the screen does not get the curve columns when the box is set back to Curved without generating', async () => {
+    serve({ report: MULTIPLIER_REPORT });
+    renderReports();
+    await chooseCourse(/CS 4850 - Capstone/);
+    await user.click(screen.getByText(/^Curved \(mean 85/));
+    await user.click(await screen.findByRole('option', { name: 'Contribution Multiplier (proposal)' }));
+    await user.click(screen.getByRole('button', { name: 'Generate Report' }));
+    await screen.findByRole('heading', { name: 'Team Grades' });
+
+    await user.click(screen.getByText(/^Contribution Multiplier \(proposal\)/));
+    await user.click(await screen.findByRole('option', { name: /^Curved \(mean 85/ }));
+    expect(screen.getByRole('columnheader', { name: 'Multiplier' })).toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: 'Original Score' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: 'Change' })).not.toBeInTheDocument();
   });
 
   test('says why a report could not be made: the server\'s message, or a plain one', async () => {

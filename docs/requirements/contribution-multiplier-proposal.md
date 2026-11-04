@@ -1,6 +1,6 @@
 # Contribution Multiplier: grading proposal
 
-**Status: proposal, not decided, not built.** The sponsor asked the team to research a "Contribution Multiplier" as a replacement for, or an addition to, curved grading, and to finalize it at the next capstone meeting. This is the team's position for that meeting (M4 Khoa Ho, Oct 30, 2026; the team grade changed on Nov 2 and again on Nov 4, see "Why the team grade is automatic and editable"). The cap, the floor and the way the team grade is set are the team's choices; the sponsor decides. The report today still uses the regular and the curved (mean 85, standard deviation 20) methods.
+**Status: proposal, not decided by the sponsor. Built as a selectable report method (CICD-81, at Khoa's request, Nov 4, 2026); curved stays the default.** The sponsor asked the team to research a "Contribution Multiplier" as a replacement for, or an addition to, curved grading, and to finalize it at the next capstone meeting. This is the team's position for that meeting (M4 Khoa Ho, Oct 30, 2026; the team grade changed on Nov 2 and again on Nov 4, see "Why the team grade is automatic and editable"). The cap, the floor and the way the team grade is set are the team's choices; the sponsor decides. The report today still uses the regular and the curved (mean 85, standard deviation 20) methods.
 
 ## Why
 
@@ -54,7 +54,7 @@ For comparison, the curve turns 95, 94, 93, 92 into 100, 94, 76 and 58 when the 
 
 ## Side effects (to tell the sponsor)
 
-- The app needs a place to show each team's grade and let the instructor edit it, and to remember that the grade was typed by hand. This is new in the report; today the app has no team grade.
+- The app needed a place to show each team's grade, let the instructor edit it and remember that it was typed by hand. That is the Team Grades panel of the report (CICD-81); the grade is stored on the team (`Team.team_grade`, `null` = automatic).
 - Nobody ends above the best score in the team, so a strong student gets no bonus for carrying the team.
 - One very high score lifts the whole team (the 99, 80, 80, 80 row). The instructor's edit is the remedy; without it the three 80s receive 91.7.
 - The floor of 70 means a student who contributed far less (60 against 95) still gets a C when the team grade is high. A floor on the multiplier alone is the alternative; without any floor the same student would get 60.0 in the first example.
@@ -70,7 +70,7 @@ For comparison, the curve turns 95, 94, 93, 92 into 100, 94, 76 and 58 when the 
 | Floor | The multiplier never takes a student below 70 | The team grade minus 10 to 15 points, or no floor |
 | Curved grading | Keep the regular and the curved methods selectable until the sponsor decides | Remove the curve |
 
-After the meeting: write the agreed formula down here and make one backlog task for it (the team grade display and edit, and the new report method). Nothing in the application changes until then.
+After the meeting: write the agreed formula down here and change what the sponsor decides differently. The report method exists already (CICD-81): the cap, the floor and the way the automatic grade is chosen are constants in `src/backend/utils/contributionMultiplier.js`, and the regular and curved methods stay selectable (curved is the default) until the sponsor decides.
 
 ## How other courses do it
 
