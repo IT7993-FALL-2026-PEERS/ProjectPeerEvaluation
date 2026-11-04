@@ -5,6 +5,7 @@ const Team = require('../models/Team');
 const Evaluation = require('../models/Evaluation');
 const Professor = require('../models/Professor');
 const { toCsv } = require('../utils/csv');
+const { gradeCourse, CAP, FLOOR } = require('../utils/contributionMultiplier');
 
 /**
  * Calculate mean score for a student across all evaluation criteria
@@ -164,7 +165,8 @@ exports.getCourseReport = async (req, res, next) => {
       });
     }
     
-    if (evaluations.length === 0) {
+    // The Contribution Multiplier goes on: the instructor can set a team grade before anyone has submitted (CICD-81)
+    if (evaluations.length === 0 && gradingMethod !== 'multiplier') {
       console.log('⚠️ No evaluations found');
       return res.status(200).json({
         course: course,
@@ -245,6 +247,23 @@ exports.getCourseReport = async (req, res, next) => {
       };
     });
 
+    // The teams: the team statistics below, and the instructor's team grades for the Contribution Multiplier
+    const teams = await Team.find({ course_id: courseObjectId });
+
+    // The Contribution Multiplier (CICD-81, docs/requirements/contribution-multiplier-proposal.md): each team is graded on
+    // its own, so this does not look at the rest of the class
+    const contribution = gradingMethod === 'multiplier'
+      ? gradeCourse(
+        studentScores.map(({ student, evaluationDetails }) => ({
+          id: student._id,
+          // team_id is populated: a plain id when the team is gone or the student has none
+          teamId: student.team_id ? (student.team_id._id || student.team_id) : null,
+          evaluations: evaluationDetails
+        })),
+        teams.map((team) => ({ id: team._id, teamGrade: team.team_grade ?? null }))
+      )
+      : null;
+
     // Extract just the scores for grading calculations
     const rawScores = studentScores.map(item => item.originalScore).filter(score => score > 0);
     
@@ -256,6 +275,7 @@ exports.getCourseReport = async (req, res, next) => {
     // Apply grading results to students
     const studentsWithGrades = studentScores.map((item) => {
       let finalScore = item.originalScore;
+      const contributed = contribution && contribution.byStudent.get(String(item.student._id));
       
       if (gradingMethod === 'curved' && gradingResults && item.originalScore > 0) {
         const scoreIndex = rawScores.indexOf(item.originalScore);
@@ -264,6 +284,9 @@ exports.getCourseReport = async (req, res, next) => {
         }
       }
       
+      // A student nobody rated has no multiplier grade: they keep the plain score (none) and the instructor decides
+      if (contributed && contributed.finalScore !== null) finalScore = contributed.finalScore;
+
       return {
         ...item.student.toObject(),
         originalScore: item.originalScore,
@@ -272,12 +295,17 @@ exports.getCourseReport = async (req, res, next) => {
         evaluationsReceived: item.evaluationsReceived,
         evaluationDetails: item.evaluationDetails, // Include the evaluation details!
         improvement: gradingMethod === 'curved' && item.originalScore > 0 ? 
-          parseFloat((finalScore - item.originalScore).toFixed(2)) : 0
+          parseFloat((finalScore - item.originalScore).toFixed(2)) : 0,
+        ...(contributed ? {
+          contributionScore: contributed.contributionScore,
+          multiplier: contributed.multiplier,
+          teamGrade: contributed.teamGrade,
+          teamGradeSource: contributed.teamGradeSource
+        } : {})
       };
     });
 
     // Get team statistics
-    const teams = await Team.find({ course_id: courseObjectId });
     const teamStats = teams.map(team => {
       const teamStudents = studentsWithGrades.filter(
         // team_id is populated, so after toObject() it's a plain object, not an id
@@ -292,7 +320,8 @@ exports.getCourseReport = async (req, res, next) => {
         ...team.toObject(),
         students: teamStudents,
         averageScore: avgScore,
-        letterGrade: teamScores.length > 0 ? getLetterGrade(avgScore) : 'No evaluations'
+        letterGrade: teamScores.length > 0 ? getLetterGrade(avgScore) : 'No evaluations',
+        ...(contribution ? contribution.byTeam.get(team._id.toString()) : {})
       };
     });
 
@@ -318,7 +347,7 @@ exports.getCourseReport = async (req, res, next) => {
       teams: teamStats,
       summary,
       gradingMethod,
-      gradingSettings: gradingMethod === 'curved' ? {
+      gradingSettings: gradingMethod === 'multiplier' ? { cap: CAP, floor: FLOOR } : gradingMethod === 'curved' ? {
         targetMean: TARGET_MEAN,
         targetStandardDeviation: TARGET_STANDARD_DEVIATION,
         // false when fewer than two students have a score: there is no class to curve
@@ -357,7 +386,21 @@ exports.downloadReport = async (req, res, next) => {
       status: () => mockRes,
       json: (data) => {
         // Convert to CSV format
-        const csvHeaders = [
+        const multiplierMethod = data.gradingMethod === 'multiplier';
+        const csvHeaders = multiplierMethod ? [
+          'Student ID',
+          'Name',
+          'Email',
+          'Team',
+          'Original Score',
+          'Contribution Score',
+          'Team Grade',
+          'Team Grade Source',
+          'Multiplier',
+          'Final Score',
+          'Letter Grade',
+          'Evaluations Received'
+        ] : [
           'Student ID',
           'Name', 
           'Email',
@@ -369,7 +412,20 @@ exports.downloadReport = async (req, res, next) => {
           'Improvement'
         ];
         
-        const csvRows = data.students.map(student => [
+        const csvRows = data.students.map(student => multiplierMethod ? [
+          student.student_id,
+          student.name,
+          student.email,
+          student.team_id?.team_name || 'No Team',
+          student.originalScore,
+          student.contributionScore ?? '',
+          student.teamGrade ?? '',
+          student.teamGradeSource ?? '',
+          student.multiplier ?? '',
+          student.finalScore,
+          student.letterGrade,
+          student.evaluationsReceived
+        ] : [
           student.student_id,
           student.name,
           student.email,
