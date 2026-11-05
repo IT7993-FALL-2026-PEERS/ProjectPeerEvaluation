@@ -132,6 +132,47 @@ test('E2E-07: the report is curved by default (mean 85, deviation 20): it shows 
   ]);
 });
 
+test('E2E-53: the Contribution Multiplier report gives each team a grade; the professor can set one and go back to the automatic grade', async ({ page }) => {
+  await resetData({ evaluations: true });
+  await loginAsAda(page, passwords);
+  await courseAction(page, 'View Reports').click();
+  await expect(page.getByRole('heading', { name: /Evaluation Reports/ })).toBeVisible();
+
+  // The grading method box has no accessible name, so find it by what it shows: the default method.
+  await page.getByRole('combobox').filter({ hasText: 'Curved' }).click();
+  await page.getByRole('option', { name: /Contribution Multiplier/ }).click();
+  await page.getByRole('button', { name: 'Regenerate Report' }).click();
+
+  // The seeded scores are Ann 100 and Ben 76.67 (Team 1), Cy 90 and Di 56.67 (Team 2). The team grade is the highest
+  // score: 100 and 90. Ben 76.67 / 100 = 0.77; Di 56.67 / 90 = 0.63, which the floor of 70 lifts to 70.
+  await expect(page.getByRole('heading', { name: 'Team Grades' })).toBeVisible();
+  const team2 = page.getByRole('row', { name: /^Team 2/ });
+  await expect(team2).toContainText('90%');
+  await expect(team2).toContainText('Automatic');
+  const di = page.getByRole('row', { name: /Di Diaz/ });
+  await expect(di).toContainText('0.63');
+  await expect(di).toContainText('70%');
+  const cy = page.getByRole('row', { name: /Cy Cole/ });
+  await expect(cy).toContainText('90%');
+  await expect(page.getByRole('row', { name: /Ben Baker/ })).toContainText('0.77');
+
+  // The professor sets 80 for Team 2: Cy gets it, the team shows who set it and what the app proposed.
+  await team2.getByRole('button', { name: 'Edit the grade of Team 2' }).click();
+  await page.getByLabel('Team grade (0 to 100)').fill('80');
+  await page.getByRole('button', { name: 'Save' }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(team2).toContainText('You');
+  await expect(team2).toContainText('80%');
+  await expect(cy).toContainText('80%');
+
+  // ... and gives it up again.
+  await team2.getByRole('button', { name: 'Edit the grade of Team 2' }).click();
+  await page.getByRole('button', { name: 'Use automatic grade' }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(team2).toContainText('Automatic');
+  await expect(cy).toContainText('90%');
+});
+
 // The team list used to keep showing the old teams after a create, edit or delete, because the
 // filter ran on the list from before the change. These check the dialog's list itself.
 test('E2E-08: renaming a team shows the new name in the team list straight away', async ({ page }) => {
