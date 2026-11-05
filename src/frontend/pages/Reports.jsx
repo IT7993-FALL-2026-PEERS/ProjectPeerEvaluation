@@ -38,6 +38,7 @@ import {
   Comment
 } from '@mui/icons-material';
 import api from '../services/api';
+import TeamGradesPanel from '../components/TeamGradesPanel';
 
 function Reports() {
   const [searchParams] = useSearchParams();
@@ -54,8 +55,8 @@ function Reports() {
   const [commentsDialogOpen, setCommentsDialogOpen] = useState(false);
   const [selectedStudentComments, setSelectedStudentComments] = useState(null);
 
-  // Helper function to generate report for a specific course
-  const generateReportForCourse = useCallback(async (courseId) => {
+  // Helper function to generate report for a specific course (the method is the one chosen in the box, unless one is given)
+  const generateReportForCourse = useCallback(async (courseId, method = gradingMethod) => {
     if (!courseId) {
       console.warn('generateReportForCourse called without courseId');
       return;
@@ -64,7 +65,7 @@ function Reports() {
     console.log('🚀 Generating report for course:', courseId);
     setLoading(true);
     try {
-      const params = new URLSearchParams({ gradingMethod });
+      const params = new URLSearchParams({ gradingMethod: method });
 
       const response = await api.get(`/courses/${courseId}/reports?${params}`);
       setReportData(response.data);
@@ -170,17 +171,21 @@ function Reports() {
 
   // Download report as CSV
   const downloadReport = async () => {
-    if (!selectedCourse) {
+    // The file is for the report on the screen: its course and its method, which are not the ones in the boxes
+    // after a change that has not been generated yet
+    const reportCourse = reportData?.course?._id || selectedCourse;
+    const reportMethod = reportData?.gradingMethod || gradingMethod;
+    if (!reportCourse) {
       setAlert({ severity: 'warning', message: 'Please select a course first' });
       return;
     }
 
     try {
       const params = new URLSearchParams({
-        gradingMethod
+        gradingMethod: reportMethod
       });
 
-      const response = await api.get(`/courses/${selectedCourse}/reports/download?${params}`, {
+      const response = await api.get(`/courses/${reportCourse}/reports/download?${params}`, {
         responseType: 'blob'
       });
 
@@ -188,7 +193,7 @@ function Reports() {
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', `course_${selectedCourse}_report.csv`);
+      link.setAttribute('download', `course_${reportCourse}_report.csv`);
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -337,6 +342,7 @@ function Reports() {
               >
                 <MenuItem value="curved">Curved (mean 85, standard deviation 20)</MenuItem>
                 <MenuItem value="mean">Regular (mean of the ratings)</MenuItem>
+                <MenuItem value="multiplier">Contribution Multiplier (proposal)</MenuItem>
               </Select>
             </FormControl>
           </Grid>
@@ -355,6 +361,18 @@ function Reports() {
               </Button>
             </Box>
           </Grid>
+
+          {/* Contribution Multiplier (CICD-81): the team's proposal, the sponsor has not decided it yet */}
+          {gradingMethod === 'multiplier' && (
+            <Grid item xs={12}>
+              <Alert severity="info">
+                <strong>Contribution Multiplier (the team&apos;s proposal, not yet decided by the sponsor):</strong> each team has one grade,
+                the highest student score in the team unless you set it. A student&apos;s score is the median of the ratings received;
+                the multiplier is that score ÷ the average of the other teammates, at most 1.00; the final grade is the team grade × the
+                multiplier, never below 70 (or the team grade, if that is lower). A student with no ratings has no grade.
+              </Alert>
+            </Grid>
+          )}
 
           {/* Curved grading: the sponsor's fixed parameters, nothing to set */}
           {gradingMethod === 'curved' && (
@@ -478,11 +496,21 @@ function Reports() {
             </Paper>
           )}
 
+          {/* Team grades: only for the report that was made with the Contribution Multiplier */}
+          {/* It belongs to the course of the report on the screen, which is not the one chosen in the box after a change of course */}
+          {reportData.gradingMethod === 'multiplier' && reportData.course?._id && (
+            <TeamGradesPanel
+              courseId={reportData.course._id}
+              teams={reportData.teams || []}
+              onChanged={() => generateReportForCourse(reportData.course._id, 'multiplier')}
+            />
+          )}
+
           {/* Student Results Table */}
           <Paper sx={{ p: 3 }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
               <Typography variant="h6">
-                Student Results ({gradingMethod === 'curved' ? 'Curved' : 'Regular'} Grading)
+                Student Results ({reportData.gradingMethod === 'multiplier' ? 'Contribution Multiplier' : gradingMethod === 'curved' ? 'Curved' : 'Regular'} Grading)
               </Typography>
               <Button
                 variant="outlined"
@@ -501,10 +529,13 @@ function Reports() {
                     <TableCell>Name</TableCell>
                     <TableCell>Team</TableCell>
                     <TableCell align="center">Evaluations</TableCell>
-                    {gradingMethod === 'curved' && <TableCell align="center">Original Score</TableCell>}
+                    {gradingMethod === 'curved' && reportData.gradingMethod !== 'multiplier' && <TableCell align="center">Original Score</TableCell>}
+                    {reportData.gradingMethod === 'multiplier' && <TableCell align="center">Score</TableCell>}
+                    {reportData.gradingMethod === 'multiplier' && <TableCell align="center">Team Grade</TableCell>}
+                    {reportData.gradingMethod === 'multiplier' && <TableCell align="center">Multiplier</TableCell>}
                     <TableCell align="center">Final Score</TableCell>
                     <TableCell align="center">Letter Grade</TableCell>
-                    {gradingMethod === 'curved' && <TableCell align="center">Change</TableCell>}
+                    {gradingMethod === 'curved' && reportData.gradingMethod !== 'multiplier' && <TableCell align="center">Change</TableCell>}
                     <TableCell align="center">Actions</TableCell>
                   </TableRow>
                 </TableHead>
@@ -515,8 +546,15 @@ function Reports() {
                       <TableCell>{student.name}</TableCell>
                       <TableCell>{student.team_id?.team_name || 'No Team'}</TableCell>
                       <TableCell align="center">{student.evaluationsReceived}</TableCell>
-                      {gradingMethod === 'curved' && (
+                      {gradingMethod === 'curved' && reportData.gradingMethod !== 'multiplier' && (
                         <TableCell align="center">{student.originalScore}%</TableCell>
+                      )}
+                      {reportData.gradingMethod === 'multiplier' && (
+                        <>
+                          <TableCell align="center">{student.contributionScore == null ? '–' : `${student.contributionScore}%`}</TableCell>
+                          <TableCell align="center">{student.teamGrade == null ? '–' : `${student.teamGrade}%`}</TableCell>
+                          <TableCell align="center">{student.multiplier == null ? '–' : student.multiplier.toFixed(2)}</TableCell>
+                        </>
                       )}
                       <TableCell align="center">
                         <strong>{student.finalScore}%</strong>
@@ -528,7 +566,7 @@ function Reports() {
                           size="small"
                         />
                       </TableCell>
-                      {gradingMethod === 'curved' && (
+                      {gradingMethod === 'curved' && reportData.gradingMethod !== 'multiplier' && (
                         <TableCell align="center">
                           {student.improvement > 0 && (
                             <Chip
@@ -570,7 +608,7 @@ function Reports() {
                     </TableRow>
                   )) : (
                     <TableRow>
-                      <TableCell colSpan={gradingMethod === 'curved' ? 8 : 6} align="center">
+                      <TableCell colSpan={reportData.gradingMethod === 'multiplier' ? 9 : gradingMethod === 'curved' ? 8 : 6} align="center">
                         <Typography color="text.secondary">No student data available</Typography>
                       </TableCell>
                     </TableRow>

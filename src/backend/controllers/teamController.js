@@ -157,6 +157,43 @@ exports.updateTeam = async (req, res, next) => {
   }
 };
 
+// The instructor's grade for a team, used by the Contribution Multiplier report (CICD-81). A number from 0 to 100,
+// or null to go back to the grade the report proposes. The team is looked up within the course in the URL, which
+// the ownership middleware has already checked.
+exports.setTeamGrade = async (req, res, next) => {
+  try {
+    const { course_id, team_id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(team_id)) return next(validationError('Invalid team ID.'));
+
+    const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};
+    const grade = body.team_grade;
+    const isGrade = typeof grade === 'number' && Number.isFinite(grade) && grade >= 0 && grade <= 100;
+    if (grade !== null && !isGrade) {
+      return next(validationError('Team grade must be a number from 0 to 100, or null to use the automatic grade.'));
+    }
+
+    // The grade was checked above (a number from 0 to 100, or null). A plain typeof conditional is what CodeQL
+    // reads as a type check: the check in `isGrade` is not seen through the variable (js/sql-injection, #252).
+    const teamGrade = typeof grade === 'number' ? grade : null;
+
+    const team = await Team.findOneAndUpdate({ _id: team_id, course_id }, { team_grade: teamGrade }, { new: true });
+    if (!team) {
+      const err = new Error('Team not found.');
+      err.code = 'NOT_FOUND';
+      err.status = 404;
+      return next(err);
+    }
+    res.status(200).json({
+      message: teamGrade === null ? `Team "${team.team_name}" uses the automatic grade.` : `Team "${team.team_name}" grade set to ${teamGrade}.`,
+      team
+    });
+  } catch (err) {
+    err.code = err.code || 'SERVER_ERROR';
+    err.status = err.status || 500;
+    next(err);
+  }
+};
+
 exports.deleteTeam = async (req, res, next) => {
   try {
     const { course_id, team_id } = req.params;

@@ -151,6 +151,7 @@ on 404 instead of this shape.
 | GET | `/courses/:course_id/teams` | 🔒 | List teams |
 | POST | `/courses/:course_id/teams` | 🔒 | Create teams |
 | PUT | `/courses/:course_id/teams/:team_id` | 🔒 | Edit a team |
+| PUT | `/courses/:course_id/teams/:team_id/grade` | 🔒 | Set or clear the instructor's team grade (Contribution Multiplier) |
 | DELETE | `/courses/:course_id/teams/:team_id` | 🔒 | Delete an empty team |
 | DELETE | `/courses/:course_id/teams` | 🔒 | Delete all teams |
 | POST | `/courses/:course_id/teams/auto-assign` | 🔒 | **501** — not implemented |
@@ -445,6 +446,7 @@ message quotes up to three problem rows.
 | `GET .../teams` | — | **200** array of teams, with each member's student record **without** `evaluation_token` or its expiry |
 | `POST .../teams` | `{ "teams": [{ "team_name": "Team 4", "team_status"? }, ...] }`. Only the name and status are read. Teams are created empty: add members with `POST .../teams/:team_id/students/:student_id` | **201** `{ "message": "Teams created.", "teams": [ids] }`. **400** `VALIDATION_ERROR` for a missing, blank or not numbered name (one bad name refuses the whole list), an unknown status, or a non-empty `students` list |
 | `PUT .../teams/:team_id` | `team_name` and/or `team_status` (`Active` or `Inactive`); other fields are ignored | **200** `{ "message", "team" }`. Renaming also updates each member's `group_assignment`. **400** for a blank name, a new name that is not numbered (a team named before the rule keeps its name while the name is left alone) or an unknown status |
+| `PUT .../teams/:team_id/grade` | `{ "team_grade": 0..100 }` or `{ "team_grade": null }` (CICD-81: the instructor's grade for the team, used by the Contribution Multiplier report; `null` goes back to the grade the report proposes) | **200** `{ "message", "team" }`. **400** `VALIDATION_ERROR` for anything that is not a finite number from 0 to 100 or `null` (a missing field, a string, `101`), or for an invalid team id. **404** for a team of another course (the team is looked up within the course in the URL) |
 | `DELETE .../teams/:team_id` | — | **200** `{ "message" }`. **409** `CONSTRAINT_ERROR` if the team still has students |
 | `DELETE .../teams` | — | **200** `{ "message", "teams_deleted" }`. Students are kept and unassigned |
 | `POST .../teams/auto-assign` | — | **501** `NOT_IMPLEMENTED` |
@@ -570,7 +572,7 @@ Deletes every evaluation in the course and clears all tokens, each student's sub
 
 | Query parameter | Default | Meaning |
 |---|---|---|
-| `gradingMethod` | `curved` | `curved` (the default, the sponsor's method) or `mean` (the regular method) |
+| `gradingMethod` | `curved` | `curved` (the default, the sponsor's method), `mean` (the regular method) or `multiplier` (the Contribution Multiplier, the team's proposal; CICD-81) |
 
 The old `boostFactor` and `protectionThreshold` parameters are ignored: the curve has fixed parameters.
 
@@ -587,6 +589,20 @@ with no evaluations is not part of the statistics and has no grade. The choices 
 made by the team, with the three defaults shown to the sponsor: the whole class (not each team), the cap at 100
 and the 85 for equal scores; they are to be confirmed with her. `mean` returns the plain scores. The per-student and
 per-team report endpoints below always show the regular scores.
+
+**Contribution Multiplier (`gradingMethod=multiplier`; CICD-81, built before the sponsor's decision at Khoa's request).** The rule is in
+`docs/requirements/contribution-multiplier-proposal.md`, the constants (cap 1.00, floor 70) in `utils/contributionMultiplier.js`. Each team is
+graded on its own, not against the rest of the class. A student's `contributionScore` is the median of the scores of the
+ratings they received (a rating's score is the mean of its six criteria × 20; their own rating of themselves is not used).
+The team grade is the instructor's (`Team.team_grade`, set with `PUT .../teams/:team_id/grade`) or, when none is set, the highest
+`contributionScore` in the team. `multiplier` = the student's score ÷ the average score of the other scored teammates, at most 1
+(1 for a student alone, and for a student with no team, who is graded alone). `finalScore` = `teamGrade × multiplier`, never
+below the lower of 70 and `teamGrade`. A student nobody rated has `contributionScore`, `multiplier` and the grade of `null`
+and keeps `letterGrade: "No evaluations"`. `originalScore` stays the pooled mean, and the other methods' responses are unchanged. In this
+method each student also has `contributionScore`, `multiplier`, `teamGrade` and `teamGradeSource` (`automatic` or `instructor`),
+each team has `teamGrade`, `teamGradeSource` (`null` when nobody in the team has a rating and no grade was set),
+`automaticTeamGrade` (the proposed grade, `null` when nobody has a rating) and `team_grade` (the instructor's grade or `null`),
+and `gradingSettings` is `{ "cap": 1, "floor": 70 }`.
 
 **200**
 ```json
@@ -616,7 +632,9 @@ a word from the professor's list (substring match, ignoring case).
 
 Same query parameters. Returns `text/csv; charset=utf-8` as
 `course_<id>_report.csv` with the columns Student ID, Name, Email, Team, Original
-Score, Final Score, Letter Grade, Evaluations Received, Improvement. Fields are quoted per
+Score, Final Score, Letter Grade, Evaluations Received, Improvement (with `gradingMethod=multiplier`: Student ID, Name, Email, Team,
+Original Score, Contribution Score, Team Grade, Team Grade Source, Multiplier, Final Score, Letter Grade, Evaluations Received).
+Fields are quoted per
 RFC 4180, and text starting with `=`, `+`, `-` or `@` gets a leading `'` so spreadsheets
 don't run it as a formula.
 
