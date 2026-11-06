@@ -1,7 +1,7 @@
 # Render workspace handover, and final delivery
 
 The staging environment runs on accounts that belong to people, not to the university. The Render workspace is
-paid for on Khoa's card. **Before Khoa graduates, the team has to hand it over or shut it down.** This page lists
+Khoa's personal account. **Before Khoa graduates, the team has to hand it over or shut it down.** This page lists
 what exists and both options, and ends with the final repository delivery checklist (M1).
 
 The MongoDB Atlas and Mailtrap accounts are Khoa's personal accounts, not the university's. The repository does not
@@ -11,7 +11,7 @@ record their email addresses.
 
 | Service | Account holder | What's in it | Cost |
 |---|---|---|---|
-| Render workspace | Khoa (paid on Khoa's card) | `peers-backend-staging`: Node web service, Starter plan, Virginia. `peers-frontend-staging`: static site. Both from the Blueprint in `render.yaml`. Older, unused services were suspended in CICD-38 | Starter plan for the backend (doesn't sleep, can send SMTP); the static site is free. 500 build minutes a month |
+| Render workspace | Khoa (personal account) | `peers-backend-staging`: Node web service, Starter plan, Virginia. `peers-frontend-staging`: static site. Both from the Blueprint in `render.yaml`. Older, unused services were suspended in CICD-38 | Starter plan for the backend (doesn't sleep, can send SMTP); the static site is free. 500 build minutes a month |
 | MongoDB Atlas | Khoa (personal account) | One M0 (free) cluster, the staging database | free |
 | Mailtrap | Khoa (personal account) | The Email Testing sandbox that staging sends to | free plan (1 email per 10 s) |
 | GitHub organisation `IT7993-FALL-2026-PEERS` | admins `dgobin-ksu`, `KhoaHo-kho6` | Repository, Actions, environments, releases, GHCR images | free (public repository) |
@@ -30,6 +30,13 @@ record their email addresses.
   the smoke tests. The images behind every `rc-*` release must be kept in ghcr.io (a rollback redeploys them); there
   is no retention rule, and `staging` is the only tag that ever moves. The repository variable `BACKEND_DEPLOY`
   (`image`; `source` is the way back to building from the repository) says which way CD deploys.
+- **The registry credential expires.** The package is private, so Render pulls the image with the credential
+  `ghcr-peers-read` (set in `render.yaml`): a GitHub personal access token with the `read:packages` scope, made on
+  Khoa's account. When the token expires, or its account loses access to the package, the backend can no longer pull a new image
+  and CD's backend deploy fails at the pull. The token is named `render-ghcr-read` and expires on Dec 31, 2026 (checked
+  on Nov 6, 2026), 25 days after final delivery. Before handing over, the next
+  owner creates their own token with `read:packages` and replaces the credential in Render (a registry credential
+  is a Render account setting); nothing in the repository changes.
 - **Blueprint.** Changes to `render.yaml` take effect when the Blueprint syncs in Render.
 - **Deploy hooks.** Each service has one (Settings > Deploy Hook). They're stored only as the
   `staging` environment secrets `RENDER_BACKEND_DEPLOY_HOOK_URL` and `RENDER_FRONTEND_DEPLOY_HOOK_URL` in GitHub.
@@ -51,8 +58,8 @@ The new owner (the sponsor, the department, or next year's team) takes over the 
 1. **Render.** A Hobby workspace cannot have other members, and Render's documentation describes no way to
    transfer a workspace to someone else ([Workspaces, Members, and Roles](https://render.com/docs/team-members)).
    So the usual route is for the new owner to create their own workspace, put the paid plan on their billing
-   details, and deploy `render.yaml` as a new Blueprint there (step 2). Khoa then deletes the old workspace and
-   removes his card. The other route is to upgrade this workspace to a plan that allows members, invite the new
+   details, and deploy `render.yaml` as a new Blueprint there (step 2). Khoa then deletes the old workspace.
+   The other route is to upgrade this workspace to a plan that allows members, invite the new
    owner as Admin, and ask Render support whether the creator role can be handed over. Check which plan the
    workspace is on (Billing) before choosing.
 2. **New workspace** (the usual route): copy the `sync: false` environment variables across (MongoDB, SMTP), generate new
@@ -72,7 +79,7 @@ The new owner (the sponsor, the department, or next year's team) takes over the 
 1. Note the final live commits (`/api/health`, `/version.txt`) in the final delivery record below.
 2. Export anything worth keeping from Atlas (Atlas > the cluster > Collections, or `mongodump`). Staging holds
    test data only.
-3. **Render:** delete both services, delete the workspace, and remove the card.
+3. **Render:** delete both services and delete the workspace.
 4. **Atlas:** terminate the cluster. **Mailtrap:** delete the sandbox, or the account.
 5. **GitHub:** delete the `staging` environment secrets. CD then fails, so disable the CD workflow
    (Actions > CD > ⋯ > Disable workflow) and say in the README that staging no longer runs. CI keeps working.
@@ -88,5 +95,5 @@ The new owner (the sponsor, the department, or next year's team) takes over the 
 - [ ] Accepted security risks are reviewed and their expiry dates noted (`docs/security/security-policy.md`).
 - [ ] The CICD-31 walkthrough ([operations runbook](README.md#walkthrough-run-test-release-roll-back)) was done by a
       teammate, with the date recorded.
-- [ ] The hand-over or shut-down above is done, and no account depends on a graduating student's card or login.
+- [ ] The hand-over or shut-down above is done, and no account depends on a graduating student's login.
 - [ ] Repository access for the sponsor is confirmed (`geetikavyas`), and student access is reduced as agreed.
