@@ -22,7 +22,7 @@ const send = () => app.request('POST', `/api/courses/${IDS.courseAda}/evaluation
 async function annSubmits() {
   const { evaluation_token: token } = await Student.findById(IDS.ann);
   const res = await app.request('POST', `/api/evaluate/${token}`, {
-    body: { evaluations: [{ student_id: String(IDS.ben), ratings: RATINGS, overall_feedback: 'Reliable and prepared every week.' }] },
+    body: { evaluations: [{ student_id: String(IDS.ben), ratings: RATINGS, overall_feedback: 'Reliable and prepared every week, and always willing to help others.' }] },
   });
   assert.equal(res.status, 201);
 }
@@ -108,7 +108,7 @@ test('TC-12-23: when everyone has submitted no reminder is sent', async () => {
   for (const [evaluator, target] of [[IDS.ann, IDS.ben], [IDS.ben, IDS.ann], [IDS.cy, IDS.di], [IDS.di, IDS.cy]]) {
     const { evaluation_token: token } = await Student.findById(evaluator);
     const res = await app.request('POST', `/api/evaluate/${token}`, {
-      body: { evaluations: [{ student_id: String(target), ratings: RATINGS, overall_feedback: 'Reliable and prepared every week.' }] },
+      body: { evaluations: [{ student_id: String(target), ratings: RATINGS, overall_feedback: 'Reliable and prepared every week, and always willing to help others.' }] },
     });
     assert.equal(res.status, 201);
   }

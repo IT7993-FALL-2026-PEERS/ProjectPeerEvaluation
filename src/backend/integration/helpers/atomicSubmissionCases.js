@@ -13,7 +13,7 @@ const { STUDENT_RATINGS: RATINGS } = require('./evaluations');
 const rating = (studentId) => ({
   student_id: String(studentId),
   ratings: RATINGS,
-  overall_feedback: 'Reliable, prepared and easy to work with.',
+  overall_feedback: 'Reliable, prepared and easy to work with, and always met deadlines.',
 });
 
 function registerAtomicSubmissionTests({ standalone }) {
@@ -144,7 +144,7 @@ function registerAtomicSubmissionTests({ standalone }) {
       course_id: IDS.courseAda, student_id: IDS.ben, evaluator_id: IDS.ann, evaluation_token: 'a'.repeat(64),
       ratings: RATINGS, overall_feedback: feedback,
     });
-    await make('Reliable, prepared and easy to work with.').save();
+    await make('Reliable, prepared and easy to work with, and always met deadlines.').save();
     await assert.rejects(make('Second attempt that must not be stored.').save(), (err) => err.code === 11000);
     assert.equal(await Evaluation.countDocuments({ evaluator_id: IDS.ann }), 1);
   });
@@ -196,7 +196,7 @@ function registerAtomicSubmissionTests({ standalone }) {
   // CICD-68: an approved resubmission replaces the earlier evaluations once, in both database modes.
   async function approvedResubmission() {
     const first = await tokenOf(IDS.ann);
-    const ok = await app.request('POST', `/api/evaluate/${first}`, { body: { evaluations: [{ ...rating(IDS.ben), overall_feedback: 'First version of my feedback.' }] } });
+    const ok = await app.request('POST', `/api/evaluate/${first}`, { body: { evaluations: [{ ...rating(IDS.ben), overall_feedback: 'First version of my feedback, written before the team meeting.' }] } });
     assert.equal(ok.status, 201);
     const allowed = await app.request('POST', `/api/courses/${IDS.courseAda}/students/${IDS.ann}/evaluations/resubmit`, { token: ada, body: deadlineBody(4) });
     assert.equal(allowed.status, 200);
@@ -219,7 +219,7 @@ function registerAtomicSubmissionTests({ standalone }) {
       }
       return updateOne.call(this, filter, ...rest);
     });
-    const [a, b] = await Promise.all(['Version A of the second try.', 'Version B of the second try.'].map((feedback) =>
+    const [a, b] = await Promise.all(['Version A of the second try, with enough detail to be valid.', 'Version B of the second try, with enough detail to be valid.'].map((feedback) =>
       app.request('POST', `/api/evaluate/${second}`, { body: { evaluations: [{ ...rating(IDS.ben), overall_feedback: feedback }] } })));
     t.mock.restoreAll();
     assert.equal(atApproval.length, 2, 'both submissions reached the approval together');
@@ -232,12 +232,12 @@ function registerAtomicSubmissionTests({ standalone }) {
     const second = await approvedResubmission();
     t.mock.method(Evaluation, 'insertMany', async () => { throw new Error('disk full'); });
     t.mock.method(Evaluation.prototype, 'save', async () => { throw new Error('disk full'); });
-    const res = await app.request('POST', `/api/evaluate/${second}`, { body: { evaluations: [{ ...rating(IDS.ben), overall_feedback: 'This one will not be saved.' }] } });
+    const res = await app.request('POST', `/api/evaluate/${second}`, { body: { evaluations: [{ ...rating(IDS.ben), overall_feedback: 'This one will not be saved because the save fails halfway through.' }] } });
     t.mock.restoreAll();
     assert.equal(res.status, 500);
     const kept = await Evaluation.find({ evaluator_id: IDS.ann });
     assert.equal(kept.length, 1);
-    assert.equal(kept[0].overall_feedback, 'First version of my feedback.');
+    assert.equal(kept[0].overall_feedback, 'First version of my feedback, written before the team meeting.');
     assert.equal((await Student.findById(IDS.ann)).resubmission_allowed, true, 'they can try again');
   });
 
@@ -261,12 +261,12 @@ function registerAtomicSubmissionTests({ standalone }) {
       await deleteMany.apply(this, args); // applied, but the acknowledgement is lost
       throw new Error('connection reset');
     });
-    const res = await app.request('POST', `/api/evaluate/${second}`, { body: { evaluations: [{ ...rating(IDS.ben), overall_feedback: 'This one will not be saved.' }] } });
+    const res = await app.request('POST', `/api/evaluate/${second}`, { body: { evaluations: [{ ...rating(IDS.ben), overall_feedback: 'This one will not be saved because the save fails halfway through.' }] } });
     t.mock.restoreAll();
     assert.equal(res.status, 500);
     const kept = await Evaluation.find({ evaluator_id: IDS.ann });
     assert.equal(kept.length, 1);
-    assert.equal(kept[0].overall_feedback, 'First version of my feedback.');
+    assert.equal(kept[0].overall_feedback, 'First version of my feedback, written before the team meeting.');
     assert.equal((await Student.findById(IDS.ann)).resubmission_allowed, true);
   });
 
@@ -278,7 +278,7 @@ function registerAtomicSubmissionTests({ standalone }) {
       await Student.updateOne({ _id: IDS.ann }, { evaluation_token: 'z'.repeat(64), resubmission_allowed: false });
       throw new Error('disk full');
     });
-    const res = await app.request('POST', `/api/evaluate/${second}`, { body: { evaluations: [{ ...rating(IDS.ben), overall_feedback: 'This one will not be saved.' }] } });
+    const res = await app.request('POST', `/api/evaluate/${second}`, { body: { evaluations: [{ ...rating(IDS.ben), overall_feedback: 'This one will not be saved because the save fails halfway through.' }] } });
     t.mock.restoreAll();
     assert.equal(res.status, 500);
     assert.equal((await Student.findById(IDS.ann)).resubmission_allowed, false, 'not switched back on');

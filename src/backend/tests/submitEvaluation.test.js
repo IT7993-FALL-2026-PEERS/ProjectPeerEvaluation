@@ -26,7 +26,7 @@ function validEvaluation(overrides = {}) {
       overall_contribution: 4,
       participation: 3,
     },
-    overall_feedback: 'Reliable teammate, always met deadlines.',
+    overall_feedback: 'Reliable teammate who always met deadlines and helped the team.',
     ...overrides,
   };
 }
@@ -104,4 +104,29 @@ test('TC-16-47: feedback that is not text is a 400, not a server error', async (
     assert.equal(error.code, 'VALIDATION_ERROR');
     assert.equal(saved.length, 0);
   }
+});
+
+test('TC-16-77: feedback must be 50 to 500 characters once trimmed; 49 and 501 are a 400, 50 and 500 are saved', async (t) => {
+  for (const length of [0, 49, 501, 1000]) {
+    const { saved, error } = await submit(t, [validEvaluation({ overall_feedback: 'a'.repeat(length) })]);
+    assert.equal(error && error.status, 400, `${length} characters should be refused`);
+    assert.equal(error.code, 'VALIDATION_ERROR');
+    assert.match(error.message, /50.*500/);
+    assert.equal(saved.length, 0);
+  }
+  for (const length of [50, 500]) {
+    const { saved, error } = await submit(t, [validEvaluation({ overall_feedback: 'a'.repeat(length) })]);
+    assert.equal(error, undefined, `${length} characters should be accepted`);
+    assert.equal(saved.length, 1);
+  }
+});
+
+test('TC-16-78: spaces around the feedback do not count toward the 50 minimum or the 500 maximum', async (t) => {
+  const padded = `${' '.repeat(30)}${'a'.repeat(49)}${' '.repeat(30)}`;
+  const tooShort = await submit(t, [validEvaluation({ overall_feedback: padded })]);
+  assert.equal(tooShort.error && tooShort.error.status, 400);
+  const long = `${' '.repeat(100)}${'a'.repeat(500)}${' '.repeat(100)}`;
+  const ok = await submit(t, [validEvaluation({ overall_feedback: long })]);
+  assert.equal(ok.error, undefined);
+  assert.equal(ok.saved[0].overall_feedback.length, 500);
 });

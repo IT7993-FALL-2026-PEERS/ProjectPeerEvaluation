@@ -686,8 +686,8 @@ submission answer the same, and the status also carries `deadline`.
   }]
 }
 ```
-Ratings, `participation` included, are whole numbers 1–5 (D-19, fixed 17 Oct 2026: it was 1–4); 4.5, "4", `true`, 0 or 6 get a 400. `overall_feedback` must be text of at
-least 10 characters (FR-14 asks for 50–500). Every evaluation is validated before any is
+Ratings, `participation` included, are whole numbers 1–5 (D-19, fixed 17 Oct 2026: it was 1–4); 4.5, "4", `true`, 0 or 6 get a 400. `overall_feedback` must be text of 50 to 500
+characters once spaces at both ends are removed (FR-14, D-22 fixed 25 Oct 2026; the limits are in `config/rubric.js`). Every evaluation is validated before any is
 saved (FR-16), and they are saved together in one transaction (or, on a database without
 transactions, one by one with a rollback if anything fails), so a submission is all-or-nothing. A
 unique index on evaluator, student and course makes two requests at the same moment save once:

@@ -17,7 +17,7 @@ let ada;
 const rating = (studentId, overrides = {}) => ({
   student_id: String(studentId),
   ratings: { ...RATINGS, ...overrides.ratings },
-  overall_feedback: overrides.overall_feedback ?? 'Reliable, prepared and easy to work with.',
+  overall_feedback: overrides.overall_feedback ?? 'Reliable, prepared and easy to work with, and always met deadlines.',
 });
 
 // Sends the invitations as Ada and returns the token from the link in a student's email.
@@ -112,13 +112,15 @@ test('TC-16-24: rating someone outside the team or yourself gets 400 and saves n
   assert.equal((await Student.findById(IDS.ann)).evaluation_completed, false);
 });
 
-test('TC-16-25: invalid ratings (out of range, fractional, not a number) or feedback (too short, not text) get 400 and save nothing, so the student can try again', async () => {
+test('TC-16-25: invalid ratings (out of range, fractional, not a number) or feedback (under 50 or over 500 characters, not text) get 400 and save nothing, so the student can try again', async () => {
   const token = await tokenFromEmail('ann@example.edu');
   const bad = [
     rating(IDS.ben, { ratings: { communication: 6 } }),
     rating(IDS.ben, { ratings: { participation: 6 } }),
     rating(IDS.ben, { ratings: { participation: 0 } }),
     rating(IDS.ben, { overall_feedback: 'too short' }),
+    rating(IDS.ben, { overall_feedback: 'a'.repeat(49) }),
+    rating(IDS.ben, { overall_feedback: 'a'.repeat(501) }),
     rating(IDS.ben, { ratings: { communication: 4.5 } }),
     rating(IDS.ben, { ratings: { participation: true } }),
     rating(IDS.ben, { overall_feedback: {} }),

@@ -97,8 +97,8 @@ const EVALUATION_RUBRIC = {
     description: "Please provide constructive feedback for each member of your team. You might offer information about a team member’s strengths or leave critical feedback for the team member and instructor to read.",
     type: "text",
     required: true,
-    minLength: 10,
-    maxLength: 1000
+    minLength: 50,
+    maxLength: 500
   }
 };
 

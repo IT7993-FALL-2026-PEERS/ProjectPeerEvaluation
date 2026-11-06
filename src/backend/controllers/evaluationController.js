@@ -828,8 +828,10 @@ exports.submitEvaluation = async (req, res, next) => {
         }
       }
 
-      if (typeof evalData.overall_feedback !== 'string' || evalData.overall_feedback.trim().length < 10) {
-        const err = new Error('Overall feedback is required (minimum 10 characters).');
+      const { minLength: feedbackMin, maxLength: feedbackMax } = EVALUATION_RUBRIC.overallFeedback;
+      const feedbackLength = typeof evalData.overall_feedback === 'string' ? evalData.overall_feedback.trim().length : 0;
+      if (feedbackLength < feedbackMin || feedbackLength > feedbackMax) {
+        const err = new Error(`Overall feedback is required (${feedbackMin} to ${feedbackMax} characters).`);
         err.code = 'VALIDATION_ERROR';
         err.status = 400;
         return next(err);

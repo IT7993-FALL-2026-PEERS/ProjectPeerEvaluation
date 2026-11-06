@@ -47,7 +47,7 @@ test('E2E-11: a student rates a teammate and submits; the professor then sees on
   await student.goto(await invitationPath('ann@example.edu'));
 
   await rate(student, [4, 5, 4, 3, 4, 3]);
-  await student.getByPlaceholder(/constructive feedback/i).fill('Reliable, prepared and easy to work with.');
+  await student.getByPlaceholder(/constructive feedback/i).fill('Reliable, prepared and easy to work with, and always met deadlines.');
   await student.getByRole('button', { name: /submit evaluation/i }).click();
   await expect(student.getByText(/Thank you for completing your peer evaluation/)).toBeVisible();
 
@@ -65,7 +65,7 @@ test('E2E-12: the same link cannot be used to submit twice', async ({ page, brow
   const form = await (await student.request.get(`${API}/evaluate/${token}`)).json();
   await student.goto(link);
   await rate(student, [4, 5, 4, 3, 4, 3]);
-  await student.getByPlaceholder(/constructive feedback/i).fill('Reliable, prepared and easy to work with.');
+  await student.getByPlaceholder(/constructive feedback/i).fill('Reliable, prepared and easy to work with, and always met deadlines.');
   await student.getByRole('button', { name: /submit evaluation/i }).click();
   await expect(student.getByText(/Thank you for completing your peer evaluation/)).toBeVisible();
 
@@ -80,7 +80,7 @@ test('E2E-12: the same link cannot be used to submit twice', async ({ page, brow
       evaluations: form.teammates.map((mate) => ({
         student_id: mate._id,
         ratings: { professionalism: 5, communication: 5, work_ethic: 5, content_knowledge_skills: 5, overall_contribution: 5, participation: 5 },
-        overall_feedback: 'A second attempt with the same link.',
+        overall_feedback: 'A second attempt with the same link, which should be refused.',
       })),
     },
   });

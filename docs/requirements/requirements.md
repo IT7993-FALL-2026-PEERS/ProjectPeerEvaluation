@@ -391,13 +391,13 @@ same six criteria and 1–5 scales, with her wording for every question and leve
 are now: 5 They participated fully and exceeded expectations, 4 They participated fully, 3 They participated
 to a moderate extent, 2 They participated to a limited extent / rarely, 1 They did not participate or
 hindered the group; so a stored 4 now reads "participated fully" (test data only). The full wording is in
-`config/rubric.js`; the feedback limit of 10 to 1,000 characters is unchanged (her sheet states none).
+`config/rubric.js`; her sheet states no feedback limit, so the 50 to 500 character limit of FR-14 applies.
 
 *Evidence.* `models/Evaluation.js` and `config/rubric.js` — `participation` is `min: 1, max: 5` and `1-5`,
 like the other criteria; tests TC-13-20, TC-16-25, TC-16-76 and the report tests.
 
 ### FR-14 — Textual feedback with length limits
-*Inherited: FR4.2* · **Status: Defective** · **Defect: D-22**
+*Inherited: FR4.2* · **Status: Validated** · **Defect: D-22 (fixed Nov 6, 2026)**
 
 **Required functionality.** Students provide written feedback, at least 50 and at most 500
 characters.
@@ -407,15 +407,18 @@ maximum,
 **when** they submit,
 **then** the submission is rejected with a message stating the permitted length.
 
-**Current behaviour.** The enforced minimum is **10 characters, not 50**, and there is
-**no maximum at all** — so a one-word response is accepted and an unbounded one is stored.
-The schema carries no `minlength` or `maxlength` on `Evaluation.overall_feedback` either.
+**Current behaviour.** Feedback must be **50 to 500 characters** once spaces at both ends are removed.
+The limits are `minLength` and `maxLength` in `config/rubric.js`, which the server checks (400 with the
+permitted length in the message) and the student form reads from the rubric it receives, so the two agree.
+The form shows a running count (`120 of 500 characters (minimum 50)`) and refuses to send otherwise.
 
-*Evidence.* `src/backend/controllers/evaluationController.js:479` —
-`evalData.overall_feedback.trim().length < 10`; `src/backend/models/Evaluation.js:15`.
+*Evidence.* `src/backend/controllers/evaluationController.js` (the feedback check in `submitEvaluation`),
+`src/backend/config/rubric.js`, `src/frontend/pages/StudentEvaluation.jsx`; tests TC-13-25, TC-16-25,
+TC-16-77, TC-16-78, the form tests in `StudentEvaluation.test.jsx` and E2E-14.
 
 *Revised 27 Sep — previously recorded as "Needs verification"; confirmed defective on
-re-reading the controller.*
+re-reading the controller. Revised Nov 6 — D-22 fixed: the limits are now 50 to 500 characters and
+enforced by both the server and the form.*
 
 ### FR-15 — Timestamp all submissions
 *Inherited: FR4.3* · **Status: Validated**

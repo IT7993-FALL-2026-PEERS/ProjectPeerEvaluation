@@ -114,6 +114,12 @@ function StudentEvaluation() {
     }));
   };
 
+  // The limits come with the rubric, so the form and the server cannot disagree.
+  const feedbackLimits = {
+    min: evaluationData?.rubric?.overallFeedback?.minLength ?? 50,
+    max: evaluationData?.rubric?.overallFeedback?.maxLength ?? 500
+  };
+
   // Submit evaluation
   const handleSubmit = async () => {
     console.log('Submit button clicked!');
@@ -134,9 +140,10 @@ function StudentEvaluation() {
       }
       
       // Check feedback is provided
-      if (!evaluation.overall_feedback || evaluation.overall_feedback.trim().length < 10) {
+      const feedbackLength = (evaluation.overall_feedback || '').trim().length;
+      if (feedbackLength < feedbackLimits.min || feedbackLength > feedbackLimits.max) {
         console.log('Missing or insufficient feedback:', evaluation.overall_feedback);
-        setError('Please provide overall feedback (at least 10 characters) for all team members.');
+        setError(`Please provide overall feedback of ${feedbackLimits.min} to ${feedbackLimits.max} characters for all team members.`);
         return;
       }
     }
@@ -350,7 +357,7 @@ function StudentEvaluation() {
                 value={evaluations[teammate._id]?.overall_feedback || ''}
                 onChange={(e) => handleFeedbackChange(teammate._id, e.target.value)}
                 placeholder="Provide constructive feedback for this team member..."
-                helperText={`${evaluations[teammate._id]?.overall_feedback?.length || 0} characters (minimum 10 required)`}
+                helperText={`${evaluations[teammate._id]?.overall_feedback?.length || 0} of ${feedbackLimits.max} characters (minimum ${feedbackLimits.min})`}
                 sx={{ bgcolor: '#f5f5f5', borderRadius: 2 }}
               />
             </Box>

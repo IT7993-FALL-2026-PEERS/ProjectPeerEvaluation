@@ -64,7 +64,7 @@ test('TC-11-24: the counts are the enrolled students who submitted, not every ev
   // An evaluation written by someone no longer in the course (their classmates were deleted, or they were)
   await Evaluation.create({
     course_id: IDS.courseAda, student_id: IDS.cy, evaluator_id: new mongoose.Types.ObjectId(), evaluation_token: 'g'.repeat(64),
-    ratings: ORDINARY_RATINGS, overall_feedback: 'Reliable and prepared every week.',
+    ratings: ORDINARY_RATINGS, overall_feedback: 'Reliable and prepared every week, and always willing to help others.',
   });
   const { body } = await status();
   assert.equal(body.completed_count, 2, 'Ann and Ben only');
@@ -117,7 +117,7 @@ test('TC-16-73: a student marked submitted with no ratings can be given a resubm
   assert.equal(allowed.status, 200);
   const { evaluation_token: link } = await Student.findById(IDS.ann);
   const submitted = await app.request('POST', `/api/evaluate/${link}`, {
-    body: { evaluations: [{ student_id: String(IDS.ben), ratings: ORDINARY_RATINGS, overall_feedback: 'Reliable and prepared every week.' }] },
+    body: { evaluations: [{ student_id: String(IDS.ben), ratings: ORDINARY_RATINGS, overall_feedback: 'Reliable and prepared every week, and always willing to help others.' }] },
   });
   assert.equal(submitted.status, 201);
   const { body } = await status();

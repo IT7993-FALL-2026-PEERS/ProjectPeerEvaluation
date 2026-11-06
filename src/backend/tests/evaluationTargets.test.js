@@ -32,7 +32,7 @@ function rating(studentId) {
       overall_contribution: 4,
       participation: 3,
     },
-    overall_feedback: 'Reliable teammate, always met deadlines.',
+    overall_feedback: 'Reliable teammate who always met deadlines and helped the team.',
   };
 }
 

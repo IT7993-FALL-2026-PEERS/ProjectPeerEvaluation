@@ -17,7 +17,7 @@ const ratings = (professionalism, communication, work_ethic, content_knowledge_s
 );
 
 const FIXED_EVALUATIONS = [
-  { evaluator: IDS.ann, student: IDS.ben, ratings: ratings(4, 4, 4, 4, 4, 3), feedback: 'Reliable and prepared every week.' },
+  { evaluator: IDS.ann, student: IDS.ben, ratings: ratings(4, 4, 4, 4, 4, 3), feedback: 'Reliable and prepared every week, and always willing to help others.' },
   { evaluator: IDS.ben, student: IDS.ann, ratings: ratings(5, 5, 5, 5, 5, 5), feedback: 'Outstanding work on every task.' },
   { evaluator: IDS.cy, student: IDS.di, ratings: ratings(3, 3, 3, 3, 3, 2), feedback: 'Often late to meetings and a bit lazy.' },
   { evaluator: IDS.di, student: IDS.cy, ratings: ratings(4, 5, 4, 5, 4, 5), feedback: 'Good communicator and a steady contributor.' },

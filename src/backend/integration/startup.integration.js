@@ -13,7 +13,7 @@ const INDEX = 'evaluator_id_1_student_id_1_course_id_1';
 
 const doc = () => ({
   course_id: IDS.courseAda, evaluator_id: IDS.ann, student_id: IDS.ben,
-  evaluation_token: 'a'.repeat(64), ratings: RATINGS, overall_feedback: 'Reliable and prepared every week.',
+  evaluation_token: 'a'.repeat(64), ratings: RATINGS, overall_feedback: 'Reliable and prepared every week, and always willing to help others.',
 });
 const recorder = () => { const messages = []; return { messages, error: (m) => messages.push(m) }; };
 

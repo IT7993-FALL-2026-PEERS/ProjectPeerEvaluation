@@ -119,6 +119,6 @@ test('TC-13-24: content knowledge, overall contribution and the written feedback
 test('TC-13-25: the written feedback limits are unchanged (the sponsor\'s sheet states none)', () => {
   assert.equal(rubric.overallFeedback.type, 'text');
   assert.equal(rubric.overallFeedback.required, true);
-  assert.equal(rubric.overallFeedback.minLength, 10);
-  assert.equal(rubric.overallFeedback.maxLength, 1000);
+  assert.equal(rubric.overallFeedback.minLength, 50);
+  assert.equal(rubric.overallFeedback.maxLength, 500);
 });
