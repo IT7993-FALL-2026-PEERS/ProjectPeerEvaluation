@@ -6,7 +6,7 @@ This is the [operations runbook](README.md#walkthrough-run-test-release-roll-bac
 step: the exact commands, what you should see, and what happened when it was run on 6 Oct 2026. Use it to repeat the
 walkthrough, or as proof that the steps work. When you repeat it, add a row to the [run log](#run-log) at the end.
 
-**Who ran it.** Donald (M1) ran it with Claude Code, in a fresh clone on a WSL Ubuntu machine with Node 24.21.0, npm
+**Who ran it.** Donald (M1) ran it in a fresh clone on a WSL Ubuntu machine with Node 24.21.0, npm
 11.19.0 and Docker 29.8. CICD-31's done condition asks for a teammate who didn't build the pipeline. This run proves
 the steps work. A run by such a teammate would also prove the docs are clear enough without help.
 
@@ -182,6 +182,8 @@ Then watch CD deploy the revert, and check `/version.txt` (and `/api/health`) ag
 
 | Date | Who | `main` at start | Result | Notes |
 |---|---|---|---|---|
-| 6 Oct 2026 | Donald (with Claude Code) | `d98b4a7` | Steps 1–3 ✔, step 4 deploy ✔, step 5 option C ✔ | Release candidate, promotion and rollback option A not possible while `CD_RELEASE` is off. Two README gaps fixed (Playwright browser and libraries) |
+| 6 Oct 2026 | Donald | `d98b4a7` | Steps 1–3 ✔, step 4 deploy ✔, step 5 option C ✔ | Release candidate, promotion and rollback option A not possible while `CD_RELEASE` is off. Two README gaps fixed (Playwright browser and libraries) |
+| 17 Oct 2026 | Khoa | `1541bb9` | Step 5 option A ✔ | `rollback_to` a release made before the image carried its commit was refused before anything changed ([run 39001504990](https://github.com/IT7993-FALL-2026-PEERS/ProjectPeerEvaluation/actions/runs/39001504990)); `rollback_to` `rc-20261017-0322-6440ed0` put both services and the backend image digest back, smoke tests green, `staging` pointer moved back ([run 39001530607](https://github.com/IT7993-FALL-2026-PEERS/ProjectPeerEvaluation/actions/runs/39001530607)); a forced CD run brought staging back to `main` ([run 39001716639](https://github.com/IT7993-FALL-2026-PEERS/ProjectPeerEvaluation/actions/runs/39001716639)) |
+| 17 Oct 2026 | Donald, approved by Khoa | — | Step 4 promotion dry run ✔ | `Promote release candidate` from `rc-20261017-0322-6440ed0` with dry run on: the check passed, an approver released the `production` gate, the placeholder deploy step was skipped and a draft release was made ([run 39033612573](https://github.com/IT7993-FALL-2026-PEERS/ProjectPeerEvaluation/actions/runs/39033612573)). A draft left behind blocks promoting the same tag again |
 
-Not yet repeated (8 Oct 2026): step 4's promotion dry run, step 5 option A by hand (`rollback_to`), and a run by a teammate who did not build the pipeline. Add a row above when they are done.
+Not yet repeated (Nov 6, 2026): a run by a teammate who did not build the pipeline (Kylee or Laeticia). Every run above was done by the people who built it. Add a row above when it is done.
