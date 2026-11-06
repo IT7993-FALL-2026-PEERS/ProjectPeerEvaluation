@@ -9,13 +9,14 @@ import ResetPassword from './pages/ResetPassword';
 import VerifyEmail from './pages/VerifyEmail';
 import Settings from './pages/Settings';
 import ProtectedRoute from './components/ProtectedRoute';
+import OnPrivatePages from './components/OnPrivatePages';
 import SessionExpiredBanner from './components/SessionExpiredBanner';
 import SessionTimeoutWarning from './components/SessionTimeoutWarning';
 
 function App() {
     return (
         <Router>
-            <SessionExpiredBanner />
+            <OnPrivatePages><SessionExpiredBanner /></OnPrivatePages>
             <SessionTimeoutWarning />
             <Routes>
                 <Route path="/" element={<LoginPage />} />

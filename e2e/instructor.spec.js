@@ -238,6 +238,34 @@ test('E2E-41: when the login has expired the page says so, and Use the login pag
   expect(await page.evaluate(() => localStorage.getItem('peer_eval_token'))).toBeNull();
 });
 
+// CICD-76: coming back with a login that has run out must not bring up the timed-out banner or its dialog on the pages
+// a visitor can open, where there is no work to keep.
+test('E2E-54: coming back with an expired login shows a clean login page, and no timed-out message on the reset page', async ({ page }) => {
+  await loginAsAda(page, passwords);
+  await expect(page).toHaveURL(/course-management/);
+
+  // A token the browser can read as having run out an hour ago, with the professor still stored.
+  await page.evaluate(() => {
+    const now = Math.floor(Date.now() / 1000);
+    const claims = btoa(JSON.stringify({ id: 'ada', iat: now - 7200, exp: now - 3600 }));
+    localStorage.setItem('peer_eval_token', `h.${claims}.s`);
+  });
+
+  const message = page.getByText('Session timed out. Log in again to keep your work.');
+  await page.goto('/reset-password/an-old-link');
+  await page.waitForTimeout(2500); // the session countdown ticks once a second
+  await expect(message).toHaveCount(0);
+  await expect(page.getByRole('dialog', { name: 'Log in again' })).toHaveCount(0);
+
+  await page.goto('/');
+  await expect(page.getByRole('heading', { name: 'Professor Login' })).toBeVisible();
+  await page.waitForTimeout(2500);
+  await expect(message).toHaveCount(0);
+  await expect(page.getByRole('dialog', { name: 'Log in again' })).toHaveCount(0);
+  expect(await page.evaluate(() => localStorage.getItem('peer_eval_token'))).toBeNull();
+  expect(await page.evaluate(() => localStorage.getItem('user'))).toBeNull();
+});
+
 // CICD-69: a timed-out professor logs in again on the same page and keeps what was typed.
 test('E2E-46: after the login expires, logging in again keeps the half-filled Create Course form, and saving works', async ({ page }) => {
   await loginAsAda(page, passwords);

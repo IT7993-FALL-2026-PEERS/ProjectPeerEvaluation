@@ -3,6 +3,8 @@ import axios from 'axios';
 import { getApiBaseUrl } from '../services/apiUrl';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import api from '../services/api';
+import { readSessionToken, secondsLeft } from '../services/sessionActivity';
 
 function LoginPage() {
   const [isRegistering, setIsRegistering] = useState(false);
@@ -44,7 +46,22 @@ function LoginPage() {
   const [department, setDepartment] = useState('');
   const [error, setError] = useState('');
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { login, logout } = useAuth();
+  // A professor who comes back with a login that has run out starts from a clean form: the stored login is of no use
+  // here and would only bring up the 'session timed out' message (CICD-76). The browser's clock can be wrong, so a
+  // login that only looks expired is checked with the server first, and is forgotten only if the server refuses it
+  // (the same check the session countdown makes). A login that is still good is left alone: it may be in use in
+  // another tab.
+  useEffect(() => {
+    const left = secondsLeft();
+    if (left === null || left > 0) return;
+    const sentWith = readSessionToken();
+    Promise.resolve(api.post('/auth/refresh', {})).catch((failure) => {
+      // Only if the login that was refused is still the one stored (another tab may have logged in meanwhile).
+      if (failure && failure.response && failure.response.status === 401 && readSessionToken() === sentWith) logout();
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
