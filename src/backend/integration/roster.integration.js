@@ -34,7 +34,7 @@ async function seedSubmittedEvaluation() {
   await Evaluation.create({
     course_id: IDS.courseAda, student_id: IDS.ben, evaluator_id: IDS.ann, evaluation_token: 'a'.repeat(64),
     ratings: { professionalism: 4, communication: 4, work_ethic: 4, content_knowledge_skills: 4, overall_contribution: 4, participation: 3 },
-    overall_feedback: 'Reliable and prepared every week.',
+    overall_feedback: 'Reliable and prepared every week, and always willing to help others.',
   });
 }
 
@@ -275,7 +275,7 @@ test('TC-06-94: an evaluation saved after the first check but before the move st
       await Evaluation.create({
         course_id: IDS.courseAda, student_id: IDS.di, evaluator_id: IDS.cy, evaluation_token: 'c'.repeat(64),
         ratings: { professionalism: 4, communication: 4, work_ethic: 4, content_knowledge_skills: 4, overall_contribution: 4, participation: 3 },
-        overall_feedback: 'Reliable and prepared every week.',
+        overall_feedback: 'Reliable and prepared every week, and always willing to help others.',
       });
     }
     return original(...args);

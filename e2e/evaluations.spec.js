@@ -138,7 +138,7 @@ test('E2E-45: allowing a resubmission marks the student and emails them a new li
     body: JSON.stringify({ evaluations: [{
       student_id: ben.teammates[0]._id,
       ratings: { professionalism: 4, communication: 4, work_ethic: 4, content_knowledge_skills: 4, overall_contribution: 4, participation: 3 },
-      overall_feedback: 'Reliable and prepared every week.',
+      overall_feedback: 'Reliable and prepared every week, and always willing to help others.',
     }] }),
   });
   expect(submitted.status).toBe(201);

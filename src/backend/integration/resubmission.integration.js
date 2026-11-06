@@ -17,7 +17,7 @@ let bo;
 
 const resubmitPath = (id) => `/api/courses/${IDS.courseAda}/students/${id}/evaluations/resubmit`;
 const send = () => app.request('POST', `/api/courses/${IDS.courseAda}/evaluations/send`, { token: ada, body: deadlineBody(2) });
-const submit = (link, feedback = 'Reliable and prepared every week.') => app.request('POST', `/api/evaluate/${link}`, {
+const submit = (link, feedback = 'Reliable and prepared every week, and always willing to help others.') => app.request('POST', `/api/evaluate/${link}`, {
   body: { evaluations: [{ student_id: String(IDS.ben), ratings: ORDINARY_RATINGS, overall_feedback: feedback }] },
 });
 
@@ -44,7 +44,7 @@ test.beforeEach(async (t) => {
 test('TC-16-63: an approved resubmission emails a new link, kills the old one, opens the form, and the next submit replaces the evaluations', async () => {
   await send();
   const { evaluation_token: first } = await Student.findById(IDS.ann);
-  assert.equal((await submit(first, 'First version of my feedback.')).status, 201);
+  assert.equal((await submit(first, 'First version of my feedback, written before the team meeting.')).status, 201);
   assert.equal((await submit(first)).status, 409, 'one submission per student');
 
   clearEmails();
@@ -63,10 +63,10 @@ test('TC-16-63: an approved resubmission emails a new link, kills the old one, o
   assert.ok(Array.isArray(form.body.teammates), 'the form opens, not "already completed"');
   assert.equal((await app.request('GET', `/api/evaluate/${ann.evaluation_token}/status`)).body.completed, false);
 
-  assert.equal((await submit(ann.evaluation_token, 'Second version, after talking to Ben.')).status, 201);
+  assert.equal((await submit(ann.evaluation_token, 'Second version of my feedback, written after talking to Ben.')).status, 201);
   const evaluations = await Evaluation.find({ evaluator_id: IDS.ann });
   assert.equal(evaluations.length, 1, 'replaced, not added');
-  assert.equal(evaluations[0].overall_feedback, 'Second version, after talking to Ben.');
+  assert.equal(evaluations[0].overall_feedback, 'Second version of my feedback, written after talking to Ben.');
   const done = await Student.findById(IDS.ann);
   assert.equal(done.resubmission_allowed, false);
   assert.equal(done.evaluation_completed, true);

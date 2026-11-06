@@ -134,7 +134,7 @@ test('TC-06-36: deleting a student removes them from their team and updates the 
 test('TC-06-37: bulk delete removes the students, the ratings about them, and fixes the teams and counts', async () => {
   await Evaluation.create({
     course_id: IDS.courseAda, student_id: IDS.ben, evaluator_id: IDS.ann, evaluation_token: 'a'.repeat(64),
-    ratings: RATINGS, overall_feedback: 'Reliable and prepared every week.',
+    ratings: RATINGS, overall_feedback: 'Reliable and prepared every week, and always willing to help others.',
   });
   const res = await app.request('POST', `${students()}/bulk-delete`, { token: ada, body: { student_ids: [String(IDS.ben), String(IDS.cy)] } });
   assert.equal(res.status, 200);

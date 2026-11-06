@@ -27,7 +27,7 @@ const sendBody = (days = 7) => ({ deadline: dueIn(days), deadline_zone: 'America
 const submittedBy = (studentId, aboutId) => Evaluation.create({
   course_id: IDS.courseAda, student_id: aboutId, evaluator_id: studentId, evaluation_token: 'e'.repeat(64),
   ratings: { professionalism: 4, communication: 4, work_ethic: 4, content_knowledge_skills: 4, overall_contribution: 4, participation: 3 },
-  overall_feedback: 'Reliable and prepared every week.',
+  overall_feedback: 'Reliable and prepared every week, and always willing to help others.',
 });
 
 test.before(async () => {

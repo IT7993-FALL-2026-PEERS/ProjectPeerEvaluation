@@ -11,7 +11,7 @@ let server;
 
 const doc = (evaluator, student) => ({
   course_id: IDS.courseAda, evaluator_id: evaluator, student_id: student,
-  evaluation_token: 'a'.repeat(64), ratings: RATINGS, overall_feedback: 'Reliable and prepared every week.',
+  evaluation_token: 'a'.repeat(64), ratings: RATINGS, overall_feedback: 'Reliable and prepared every week, and always willing to help others.',
 });
 
 test.before(async () => { server = await startDatabase(); });

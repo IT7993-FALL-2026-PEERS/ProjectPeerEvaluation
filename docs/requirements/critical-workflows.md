@@ -113,8 +113,8 @@ so the two are never confused.
   `POST /evaluate/:token`, `GET /evaluate/:token/status` (`evaluationController.js`,
   public route `evaluate.js`)
 - **Status:** Partial — the flow works end to end (participation has been rated 1-5 like the other criteria since 17 Oct 2026,
-  FR4.1, **D-19** fixed), but feedback only requires 10 characters with no maximum, against a
-  spec of 50-500 (FR4.2). The duplicate guard (FR4.4) still lets concurrent submits through; see FR-16 in
+  FR4.1, **D-19** fixed; feedback must be 50 to 500 characters since 25 Oct 2026, FR4.2, **D-22**
+  fixed). The duplicate guard (FR4.4) still lets concurrent submits through; see FR-16 in
   `rtm.md`.
 
 ## CW-08: Evaluation Tracking and Reminders

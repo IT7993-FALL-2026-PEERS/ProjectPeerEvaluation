@@ -61,6 +61,7 @@ async function rate(teammateIndex, scores) {
   }
 }
 
+const FEEDBACK_ERROR = 'Please provide overall feedback of 50 to 500 characters for all team members.';
 const feedbackBoxes = () => screen.getAllByPlaceholderText(/constructive feedback/i);
 const write = (teammateIndex, text) => fireEvent.change(feedbackBoxes()[teammateIndex], { target: { value: text } });
 const submit = () => user.click(screen.getByRole('button', { name: /submit evaluation/i }));
@@ -122,10 +123,10 @@ describe('StudentEvaluation', () => {
   test('counts the feedback characters as the student types', async () => {
     renderForm();
     await screen.findByRole('heading', { name: 'Evaluate: Ben Baker' });
-    expect(screen.getAllByText('0 characters (minimum 10 required)')).toHaveLength(2);
+    expect(screen.getAllByText('0 of 500 characters (minimum 50)')).toHaveLength(2);
 
     await user.type(feedbackBoxes()[0], 'Helpful');
-    expect(screen.getByText('7 characters (minimum 10 required)')).toBeInTheDocument();
+    expect(screen.getByText('7 of 500 characters (minimum 50)')).toBeInTheDocument();
   });
 
   test('refuses to submit while a rating is missing, names it, and sends nothing', async () => {
@@ -139,17 +140,51 @@ describe('StudentEvaluation', () => {
     expect(api.post).not.toHaveBeenCalled();
   });
 
-  test('refuses to submit when feedback is shorter than 10 characters', async () => {
+  test.each([
+    ['49 characters is too short', 'a'.repeat(49)],
+    ['501 characters is too long', 'a'.repeat(501)],
+    ['spaces do not count toward the minimum', `${' '.repeat(40)}${'a'.repeat(30)}`],
+  ])('refuses to submit when feedback is outside 50 to 500 characters: %s', async (_name, text) => {
     oneTeammate();
     renderForm();
     await screen.findByRole('heading', { name: 'Evaluate: Ben Baker' });
     await rate(0, [5, 5, 5, 5, 5, 4]);
-    write(0, 'too short');
+    write(0, text);
 
     await submit();
 
-    expect(await screen.findByText('Please provide overall feedback (at least 10 characters) for all team members.')).toBeInTheDocument();
+    expect(await screen.findByText(FEEDBACK_ERROR)).toBeInTheDocument();
     expect(api.post).not.toHaveBeenCalled();
+  });
+
+  test.each([50, 500])('accepts feedback of exactly %i characters', async (length) => {
+    api.post.mockResolvedValue({ data: { message: 'Evaluation submitted successfully.' } });
+    oneTeammate();
+    renderForm();
+    await screen.findByRole('heading', { name: 'Evaluate: Ben Baker' });
+    await rate(0, [5, 5, 5, 5, 5, 4]);
+    write(0, 'a'.repeat(length));
+
+    await submit();
+
+    expect(await screen.findByRole('heading', { name: 'Evaluation Completed!' })).toBeInTheDocument();
+    expect(api.post).toHaveBeenCalledTimes(1);
+  });
+
+  test('shows the limits and a running count under the feedback box', async () => {
+    oneTeammate();
+    renderForm();
+    await screen.findByRole('heading', { name: 'Evaluate: Ben Baker' });
+    expect(screen.getByText('0 of 500 characters (minimum 50)')).toBeInTheDocument();
+    write(0, 'a'.repeat(120));
+    expect(await screen.findByText('120 of 500 characters (minimum 50)')).toBeInTheDocument();
+  });
+
+  test('uses the limits the server sends with the rubric', async () => {
+    api.get.mockResolvedValue({ data: { ...FORM, teammates: FORM.teammates.slice(0, 1), rubric: { ...FORM.rubric, overallFeedback: { ...FORM.rubric.overallFeedback, minLength: 20, maxLength: 80 } } } });
+    renderForm();
+    await screen.findByRole('heading', { name: 'Evaluate: Ben Baker' });
+    expect(screen.getByText('0 of 80 characters (minimum 20)')).toBeInTheDocument();
   });
 
   test('sends one evaluation per teammate with whole-number ratings, then shows the thank-you page', async () => {
@@ -158,8 +193,8 @@ describe('StudentEvaluation', () => {
     await screen.findByRole('heading', { name: 'Evaluate: Ben Baker' });
     await rate(0, [5, 4, 5, 4, 5, 4]);
     await rate(1, [1, 1, 1, 1, 1, 1]);
-    write(0, 'Reliable, prepared and easy to work with.');
-    write(1, 'Did the minimum, but was polite.');
+    write(0, 'Reliable, prepared and easy to work with, and she led the final demo.');
+    write(1, 'Did the minimum, but was polite and always answered messages promptly.');
 
     await submit();
 
@@ -171,12 +206,12 @@ describe('StudentEvaluation', () => {
       {
         student_id: 'b1',
         ratings: { professionalism: 5, communication: 4, work_ethic: 5, content_knowledge_skills: 4, overall_contribution: 5, participation: 4 },
-        overall_feedback: 'Reliable, prepared and easy to work with.',
+        overall_feedback: 'Reliable, prepared and easy to work with, and she led the final demo.',
       },
       {
         student_id: 'c1',
         ratings: { professionalism: 1, communication: 1, work_ethic: 1, content_knowledge_skills: 1, overall_contribution: 1, participation: 1 },
-        overall_feedback: 'Did the minimum, but was polite.',
+        overall_feedback: 'Did the minimum, but was polite and always answered messages promptly.',
       },
     ]);
   });
@@ -187,7 +222,7 @@ describe('StudentEvaluation', () => {
     renderForm();
     await screen.findByRole('heading', { name: 'Evaluate: Ben Baker' });
     await rate(0, [5, 5, 5, 5, 5, 4]);
-    write(0, 'Reliable, prepared and easy to work with.');
+    write(0, 'Reliable, prepared and easy to work with, and she led the final demo.');
 
     await submit();
 
