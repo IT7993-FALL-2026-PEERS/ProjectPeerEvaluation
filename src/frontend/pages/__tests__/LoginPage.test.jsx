@@ -7,6 +7,8 @@ import LoginPage from '../LoginPage';
 import { AuthProvider } from '../../contexts/AuthContext';
 
 vi.mock('axios');
+// The page asks the server about a login that looks expired (CICD-76) through the shared request layer.
+vi.mock('../../services/api', () => ({ default: { post: vi.fn() } }));
 
 function renderLoginPage() {
   render(

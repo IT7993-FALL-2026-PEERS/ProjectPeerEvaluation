@@ -150,7 +150,7 @@ the server's clock (`X-Server-Time`), and a login that only looks expired is che
 the timeout message is shown. When the time runs out the page stays as it is and a Log in dialog signs the
 same professor back in on that page (the same login request; the new token replaces the old one), so what was typed in
 an open form is kept (with a form open, whose dialog traps the keyboard, the Log in dialog opens by itself above it);
-"Use the login page" leaves instead. A log-in that is given up, or whose stored login changed meanwhile, stores nothing (CICD-69). A session
+"Use the login page" leaves instead. The banner and the dialog appear only on the pages a professor reaches after logging in: not on the login page, password reset, email confirmation or a student's evaluation link, where there is no work to keep, and the login page forgets a stored login that has run out, so a professor who comes back to it sees a clean form (CICD-76). A log-in that is given up, or whose stored login changed meanwhile, stores nothing (CICD-69). A session
 is capped at 8 hours since login (`SESSION_MAX_HOURS`). Before this change the expiry was
 absolute, one hour after login. **Still open for the sponsor:** the inherited requirement says
 30 minutes, the app uses 60, and the 8-hour cap is the team's own choice.
