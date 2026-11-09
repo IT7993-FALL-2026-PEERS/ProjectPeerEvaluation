@@ -591,18 +591,20 @@ and the 85 for equal scores; they are to be confirmed with her. `mean` returns t
 per-team report endpoints below always show the regular scores.
 
 **Contribution Multiplier (`gradingMethod=multiplier`; CICD-81, built before the sponsor's decision at Khoa's request).** The rule is in
-`docs/requirements/contribution-multiplier-proposal.md`, the constants (cap 1.00, floor 70) in `utils/contributionMultiplier.js`. Each team is
+`docs/requirements/contribution-multiplier-proposal.md`, the constants (cap 1.00, flag below 70) in `utils/contributionMultiplier.js`. Each team is
 graded on its own, not against the rest of the class. A student's `contributionScore` is the median of the scores of the
 ratings they received (a rating's score is the mean of its six criteria × 20; their own rating of themselves is not used).
 The team grade is the instructor's (`Team.team_grade`, set with `PUT .../teams/:team_id/grade`) or, when none is set, the highest
 `contributionScore` in the team. `multiplier` = the student's score ÷ the average score of the other scored teammates, at most 1
-(1 for a student alone, and for a student with no team, who is graded alone). `finalScore` = `teamGrade × multiplier`, never
-below the lower of 70 and `teamGrade`. A student nobody rated has `contributionScore`, `multiplier` and the grade of `null`
+(1 for a student alone, and for a student with no team, who is graded alone). `finalScore` = `teamGrade × multiplier`, rounded to the nearest 5 (halves up, at most 100; so it can end up to 2.5 above
+`teamGrade`, e.g. 99 becomes 100). There is no floor: a student the multiplier takes below 70 (and below `teamGrade`) keeps
+the real grade and has `flagged: true` (checked on the rounded grade, and only for a multiplier below 1), so the instructor can review the ratings behind it. A student nobody rated has `contributionScore`, `multiplier` and the grade of `null`
 and keeps `letterGrade: "No evaluations"`. `originalScore` stays the pooled mean, and the other methods' responses are unchanged. In this
-method each student also has `contributionScore`, `multiplier`, `teamGrade` and `teamGradeSource` (`automatic` or `instructor`),
+method each student also has `contributionScore`, `multiplier`, `flagged`, `teamGrade` and `teamGradeSource` (`automatic` or `instructor`),
 each team has `teamGrade`, `teamGradeSource` (`null` when nobody in the team has a rating and no grade was set),
 `automaticTeamGrade` (the proposed grade, `null` when nobody has a rating) and `team_grade` (the instructor's grade or `null`),
-and `gradingSettings` is `{ "cap": 1, "floor": 70 }`.
+`summary.flaggedStudents` counts the flagged students, `gradingSettings` is `{ "cap": 1, "flagBelow": 70 }`, and the CSV export has a
+`Flag` column ("Review: grade below 70" for a flagged student).
 
 **200**
 ```json

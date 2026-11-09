@@ -144,14 +144,17 @@ test('E2E-53: the Contribution Multiplier report gives each team a grade; the pr
   await page.getByRole('button', { name: 'Regenerate Report' }).click();
 
   // The seeded scores are Ann 100 and Ben 76.67 (Team 1), Cy 90 and Di 56.67 (Team 2). The team grade is the highest
-  // score: 100 and 90. Ben 76.67 / 100 = 0.77; Di 56.67 / 90 = 0.63, which the floor of 70 lifts to 70.
+  // score: 100 and 90. Ben 76.67 / 100 = 0.77; Di 56.67 / 90 = 0.63. There is no floor, so
+  // Di keeps her grade (55 after rounding to a step of 5) and the report flags her for the instructor.
   await expect(page.getByRole('heading', { name: 'Team Grades' })).toBeVisible();
   const team2 = page.getByRole('row', { name: /^Team 2/ });
   await expect(team2).toContainText('90%');
   await expect(team2).toContainText('Automatic');
   const di = page.getByRole('row', { name: /Di Diaz/ });
   await expect(di).toContainText('0.63');
-  await expect(di).toContainText('70%');
+  await expect(di).toContainText('55%');
+  await expect(di).toContainText('Review');
+  await expect(page.getByText(/1 student is flagged for review/)).toBeVisible();
   const cy = page.getByRole('row', { name: /Cy Cole/ });
   await expect(cy).toContainText('90%');
   await expect(page.getByRole('row', { name: /Ben Baker/ })).toContainText('0.77');

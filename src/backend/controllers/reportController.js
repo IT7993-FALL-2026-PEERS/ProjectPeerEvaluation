@@ -5,7 +5,7 @@ const Team = require('../models/Team');
 const Evaluation = require('../models/Evaluation');
 const Professor = require('../models/Professor');
 const { toCsv } = require('../utils/csv');
-const { gradeCourse, CAP, FLOOR } = require('../utils/contributionMultiplier');
+const { gradeCourse, CAP, FLAG_BELOW } = require('../utils/contributionMultiplier');
 
 /**
  * Calculate mean score for a student across all evaluation criteria
@@ -299,6 +299,8 @@ exports.getCourseReport = async (req, res, next) => {
         ...(contributed ? {
           contributionScore: contributed.contributionScore,
           multiplier: contributed.multiplier,
+          // true when the multiplier took the grade below 70: the instructor should look at the ratings behind it
+          flagged: contributed.flagged,
           teamGrade: contributed.teamGrade,
           teamGradeSource: contributed.teamGradeSource
         } : {})
@@ -338,7 +340,9 @@ exports.getCourseReport = async (req, res, next) => {
         C: finalScores.filter(score => score >= 70 && score < 80).length,
         D: finalScores.filter(score => score >= 60 && score < 70).length,
         F: finalScores.filter(score => score < 60).length
-      }
+      },
+      // The Contribution Multiplier has no floor: the students it took below 70 are counted here, flagged in the list
+      ...(contribution ? { flaggedStudents: studentsWithGrades.filter(s => s.flagged).length } : {})
     };
 
     const response = {
@@ -347,7 +351,7 @@ exports.getCourseReport = async (req, res, next) => {
       teams: teamStats,
       summary,
       gradingMethod,
-      gradingSettings: gradingMethod === 'multiplier' ? { cap: CAP, floor: FLOOR } : gradingMethod === 'curved' ? {
+      gradingSettings: gradingMethod === 'multiplier' ? { cap: CAP, flagBelow: FLAG_BELOW } : gradingMethod === 'curved' ? {
         targetMean: TARGET_MEAN,
         targetStandardDeviation: TARGET_STANDARD_DEVIATION,
         // false when fewer than two students have a score: there is no class to curve
@@ -399,7 +403,8 @@ exports.downloadReport = async (req, res, next) => {
           'Multiplier',
           'Final Score',
           'Letter Grade',
-          'Evaluations Received'
+          'Evaluations Received',
+          'Flag'
         ] : [
           'Student ID',
           'Name', 
@@ -424,7 +429,8 @@ exports.downloadReport = async (req, res, next) => {
           student.multiplier ?? '',
           student.finalScore,
           student.letterGrade,
-          student.evaluationsReceived
+          student.evaluationsReceived,
+          student.flagged ? 'Review: grade below 70' : ''
         ] : [
           student.student_id,
           student.name,

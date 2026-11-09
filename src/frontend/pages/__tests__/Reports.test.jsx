@@ -48,8 +48,8 @@ const REPORT = {
 const MULTIPLIER_REPORT = {
   course: { _id: 'c1' },
   gradingMethod: 'multiplier',
-  gradingSettings: { cap: 1, floor: 70 },
-  summary: { totalStudents: 3, studentsWithEvaluations: 2, averageScore: 88.34, gradeDistribution: { A: 1, B: 0, C: 1, F: 0 } },
+  gradingSettings: { cap: 1, flagBelow: 70 },
+  summary: { totalStudents: 4, studentsWithEvaluations: 3, averageScore: 77.78, gradeDistribution: { A: 1, B: 0, C: 1, F: 1 }, flaggedStudents: 1 },
   teams: [{ _id: 't1', team_name: 'Team 1', teamGrade: 100, teamGradeSource: 'automatic', automaticTeamGrade: 100 }],
   students: [
     {
@@ -59,13 +59,19 @@ const MULTIPLIER_REPORT = {
     },
     {
       _id: 's2', student_id: '1002', name: 'Ben Baker', team_id: { team_name: 'Team 1' }, evaluationsReceived: 1,
-      originalScore: 76.67, finalScore: 76.67, letterGrade: 'C', improvement: 0, evaluationDetails: [],
+      originalScore: 76.67, finalScore: 75, letterGrade: 'C', improvement: 0, evaluationDetails: [],
       contributionScore: 76.67, multiplier: 0.7667, teamGrade: 100, teamGradeSource: 'automatic',
     },
     {
       _id: 's3', student_id: '1003', name: 'Cy Cole', team_id: { team_name: 'Team 1' }, evaluationsReceived: 0,
       originalScore: 0, finalScore: 0, letterGrade: 'No evaluations', improvement: 0, evaluationDetails: [],
       contributionScore: null, multiplier: null, teamGrade: 100, teamGradeSource: 'automatic',
+    },
+    {
+      // No floor: the multiplier took this student to 55 (rounded to a step of 5), so the report flags them for the instructor.
+      _id: 's4', student_id: '1004', name: 'Di Diaz', team_id: { team_name: 'Team 1' }, evaluationsReceived: 1,
+      originalScore: 56.67, finalScore: 55, letterGrade: 'F', improvement: 0, evaluationDetails: [],
+      contributionScore: 56.67, multiplier: 0.5667, flagged: true, teamGrade: 100, teamGradeSource: 'automatic',
     },
   ],
 };
@@ -215,6 +221,7 @@ describe('Reports', () => {
     expect(screen.queryByText('Original Score')).not.toBeInTheDocument();
     const ben = screen.getByRole('row', { name: /Ben Baker/ });
     expect(ben).toHaveTextContent('76.67%');
+    expect(ben).toHaveTextContent('75%');
     expect(ben).toHaveTextContent('100%');
     expect(ben).toHaveTextContent('0.77');
     // A student nobody rated has no score, multiplier or grade: dashes, not zeros.
@@ -224,6 +231,41 @@ describe('Reports', () => {
     // The team grades are listed.
     expect(screen.getByRole('heading', { name: 'Team Grades' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Edit the grade of Team 1' })).toBeInTheDocument();
+  });
+
+  test('a student the multiplier took below 70 is flagged for the instructor, with a notice above the table', async () => {
+    serve({ report: MULTIPLIER_REPORT });
+    renderReports();
+    await chooseCourse(/CS 4850 - Capstone/);
+    await user.click(screen.getByText(/^Curved \(mean 85/));
+    await user.click(await screen.findByRole('option', { name: 'Contribution Multiplier (proposal)' }));
+    // The explanation says there is no floor.
+    expect(screen.getByText(/There is no floor/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Generate Report' }));
+    await screen.findByText('Report generated successfully');
+
+    expect(screen.getByText(/1 student is flagged for review/)).toBeInTheDocument();
+    const di = screen.getByRole('row', { name: /Di Diaz/ });
+    expect(di).toHaveTextContent('55%');
+    expect(within(di).getByText('Review')).toBeInTheDocument();
+    expect(within(screen.getByRole('row', { name: /Ben Baker/ })).queryByText('Review')).not.toBeInTheDocument();
+  });
+
+  test('no notice and no flag when the multiplier took nobody below 70', async () => {
+    const calm = {
+      ...MULTIPLIER_REPORT,
+      summary: { ...MULTIPLIER_REPORT.summary, flaggedStudents: 0 },
+      students: MULTIPLIER_REPORT.students.filter((student) => !student.flagged),
+    };
+    serve({ report: calm });
+    renderReports();
+    await chooseCourse(/CS 4850 - Capstone/);
+    await user.click(screen.getByText(/^Curved \(mean 85/));
+    await user.click(await screen.findByRole('option', { name: 'Contribution Multiplier (proposal)' }));
+    await user.click(screen.getByRole('button', { name: 'Generate Report' }));
+    await screen.findByText('Report generated successfully');
+    expect(screen.queryByText(/flagged for review/)).not.toBeInTheDocument();
+    expect(screen.queryByText('Review')).not.toBeInTheDocument();
   });
 
   test('the other methods do not show the team grades', async () => {

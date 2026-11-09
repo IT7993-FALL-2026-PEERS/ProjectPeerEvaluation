@@ -2,7 +2,8 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
   CAP,
-  FLOOR,
+  FLAG_BELOW,
+  ROUND_TO,
   evaluationScore,
   studentScore,
   automaticTeamGrade,
@@ -16,37 +17,40 @@ const members = (scores) => scores.map((score, i) => ({ id: `s${i}`, score }));
 const one = (n) => Math.round(n * 10) / 10;
 const finals = (scores, override) => gradeTeam(members(scores), override).members.map((m) => (m.finalScore === null ? null : one(m.finalScore)));
 
-test('TC-17-40: the cap is 1.00 and the floor is 70', () => {
+test('TC-17-40: the cap is 1.00, there is no floor (a grade below 70 is flagged, not raised) and final grades go in steps of 5', () => {
   assert.equal(CAP, 1);
-  assert.equal(FLOOR, 70);
+  assert.equal(FLAG_BELOW, 70);
+  assert.equal(ROUND_TO, 5);
 });
 
-// The table of worked examples: peer scores, the automatic team grade (the highest score) and the final grades.
+// The table of worked examples: peer scores, the automatic team grade (the highest score), the final grades (rounded to
+// the nearest 5) and which students are flagged for the instructor (no floor: the multiplier alone decides the grade).
 const TABLE = [
-  ['3 strong, 1 weak', [95, 95, 95, 60], 95, [95, 95, 95, 70]],
-  ['1 strong, 3 weak', [95, 60, 60, 60], 95, [95, 79.5, 79.5, 79.5]],
-  ['2 strong, 2 weak', [95, 95, 60, 60], 95, [95, 95, 70, 70]],
-  ['all strong', [95, 94, 93, 92], 95, [95, 95, 94.3, 93]],
-  ['one weak, 70', [95, 94, 93, 70], 95, [95, 95, 95, 70.7]],
-  ['a team of 5, one weak', [95, 95, 95, 95, 50], 95, [95, 95, 95, 95, 70]],
-  ['a team of 2', [90, 88], 90, [90, 88]],
-  ['everyone low: the team grade is not raised', [60, 60, 60, 60], 60, [60, 60, 60, 60]],
-  ['one very high score lifts the team', [99, 80, 80, 80], 99, [99, 91.7, 91.7, 91.7]]
+  ['3 strong, 1 weak', [95, 95, 95, 60], 95, [95, 95, 95, 60], [false, false, false, true]],
+  ['1 strong, 3 weak', [95, 60, 60, 60], 95, [95, 80, 80, 80], [false, false, false, false]],
+  ['2 strong, 2 weak (68.4 rounds to 70, so no flag)', [95, 95, 60, 60], 95, [95, 95, 70, 70], [false, false, false, false]],
+  ['all strong', [95, 94, 93, 92], 95, [95, 95, 95, 95], [false, false, false, false]],
+  ['one weak, 70', [95, 94, 93, 70], 95, [95, 95, 95, 70], [false, false, false, false]],
+  ['a team of 5, one weak', [95, 95, 95, 95, 50], 95, [95, 95, 95, 95, 50], [false, false, false, false, true]],
+  ['a team of 2', [90, 88], 90, [90, 90], [false, false]],
+  ['everyone low: the team grade is not raised, nobody is flagged', [60, 60, 60, 60], 60, [60, 60, 60, 60], [false, false, false, false]],
+  ['one very high score lifts the team (99 rounds to 100)', [99, 80, 80, 80], 99, [100, 90, 90, 90], [false, false, false, false]]
 ];
-for (const [name, scores, grade, expected] of TABLE) {
+for (const [name, scores, grade, expected, flags] of TABLE) {
   test(`TC-17-41: worked example, ${name} (${scores.join(', ')})`, () => {
     const result = gradeTeam(members(scores));
     assert.equal(result.teamGrade, grade);
     assert.equal(result.teamGradeSource, 'automatic');
     assert.deepEqual(finals(scores), expected);
+    assert.deepEqual(result.members.map((m) => m.flagged), flags);
   });
 }
 
-test('TC-17-42: the instructor can replace the team grade: 99, 80, 80, 80 with 85 gives 85, 78.8, 78.8, 78.8', () => {
+test('TC-17-42: the instructor can replace the team grade: 99, 80, 80, 80 with 85 gives 85, 80, 80, 80 (78.8 rounds to 80)', () => {
   const result = gradeTeam(members([99, 80, 80, 80]), 85);
   assert.equal(result.teamGrade, 85);
   assert.equal(result.teamGradeSource, 'instructor');
-  assert.deepEqual(finals([99, 80, 80, 80], 85), [85, 78.8, 78.8, 78.8]);
+  assert.deepEqual(finals([99, 80, 80, 80], 85), [85, 80, 80, 80]);
 });
 
 test('TC-17-43: no override (null or undefined) means the automatic grade', () => {
@@ -54,7 +58,7 @@ test('TC-17-43: no override (null or undefined) means the automatic grade', () =
   assert.equal(gradeTeam(members([90, 80]), undefined).teamGradeSource, 'automatic');
 });
 
-test('TC-17-44: nobody ends above the team grade, and the multiplier is at most 1', () => {
+test('TC-17-44: with a team grade that is a multiple of 5, nobody ends above it, and the multiplier is at most 1', () => {
   const result = gradeTeam(members([90, 88, 70, 100]), 80);
   for (const m of result.members) {
     assert.ok(m.finalScore <= 80, `${m.id} got ${m.finalScore}`);
@@ -62,23 +66,50 @@ test('TC-17-44: nobody ends above the team grade, and the multiplier is at most 
   }
 });
 
-test('TC-17-45: a team grade below 70 is not raised by the floor: the floor is the team grade', () => {
-  // 60 with one very weak teammate: the multiplier cannot take anybody below the team grade, and nothing is raised.
-  assert.deepEqual(finals([95, 30], 60), [60, 60]);
-  assert.deepEqual(finals([60, 60, 60, 60]), [60, 60, 60, 60]);
+test('TC-17-45: a team grade below 70 is not raised, and a student below it is flagged only for what the multiplier did', () => {
+  // The team grade is 60: the strong student keeps it, the weak one is scaled from it (30 / 95 of 60) and flagged.
+  const result = gradeTeam(members([95, 30]), 60);
+  assert.deepEqual(result.members.map((m) => m.finalScore), [60, 20]);
+  assert.deepEqual(result.members.map((m) => m.flagged), [false, true]);
+  // Everyone at the team grade: nothing was taken from anybody, so nobody is flagged although the grade is below 70.
+  assert.deepEqual(gradeTeam(members([60, 60, 60, 60])).members.map((m) => m.flagged), [false, false, false, false]);
 });
 
-test('TC-17-46: the multiplier never takes a student below 70 when the team grade is higher', () => {
+test('TC-17-46: there is no floor: the lowest student gets the real grade (team grade x multiplier) and is flagged', () => {
   const result = gradeTeam(members([100, 100, 100, 20]), 90);
-  assert.equal(result.members[3].finalScore, 70);
-  assert.ok(result.members[3].multiplier < 0.7);
+  assert.equal(result.members[3].finalScore, 20);
+  assert.equal(result.members[3].multiplier, 0.2);
+  assert.equal(result.members[3].flagged, true);
+  assert.deepEqual(result.members.slice(0, 3).map((m) => m.flagged), [false, false, false]);
+});
+
+test('TC-17-46a: the flag looks at the rounded final grade: 67.4 rounds to 65 (flagged), 67.5 rounds to 70 (not flagged)', () => {
+  const low = gradeTeam(members([100, 100, 100, 67.4]), 100).members[3];
+  assert.equal(low.finalScore, 65);
+  assert.equal(low.flagged, true);
+  const edge = gradeTeam(members([100, 100, 100, 67.5]), 100).members[3];
+  assert.equal(edge.finalScore, 70);
+  assert.equal(edge.flagged, false);
+});
+
+test('TC-17-46c: a team grade that is low by itself is not a flag: only a multiplier below 1 can flag a student', () => {
+  // The team grade is 62: both students keep it (multiplier 1), it rounds to 60, and nobody is flagged.
+  const result = gradeTeam(members([62, 62]));
+  assert.deepEqual(result.members.map((m) => m.finalScore), [60, 60]);
+  assert.deepEqual(result.members.map((m) => m.flagged), [false, false]);
+});
+
+test('TC-17-46b: a student with no ratings has no grade and is not flagged', () => {
+  const result = gradeTeam(members([90, null]), 85);
+  assert.equal(result.members[1].finalScore, null);
+  assert.equal(result.members[1].flagged, false);
 });
 
 test('TC-17-47: a student alone in a team gets a multiplier of 1 and the team grade', () => {
   const result = gradeTeam(members([83.4]));
   assert.equal(result.teamGrade, 83.4);
   assert.equal(result.members[0].multiplier, 1);
-  assert.equal(result.members[0].finalScore, 83.4);
+  assert.equal(result.members[0].finalScore, 85);
   const typed = gradeTeam(members([83.4]), 90);
   assert.equal(typed.members[0].finalScore, 90);
 });
@@ -115,10 +146,20 @@ test('TC-17-51: an empty team, and the automatic grade of a list of scores', () 
   assert.equal(automaticTeamGrade([]), null);
 });
 
-test('TC-17-52: the final grade is rounded to two decimals and the multiplier to four', () => {
+test('TC-17-52: the multiplier is rounded to four decimals, and the final grade to the nearest 5', () => {
   const result = gradeTeam(members([95, 60, 60, 60]));
-  assert.equal(result.members[1].finalScore, 79.53);
   assert.equal(result.members[1].multiplier, 0.8372);
+  assert.equal(result.members[1].finalScore, 80);
+});
+
+test('TC-17-52a: the final grade goes to the nearest 5, halves up, and never above 100', () => {
+  const grade = (teamGrade) => gradeTeam(members([teamGrade]), teamGrade).members[0].finalScore;
+  assert.equal(grade(62.4), 60);
+  assert.equal(grade(62.5), 65);
+  assert.equal(grade(97.4), 95);
+  assert.equal(grade(97.5), 100);
+  assert.equal(grade(100), 100);
+  assert.equal(grade(0), 0);
 });
 
 // The score of one rating and of one student.
@@ -173,10 +214,14 @@ test('TC-17-59: gradeCourse grades each team on its own: students, instructor gr
   assert.equal(byStudent.get('a').teamGradeSource, 'automatic');
   assert.equal(byStudent.get('b').contributionScore, 60);
   assert.equal(byStudent.get('b').multiplier, 0.6);
-  assert.equal(byStudent.get('b').finalScore, 70);
+  assert.equal(byStudent.get('b').finalScore, 60);
+  assert.equal(byStudent.get('b').flagged, true);
+  assert.equal(byStudent.get('a').flagged, false);
   assert.equal(byStudent.get('c').teamGradeSource, 'instructor');
   assert.equal(byStudent.get('c').finalScore, 70);
+  assert.equal(byStudent.get('c').flagged, false);
   assert.equal(byStudent.get('e').finalScore, null);
+  assert.equal(byStudent.get('e').flagged, false);
   assert.deepEqual(byTeam.get('t1'), { teamGrade: 100, teamGradeSource: 'automatic', automaticTeamGrade: 100 });
   assert.deepEqual(byTeam.get('t2'), { teamGrade: 70, teamGradeSource: 'instructor', automaticTeamGrade: 80 });
   assert.deepEqual(byTeam.get('t3'), { teamGrade: null, teamGradeSource: null, automaticTeamGrade: null });

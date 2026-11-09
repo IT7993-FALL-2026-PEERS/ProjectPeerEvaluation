@@ -3,13 +3,15 @@
 //   student score = the median of the scores of the ratings the student received (a rating by themselves is not used)
 //   team grade    = the instructor's grade for the team, or else the highest student score in the team
 //   multiplier    = student score / average score of the OTHER scored teammates, at most CAP
-//   final grade   = team grade x multiplier, never above the team grade, and the multiplier never takes the student
-//                   below FLOOR (or below the team grade, when that is lower than FLOOR)
-// The cap, the floor and the way the automatic grade is chosen are the team's proposal; the sponsor decides, so they
-// live here and nowhere else.
+//   final grade   = team grade x multiplier, rounded to the nearest ROUND_TO points (halves up, at most 100). There is no
+//                   floor: a student the multiplier takes below FLAG_BELOW keeps the real grade and is flagged for the
+//                   instructor. The rounding can put a grade up to half a step above the team grade (99 -> 100).
+// The cap, the flag threshold, the rounding and the way the automatic grade is chosen are the team's proposal; the
+// sponsor decides, so they live here and nowhere else.
 
 const CAP = 1;
-const FLOOR = 70;
+const FLAG_BELOW = 70;
+const ROUND_TO = 5;
 
 const CRITERIA = ['professionalism', 'communication', 'work_ethic', 'content_knowledge_skills', 'overall_contribution', 'participation'];
 
@@ -25,6 +27,9 @@ const round = (value, places) => {
   const factor = 10 ** places;
   return Math.round(value * factor) / factor;
 };
+
+// A final grade in steps of ROUND_TO: the nearest step, a half goes up, never above 100.
+const toStep = (value) => Math.min(100, Math.round(value / ROUND_TO) * ROUND_TO);
 
 // One rater's score for one student: the mean of the criteria they rated, as a percentage (1 to 5 times 20), the
 // same arithmetic as the report's mean score. null when no criterion has a rating.
@@ -52,7 +57,8 @@ function automaticTeamGrade(scores) {
 
 // members: [{ id, score }] with score null for a student nobody rated. override: the instructor's team grade, or
 // null/undefined for the automatic one. Returns the team grade, where it came from, and for each member the score,
-// multiplier and final grade (null for a member with no ratings: they are not guessed, the instructor decides).
+// multiplier, final grade and flag (null grade and no flag for a member with no ratings: they are not guessed, the
+// instructor decides).
 function gradeTeam(members, override) {
   const scored = members.filter((member) => member.score !== null && member.score !== undefined);
   const typed = override !== null && override !== undefined;
@@ -64,12 +70,15 @@ function gradeTeam(members, override) {
     teamGradeSource: source,
     members: members.map((member) => {
       if (teamGrade === null || member.score === null || member.score === undefined) {
-        return { id: member.id, score: member.score ?? null, multiplier: null, finalScore: null };
+        return { id: member.id, score: member.score ?? null, multiplier: null, finalScore: null, flagged: false };
       }
       const others = scored.filter((other) => other !== member).map((other) => other.score);
       const multiplier = others.length === 0 ? CAP : Math.min(CAP, member.score / mean(others));
-      const finalScore = Math.max(Math.min(teamGrade, FLOOR), teamGrade * multiplier);
-      return { id: member.id, score: member.score, multiplier: round(multiplier, 4), finalScore: round(finalScore, 2) };
+      const finalScore = toStep(teamGrade * multiplier);
+      // Flagged when the multiplier itself took the (rounded) grade below FLAG_BELOW: a team whose grade is already low
+      // is not flagged for being low, only a student the multiplier pulled down (multiplier below 1)
+      const flagged = multiplier < 1 && finalScore < FLAG_BELOW;
+      return { id: member.id, score: member.score, multiplier: round(multiplier, 4), finalScore, flagged };
     })
   };
 }
@@ -106,6 +115,7 @@ function gradeCourse(students, teams) {
         contributionScore: member.score === null ? null : round(member.score, 2),
         multiplier: member.multiplier,
         finalScore: member.finalScore,
+        flagged: member.flagged,
         teamGrade: result.teamGrade,
         teamGradeSource: result.teamGradeSource
       });
@@ -114,4 +124,4 @@ function gradeCourse(students, teams) {
   return { byStudent, byTeam };
 }
 
-module.exports = { CAP, FLOOR, evaluationScore, studentScore, automaticTeamGrade, gradeTeam, gradeCourse };
+module.exports = { CAP, FLAG_BELOW, ROUND_TO, evaluationScore, studentScore, automaticTeamGrade, gradeTeam, gradeCourse };

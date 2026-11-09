@@ -369,7 +369,8 @@ function Reports() {
                 <strong>Contribution Multiplier (the team&apos;s proposal, not yet decided by the sponsor):</strong> each team has one grade,
                 the highest student score in the team unless you set it. A student&apos;s score is the median of the ratings received;
                 the multiplier is that score ÷ the average of the other teammates, at most 1.00; the final grade is the team grade × the
-                multiplier, never below 70 (or the team grade, if that is lower). A student with no ratings has no grade.
+                multiplier, rounded to the nearest 5. There is no floor: a student the multiplier takes below 70 keeps that grade and is
+                flagged for you to review. A student with no ratings has no grade.
               </Alert>
             </Grid>
           )}
@@ -521,6 +522,17 @@ function Reports() {
               </Button>
             </Box>
             
+            {/* Contribution Multiplier: the students it took below 70 are flagged, the grade is not raised */}
+            {reportData.gradingMethod === 'multiplier' && reportData.summary?.flaggedStudents > 0 && (
+              <Alert severity="warning" sx={{ mb: 2 }}>
+                {reportData.summary.flaggedStudents === 1
+                  ? '1 student is flagged for review'
+                  : `${reportData.summary.flaggedStudents} students are flagged for review`}
+                : the multiplier took their grade below 70. They keep the grade it gives; check the ratings behind it
+                before it is final.
+              </Alert>
+            )}
+
             <TableContainer>
               <Table>
                 <TableHead>
@@ -558,6 +570,11 @@ function Reports() {
                       )}
                       <TableCell align="center">
                         <strong>{student.finalScore}%</strong>
+                        {student.flagged && (
+                          <Tooltip title="The multiplier took this grade below 70. Check the ratings behind it before it is final.">
+                            <Chip label="Review" color="warning" size="small" sx={{ ml: 1 }} />
+                          </Tooltip>
+                        )}
                       </TableCell>
                       <TableCell align="center">
                         <Chip
