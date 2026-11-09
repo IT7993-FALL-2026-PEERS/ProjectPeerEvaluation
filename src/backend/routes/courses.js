@@ -35,6 +35,7 @@ router.post('/:course_id/roster', (req, res, next) => {
 router.get('/:course_id/students', authenticateToken, studentController.listStudents);
 router.post('/:course_id/students', authenticateToken, studentController.addStudent); // Manual add
 router.put('/:course_id/students/:student_id', authenticateToken, studentController.updateStudent);
+router.put('/:course_id/students/:student_id/grade', authenticateToken, studentController.setStudentGrade); // The instructor's final score for a student (CICD-81)
 router.delete('/:course_id/students/:student_id', authenticateToken, studentController.deleteStudent);
 router.post('/:course_id/students/bulk-delete', authenticateToken, studentController.bulkDeleteStudents);
 router.delete('/:course_id/students', authenticateToken, studentController.deleteAllStudents); // Delete ALL students

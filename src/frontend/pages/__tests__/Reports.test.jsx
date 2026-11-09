@@ -55,23 +55,23 @@ const MULTIPLIER_REPORT = {
     {
       _id: 's1', student_id: '1001', name: 'Ann Archer', team_id: { team_name: 'Team 1' }, evaluationsReceived: 1,
       originalScore: 100, finalScore: 100, letterGrade: 'A', improvement: 0, evaluationDetails: [],
-      contributionScore: 100, multiplier: 1, teamGrade: 100, teamGradeSource: 'automatic',
+      contributionScore: 100, multiplier: 1, teamGrade: 100, teamGradeSource: 'automatic', calculatedScore: 100, finalScoreSource: 'calculated',
     },
     {
       _id: 's2', student_id: '1002', name: 'Ben Baker', team_id: { team_name: 'Team 1' }, evaluationsReceived: 1,
       originalScore: 76.67, finalScore: 75, letterGrade: 'C', improvement: 0, evaluationDetails: [],
-      contributionScore: 76.67, multiplier: 0.7667, teamGrade: 100, teamGradeSource: 'automatic',
+      contributionScore: 76.67, multiplier: 0.7667, teamGrade: 100, teamGradeSource: 'automatic', calculatedScore: 75, finalScoreSource: 'calculated',
     },
     {
       _id: 's3', student_id: '1003', name: 'Cy Cole', team_id: { team_name: 'Team 1' }, evaluationsReceived: 0,
       originalScore: 0, finalScore: 0, letterGrade: 'No evaluations', improvement: 0, evaluationDetails: [],
-      contributionScore: null, multiplier: null, teamGrade: 100, teamGradeSource: 'automatic',
+      contributionScore: null, multiplier: null, teamGrade: 100, teamGradeSource: 'automatic', calculatedScore: null, finalScoreSource: null,
     },
     {
       // No floor: the multiplier took this student to 55 (rounded to a step of 5), so the report flags them for the instructor.
       _id: 's4', student_id: '1004', name: 'Di Diaz', team_id: { team_name: 'Team 1' }, evaluationsReceived: 1,
       originalScore: 56.67, finalScore: 55, letterGrade: 'F', improvement: 0, evaluationDetails: [],
-      contributionScore: 56.67, multiplier: 0.5667, flagged: true, teamGrade: 100, teamGradeSource: 'automatic',
+      contributionScore: 56.67, multiplier: 0.5667, flagged: true, teamGrade: 100, teamGradeSource: 'automatic', calculatedScore: 55, finalScoreSource: 'calculated',
     },
   ],
 };
@@ -266,6 +266,102 @@ describe('Reports', () => {
     await screen.findByText('Report generated successfully');
     expect(screen.queryByText(/flagged for review/)).not.toBeInTheDocument();
     expect(screen.queryByText('Review')).not.toBeInTheDocument();
+  });
+
+  // The instructor can set the final score of any student (CICD-81): the Edit button of a row, or the Review mark.
+  async function openMultiplierReport(report) {
+    serve({ report });
+    api.put.mockResolvedValue({ data: {} });
+    renderReports();
+    await chooseCourse(/CS 4850 - Capstone/);
+    await user.click(screen.getByText(/^Curved \(mean 85/));
+    await user.click(await screen.findByRole('option', { name: 'Contribution Multiplier (proposal)' }));
+    await user.click(screen.getByRole('button', { name: 'Generate Report' }));
+    await screen.findByRole('heading', { name: 'Team Grades' });
+  }
+
+  test('the Review mark opens the final score of that student; saving sets it and makes the report again', async () => {
+    await openMultiplierReport(MULTIPLIER_REPORT);
+    await user.click(screen.getByRole('button', { name: 'Review Di Diaz' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('Final Score: Di Diaz')).toBeInTheDocument();
+    expect(dialog).toHaveTextContent('Calculated final score: 55%');
+    expect(dialog).toHaveTextContent('0.57');
+    expect(within(dialog).queryByRole('button', { name: 'Use calculated grade' })).not.toBeInTheDocument();
+
+    await user.type(within(dialog).getByLabelText('Final score (0 to 100)'), '62.5');
+    await user.click(within(dialog).getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => expect(api.put).toHaveBeenCalledWith('/courses/c1/students/s4/grade', { final_score: 62.5 }));
+    await waitFor(() => expect(api.get.mock.calls.filter(([url]) => url === '/courses/c1/reports?gradingMethod=multiplier').length).toBe(2));
+  });
+
+  test('every student has an Edit button, also one nobody rated', async () => {
+    await openMultiplierReport(MULTIPLIER_REPORT);
+    for (const name of ['Ann Archer', 'Ben Baker', 'Cy Cole', 'Di Diaz']) {
+      expect(screen.getByRole('button', { name: `Edit the final score of ${name}` })).toBeInTheDocument();
+    }
+    await user.click(screen.getByRole('button', { name: 'Edit the final score of Cy Cole' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent('Nobody has rated this student, so there is no calculated grade.');
+    await user.type(within(dialog).getByLabelText('Final score (0 to 100)'), '85');
+    await user.click(within(dialog).getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(api.put).toHaveBeenCalledWith('/courses/c1/students/s3/grade', { final_score: 85 }));
+  });
+
+  test('a grade the instructor set is marked Adjusted, is not flagged, and can go back to the calculated grade', async () => {
+    const adjusted = {
+      ...MULTIPLIER_REPORT,
+      summary: { ...MULTIPLIER_REPORT.summary, flaggedStudents: 0 },
+      students: MULTIPLIER_REPORT.students.map((student) => (student._id === 's4'
+        ? { ...student, finalScore: 65, letterGrade: 'D', flagged: false, finalScoreSource: 'instructor', final_grade_override: 65 }
+        : student)),
+    };
+    await openMultiplierReport(adjusted);
+    const di = screen.getByRole('row', { name: /Di Diaz/ });
+    expect(di).toHaveTextContent('65%');
+    expect(within(di).getByText('Adjusted')).toBeInTheDocument();
+    expect(within(di).queryByText('Review')).not.toBeInTheDocument();
+    expect(screen.queryByText(/flagged for review/)).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Edit the final score of Di Diaz' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByLabelText('Final score (0 to 100)')).toHaveValue(65);
+    await user.click(within(dialog).getByRole('button', { name: 'Use calculated grade' }));
+    await waitFor(() => expect(api.put).toHaveBeenCalledWith('/courses/c1/students/s4/grade', { final_score: null }));
+  });
+
+  test('the final score must be a number from 0 to 100 before Save works', async () => {
+    await openMultiplierReport(MULTIPLIER_REPORT);
+    await user.click(screen.getByRole('button', { name: 'Edit the final score of Ben Baker' }));
+    const dialog = await screen.findByRole('dialog');
+    const save = within(dialog).getByRole('button', { name: 'Save' });
+    expect(save).toBeDisabled();
+    await user.type(within(dialog).getByLabelText('Final score (0 to 100)'), '101');
+    expect(dialog).toHaveTextContent('The grade must be a number from 0 to 100.');
+    expect(save).toBeDisabled();
+    await user.clear(within(dialog).getByLabelText('Final score (0 to 100)'));
+    await user.type(within(dialog).getByLabelText('Final score (0 to 100)'), '100');
+    expect(save).toBeEnabled();
+  });
+
+  test('a failed save keeps the dialog open and shows the server message', async () => {
+    await openMultiplierReport(MULTIPLIER_REPORT);
+    api.put.mockRejectedValue(serverError({ error: { message: 'Student not found.' } }));
+    await user.click(screen.getByRole('button', { name: 'Edit the final score of Ben Baker' }));
+    const dialog = await screen.findByRole('dialog');
+    await user.type(within(dialog).getByLabelText('Final score (0 to 100)'), '80');
+    await user.click(within(dialog).getByRole('button', { name: 'Save' }));
+    expect(await within(dialog).findByText('Student not found.')).toBeInTheDocument();
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
+
+  test('the other methods have no Edit button for the final score', async () => {
+    renderReports();
+    await chooseCourse(/CS 4850 - Capstone/);
+    await user.click(screen.getByRole('button', { name: 'Generate Report' }));
+    await screen.findByText('Report generated successfully');
+    expect(screen.queryByRole('button', { name: /Edit the final score of/ })).not.toBeInTheDocument();
   });
 
   test('the other methods do not show the team grades', async () => {

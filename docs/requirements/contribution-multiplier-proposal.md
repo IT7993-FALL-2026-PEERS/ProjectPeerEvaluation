@@ -18,6 +18,8 @@ The team gets one grade for its work. The peer ratings do not decide how good th
 6. **A student with no ratings** shows as "no ratings" and is not guessed; the instructor decides. A team where nobody has a rating has no automatic grade, so the instructor enters one.
 7. **Ratings that differ a lot** from the others a student received are flagged for the instructor, who sees every team grade, multiplier and the ratings behind it before anything is final. The report already flags all-fives ratings as a possible outlier (FR-20); the same check would flag very low ones.
 
+8. **The instructor can set any student's final score** (added Nov 9, 2026). The Review mark of a flagged student and an Edit button on every row open a small dialog with the student's score, team grade, multiplier and calculated grade. The instructor types a final score from 0 to 100, which is used exactly as typed (not rounded), or goes back to the calculated grade. A student with a typed score is marked "Adjusted" and is no longer flagged; the calculated grade stays in the report for reference and the CSV says where each grade came from. This also gives a grade to a student nobody rated. It is stored on the student (`Student.final_grade_override`) and only the multiplier report uses it.
+
 ## Why these choices
 
 - **Median of the ratings received:** one angry rater cannot wreck a result in a team of 4 or more. If a weak student rates the three good ones 20, each good student's average rating falls from 95 to 70 (ratings 95, 95, 20) and the weak student's penalty nearly disappears; the median stays 95. A team of 3 has only two ratings per student, so there the median is the average and the report relies on the flag in step 7.

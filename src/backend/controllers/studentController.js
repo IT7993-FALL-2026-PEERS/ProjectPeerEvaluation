@@ -6,6 +6,42 @@ const { asText, firstNonText, validationError } = require('../utils/inputGuards'
 const { isEmailFormat } = require('../utils/emailFormat');
 const { normalizeTeamName, TEAM_NAME_HELP } = require('../utils/teamName');
 
+// The instructor's final score for one student, used by the Contribution Multiplier report (CICD-81): a number from 0
+// to 100, used exactly as typed, or null to go back to the calculated grade. The student is looked up within the
+// course in the URL, which the ownership middleware has already checked.
+exports.setStudentGrade = async (req, res, next) => {
+  try {
+    const { course_id, student_id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(student_id)) return next(validationError('Invalid student ID.'));
+
+    const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};
+    const score = body.final_score;
+    const isScore = typeof score === 'number' && Number.isFinite(score) && score >= 0 && score <= 100;
+    if (score !== null && !isScore) {
+      return next(validationError('Final score must be a number from 0 to 100, or null to use the calculated grade.'));
+    }
+
+    // Checked above; a plain typeof conditional is what CodeQL reads as a type check (see setTeamGrade)
+    const finalScore = typeof score === 'number' ? score : null;
+
+    const student = await Student.findOneAndUpdate({ _id: student_id, course_id }, { final_grade_override: finalScore }, { new: true });
+    if (!student) {
+      const err = new Error('Student not found.');
+      err.code = 'NOT_FOUND';
+      err.status = 404;
+      return next(err);
+    }
+    res.status(200).json({
+      message: finalScore === null ? `${student.name} uses the calculated grade.` : `${student.name}'s final score set to ${finalScore}.`,
+      student: { _id: student._id, student_id: student.student_id, name: student.name, final_grade_override: student.final_grade_override }
+    });
+  } catch (err) {
+    err.code = err.code || 'SERVER_ERROR';
+    err.status = err.status || 500;
+    next(err);
+  }
+};
+
 // Manual add student to course
 exports.addStudent = async (req, res, next) => {
   try {

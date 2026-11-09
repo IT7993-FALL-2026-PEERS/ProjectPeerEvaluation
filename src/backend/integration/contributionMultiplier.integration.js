@@ -20,6 +20,7 @@ let bo;
 
 const report = (query = '?gradingMethod=multiplier') => `/api/courses/${IDS.courseAda}/reports${query}`;
 const gradeUrl = (teamId, courseId = IDS.courseAda) => `/api/courses/${courseId}/teams/${teamId}/grade`;
+const studentGradeUrl = (studentId, courseId = IDS.courseAda) => `/api/courses/${courseId}/students/${studentId}/grade`;
 const byName = (students) => Object.fromEntries(students.map((s) => [s.name.split(' ')[0].toLowerCase(), s]));
 const near = (actual, expected, message) => assert.ok(Math.abs(actual - expected) < 0.011, `${message}: ${actual} vs ${expected}`);
 const teamNamed = (body, name) => body.teams.find((team) => team.team_name === name);
@@ -165,10 +166,10 @@ test('TC-17-69: the CSV export for the multiplier method has the team grade, its
   const res = await fetch(`${app.baseUrl}${report('/download?gradingMethod=multiplier')}`, { headers: { Authorization: `Bearer ${ada}` } });
   assert.equal(res.status, 200);
   const lines = (await res.text()).split('\n');
-  assert.equal(lines[0], 'Student ID,Name,Email,Team,Original Score,Contribution Score,Team Grade,Team Grade Source,Multiplier,Final Score,Letter Grade,Evaluations Received,Flag');
+  assert.equal(lines[0], 'Student ID,Name,Email,Team,Original Score,Contribution Score,Team Grade,Team Grade Source,Multiplier,Calculated Score,Final Score,Final Score Source,Letter Grade,Evaluations Received,Flag');
   assert.equal(lines.length, 5);
-  assert.ok(lines.includes('1002,Ben Baker,ben@example.edu,Team 1,76.67,76.67,100,automatic,0.7667,75,C,1,'));
-  assert.ok(lines.includes('1004,Di Diaz,di@example.edu,Team 2,56.67,56.67,90,automatic,0.6296,55,F,1,Review: grade below 70'));
+  assert.ok(lines.includes('1002,Ben Baker,ben@example.edu,Team 1,76.67,76.67,100,automatic,0.7667,75,75,calculated,C,1,'));
+  assert.ok(lines.includes('1004,Di Diaz,di@example.edu,Team 2,56.67,56.67,90,automatic,0.6296,55,55,calculated,F,1,Review: grade below 70'));
 });
 
 test('TC-17-70: before anyone has submitted an evaluation the report still lists the teams, so the instructor can set a team grade', async () => {
@@ -194,4 +195,100 @@ test('TC-17-70: before anyone has submitted an evaluation the report still lists
   await app.request('PUT', gradeUrl(IDS.teamBeta), { token: ada, body: { team_grade: null } });
   res = await app.request('GET', report(), { token: ada });
   assert.equal(teamNamed(res.body, 'Team 2').teamGrade, null);
+});
+
+test('TC-17-71: the instructor sets a final score for a student: the report uses it as typed, marks it, and the student is no longer flagged', async () => {
+  let res = await app.request('GET', report(), { token: ada });
+  let s = byName(res.body.students);
+  assert.equal(s.di.finalScore, 55);
+  assert.equal(s.di.finalScoreSource, 'calculated');
+  assert.equal(s.di.flagged, true);
+
+  const set = await app.request('PUT', studentGradeUrl(IDS.di), { token: ada, body: { final_score: 63.5 } });
+  assert.equal(set.status, 200);
+  assert.equal(set.body.student.final_grade_override, 63.5);
+  assert.equal((await Student.findById(IDS.di)).final_grade_override, 63.5);
+
+  res = await app.request('GET', report(), { token: ada });
+  s = byName(res.body.students);
+  // As typed: not rounded to a step of 5. The calculated grade stays in the report for reference.
+  assert.equal(s.di.finalScore, 63.5);
+  assert.equal(s.di.finalScoreSource, 'instructor');
+  assert.equal(s.di.calculatedScore, 55);
+  assert.equal(s.di.letterGrade, 'D');
+  assert.equal(s.di.flagged, false);
+  assert.equal(res.body.summary.flaggedStudents, 0);
+  // The others are not affected, and the class figures use the typed grade: (100 + 75 + 90 + 63.5) / 4 = 82.13.
+  assert.equal(s.ben.finalScore, 75);
+  assert.equal(s.ben.finalScoreSource, 'calculated');
+  near(res.body.summary.averageScore, 82.13, 'class average');
+
+  const cleared = await app.request('PUT', studentGradeUrl(IDS.di), { token: ada, body: { final_score: null } });
+  assert.equal(cleared.status, 200);
+  assert.equal((await Student.findById(IDS.di)).final_grade_override, null);
+  res = await app.request('GET', report(), { token: ada });
+  s = byName(res.body.students);
+  assert.equal(s.di.finalScore, 55);
+  assert.equal(s.di.finalScoreSource, 'calculated');
+  assert.equal(s.di.flagged, true);
+});
+
+test('TC-17-72: a final score is a number from 0 to 100; anything else is refused and nothing is saved', async () => {
+  for (const body of [{ final_score: 101 }, { final_score: -1 }, { final_score: '90' }, { final_score: true }, { final_score: [90] }, { final_score: { $gt: 0 } }, {}, { score: 90 }]) {
+    const res = await app.request('PUT', studentGradeUrl(IDS.di), { token: ada, body });
+    assert.equal(res.status, 400, JSON.stringify(body));
+    assert.equal(res.body.error.code, 'VALIDATION_ERROR');
+  }
+  assert.equal((await Student.findById(IDS.di)).final_grade_override, null);
+  for (const value of [0, 100, 87.5]) {
+    assert.equal((await app.request('PUT', studentGradeUrl(IDS.di), { token: ada, body: { final_score: value } })).status, 200, String(value));
+  }
+  assert.equal((await Student.findById(IDS.di)).final_grade_override, 87.5);
+  assert.equal((await app.request('PUT', studentGradeUrl('not-an-id'), { token: ada, body: { final_score: 90 } })).status, 400);
+});
+
+test('TC-17-73: only the course\'s own professor can set a final score, and only for a student of that course', async () => {
+  assert.equal((await app.request('PUT', studentGradeUrl(IDS.di), { body: { final_score: 50 } })).status, 401);
+  assert.equal((await app.request('PUT', studentGradeUrl(IDS.di), { token: bo, body: { final_score: 50 } })).status, 404);
+  // Own course, but the student belongs to another course: not found, and the student is untouched.
+  const other = await Student.create({ student_id: '9001', name: 'Eli Else', email: 'eli@example.edu', course_id: IDS.courseBo });
+  const res = await app.request('PUT', studentGradeUrl(other._id, IDS.courseAda), { token: ada, body: { final_score: 50 } });
+  assert.equal(res.status, 404);
+  assert.equal((await Student.findById(other._id)).final_grade_override, null);
+  assert.equal((await Student.findById(IDS.di)).final_grade_override, null);
+});
+
+test('TC-17-74: a student nobody rated can be given a grade; it counts as graded but not as evaluated', async () => {
+  const Evaluation = require('../models/Evaluation');
+  await Evaluation.deleteMany({ student_id: IDS.di });
+  let res = await app.request('GET', report(), { token: ada });
+  let s = byName(res.body.students);
+  assert.equal(s.di.finalScore, 0);
+  assert.equal(s.di.letterGrade, 'No evaluations');
+  assert.equal(s.di.finalScoreSource, null);
+  const before = res.body.summary.studentsWithEvaluations;
+
+  await app.request('PUT', studentGradeUrl(IDS.di), { token: ada, body: { final_score: 85 } });
+  res = await app.request('GET', report(), { token: ada });
+  s = byName(res.body.students);
+  assert.equal(s.di.finalScore, 85);
+  assert.equal(s.di.finalScoreSource, 'instructor');
+  assert.equal(s.di.calculatedScore, null);
+  assert.equal(s.di.letterGrade, 'B');
+  assert.equal(s.di.originalScore, 0);
+  assert.equal(res.body.summary.studentsWithEvaluations, before);
+  assert.equal(res.body.summary.gradeDistribution.B, 1);
+});
+
+test('TC-17-75: the other report methods ignore a typed final score, and the CSV shows where a grade came from', async () => {
+  await app.request('PUT', studentGradeUrl(IDS.di), { token: ada, body: { final_score: 63.5 } });
+  const curved = (await app.request('GET', report(''), { token: ada })).body;
+  const di = byName(curved.students).di;
+  assert.notEqual(di.finalScore, 63.5);
+  assert.equal(di.finalScoreSource, undefined);
+  assert.equal(di.calculatedScore, undefined);
+
+  const res = await fetch(`${app.baseUrl}${report('/download?gradingMethod=multiplier')}`, { headers: { Authorization: `Bearer ${ada}` } });
+  const lines = (await res.text()).split('\n');
+  assert.ok(lines.includes('1004,Di Diaz,di@example.edu,Team 2,56.67,56.67,90,automatic,0.6296,55,63.5,instructor,D,1,'));
 });

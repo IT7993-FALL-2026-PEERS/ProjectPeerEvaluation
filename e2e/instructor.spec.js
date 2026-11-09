@@ -174,6 +174,30 @@ test('E2E-53: the Contribution Multiplier report gives each team a grade; the pr
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(team2).toContainText('Automatic');
   await expect(cy).toContainText('90%');
+
+  // The professor opens the Review mark of the flagged student and sets the final score: it is used as typed, marked as
+  // adjusted, and the flag is gone because the professor has dealt with it.
+  await di.getByRole('button', { name: 'Review Di Diaz' }).click();
+  await page.getByLabel('Final score (0 to 100)').fill('62.5');
+  await page.getByRole('button', { name: 'Save' }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(di).toContainText('62.5%');
+  await expect(di).toContainText('Adjusted');
+  await expect(di).not.toContainText('Review');
+  await expect(page.getByText(/flagged for review/)).toHaveCount(0);
+
+  // Any student can be set: Ben gets 80, then goes back to the calculated grade.
+  const ben = page.getByRole('row', { name: /Ben Baker/ });
+  await ben.getByRole('button', { name: 'Edit the final score of Ben Baker' }).click();
+  await page.getByLabel('Final score (0 to 100)').fill('80');
+  await page.getByRole('button', { name: 'Save' }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(ben).toContainText('80%');
+  await ben.getByRole('button', { name: 'Edit the final score of Ben Baker' }).click();
+  await page.getByRole('button', { name: 'Use calculated grade' }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(ben).toContainText('75%');
+  await expect(ben).not.toContainText('Adjusted');
 });
 
 // The team list used to keep showing the old teams after a create, edit or delete, because the

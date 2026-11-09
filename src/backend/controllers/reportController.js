@@ -272,6 +272,8 @@ exports.getCourseReport = async (req, res, next) => {
       gradingResults = applyCurvedGrading(rawScores);
     }
 
+    const isGraded = (s) => s.originalScore > 0 || s.finalScoreSource === 'instructor';
+
     // Apply grading results to students
     const studentsWithGrades = studentScores.map((item) => {
       let finalScore = item.originalScore;
@@ -286,12 +288,15 @@ exports.getCourseReport = async (req, res, next) => {
       
       // A student nobody rated has no multiplier grade: they keep the plain score (none) and the instructor decides
       if (contributed && contributed.finalScore !== null) finalScore = contributed.finalScore;
+      // The instructor's own final score for the student wins, as typed (not rounded). It is only used by this method.
+      const override = contribution ? (item.student.final_grade_override ?? null) : null;
+      if (override !== null) finalScore = override;
 
       return {
         ...item.student.toObject(),
         originalScore: item.originalScore,
         finalScore: finalScore,
-        letterGrade: item.originalScore > 0 ? getLetterGrade(finalScore) : 'No evaluations',
+        letterGrade: item.originalScore > 0 || override !== null ? getLetterGrade(finalScore) : 'No evaluations',
         evaluationsReceived: item.evaluationsReceived,
         evaluationDetails: item.evaluationDetails, // Include the evaluation details!
         improvement: gradingMethod === 'curved' && item.originalScore > 0 ? 
@@ -299,8 +304,12 @@ exports.getCourseReport = async (req, res, next) => {
         ...(contributed ? {
           contributionScore: contributed.contributionScore,
           multiplier: contributed.multiplier,
-          // true when the multiplier took the grade below 70: the instructor should look at the ratings behind it
-          flagged: contributed.flagged,
+          // true when the multiplier took the grade below 70: the instructor should look at the ratings behind it. A
+          // grade the instructor typed has been looked at, so it is not flagged.
+          flagged: override === null && contributed.flagged,
+          // the grade the formula gives (null when nobody rated the student), and whose grade finalScore is
+          calculatedScore: contributed.finalScore,
+          finalScoreSource: override !== null ? 'instructor' : contributed.finalScore !== null ? 'calculated' : null,
           teamGrade: contributed.teamGrade,
           teamGradeSource: contributed.teamGradeSource
         } : {})
@@ -314,7 +323,7 @@ exports.getCourseReport = async (req, res, next) => {
         student => student.team_id && String(student.team_id._id || student.team_id) === team._id.toString()
       );
       
-      const teamScores = teamStudents.filter(s => s.originalScore > 0).map(s => s.finalScore);
+      const teamScores = teamStudents.filter(isGraded).map(s => s.finalScore);
       const avgScore = teamScores.length > 0 ? 
         parseFloat((teamScores.reduce((sum, score) => sum + score, 0) / teamScores.length).toFixed(2)) : 0;
       
@@ -328,10 +337,11 @@ exports.getCourseReport = async (req, res, next) => {
     });
 
     // Summary statistics
-    const finalScores = studentsWithGrades.filter(s => s.originalScore > 0).map(s => s.finalScore);
+    // Graded: rated by someone, or given a final score by the instructor (Contribution Multiplier)
+    const finalScores = studentsWithGrades.filter(isGraded).map(s => s.finalScore);
     const summary = {
       totalStudents: students.length,
-      studentsWithEvaluations: finalScores.length,
+      studentsWithEvaluations: studentsWithGrades.filter(s => s.originalScore > 0).length,
       averageScore: finalScores.length > 0 ? 
         parseFloat((finalScores.reduce((sum, score) => sum + score, 0) / finalScores.length).toFixed(2)) : 0,
       gradeDistribution: {
@@ -401,7 +411,9 @@ exports.downloadReport = async (req, res, next) => {
           'Team Grade',
           'Team Grade Source',
           'Multiplier',
+          'Calculated Score',
           'Final Score',
+          'Final Score Source',
           'Letter Grade',
           'Evaluations Received',
           'Flag'
@@ -427,7 +439,9 @@ exports.downloadReport = async (req, res, next) => {
           student.teamGrade ?? '',
           student.teamGradeSource ?? '',
           student.multiplier ?? '',
+          student.calculatedScore ?? '',
           student.finalScore,
+          student.finalScoreSource ?? '',
           student.letterGrade,
           student.evaluationsReceived,
           student.flagged ? 'Review: grade below 70' : ''
