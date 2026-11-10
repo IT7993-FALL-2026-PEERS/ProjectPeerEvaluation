@@ -282,6 +282,22 @@ describe('useEvaluations: resetting the evaluation state', () => {
     expect(view.result.current.evaluationStatusDialog).toMatchObject({ open: true, status: NOT_SENT });
   });
 
+  // CICD-87: the reset also clears the grades the instructor typed, and says so when there were any.
+  test('says how many typed grades were cleared, when there were any', async () => {
+    const view = render();
+    api.delete.mockResolvedValue({ data: { message: 'Evaluation state reset', tokens_cleared: 4, evaluations_deleted: 2, grades_cleared: 3 } });
+    await act(() => view.result.current.resetEvaluationState('c1'));
+    expect(setAlert).toHaveBeenCalledWith({ severity: 'success', message: '✅ Evaluation state reset - Cleared 4 tokens, 2 evaluations and 3 typed grades' });
+
+    api.delete.mockResolvedValue({ data: { message: 'Evaluation state reset', tokens_cleared: 4, evaluations_deleted: 2, grades_cleared: 1 } });
+    await act(() => view.result.current.resetEvaluationState('c1'));
+    expect(setAlert).toHaveBeenLastCalledWith({ severity: 'success', message: '✅ Evaluation state reset - Cleared 4 tokens, 2 evaluations and 1 typed grade' });
+
+    api.delete.mockResolvedValue({ data: { message: 'Evaluation state reset', tokens_cleared: 4, evaluations_deleted: 2, grades_cleared: 0 } });
+    await act(() => view.result.current.resetEvaluationState('c1'));
+    expect(setAlert).toHaveBeenLastCalledWith({ severity: 'success', message: '✅ Evaluation state reset - Cleared 4 tokens and 2 evaluations' });
+  });
+
   test('is resetting only while the request runs', async () => {
     const view = render();
     let release;

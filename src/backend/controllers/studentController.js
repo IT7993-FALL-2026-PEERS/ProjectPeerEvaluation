@@ -849,12 +849,27 @@ exports.resetEvaluationState = async (req, res, next) => {
     const Evaluation = require('../models/Evaluation');
     const evaluationDeleteResult = await Evaluation.deleteMany({ course_id: courseObjectId });
 
+    // The grades the instructor typed in the Contribution Multiplier report (a student's final score, a team's
+    // grade) belong to the round that is being cleared: left in place, they would replace the calculated grades
+    // of the next round (CICD-87).
+    const typedScores = await Student.updateMany(
+      { course_id: courseObjectId, final_grade_override: { $ne: null } },
+      { $set: { final_grade_override: null } }
+    );
+    const Team = require('../models/Team');
+    const typedTeamGrades = await Team.updateMany(
+      { course_id: courseObjectId, team_grade: { $ne: null } },
+      { $set: { team_grade: null } }
+    );
+    const gradesCleared = typedScores.modifiedCount + typedTeamGrades.modifiedCount;
+
     console.log(`Reset evaluation state for course ${course_id}: cleared ${tokenUpdateResult.modifiedCount} tokens, deleted ${evaluationDeleteResult.deletedCount} evaluations`);
 
     res.status(200).json({
       message: 'Evaluation state reset successfully.',
       tokens_cleared: tokenUpdateResult.modifiedCount,
-      evaluations_deleted: evaluationDeleteResult.deletedCount
+      evaluations_deleted: evaluationDeleteResult.deletedCount,
+      grades_cleared: gradesCleared
     });
 
   } catch (err) {

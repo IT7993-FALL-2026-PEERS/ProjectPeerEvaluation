@@ -563,8 +563,8 @@ approval back); no copy of the earlier evaluations is kept. **200** `{ "message"
 
 ### `DELETE .../evaluations/reset`
 
-Deletes every evaluation in the course and clears all tokens, each student's submitted mark and any approved resubmission, so old links stop working and the next send reaches everyone again.
-**200** `{ "message", "tokens_cleared", "evaluations_deleted" }`.
+Deletes every evaluation in the course and clears all tokens, each student's submitted mark and any approved resubmission, so old links stop working and the next send reaches everyone again. It also clears the grades the instructor typed in the Contribution Multiplier report for this course (each student's `final_grade_override` and each team's `team_grade`), because they belong to the round being cleared (CICD-87); a roster upload does not clear them.
+**200** `{ "message", "tokens_cleared", "evaluations_deleted", "grades_cleared" }` (`grades_cleared`: typed final scores plus typed team grades).
 
 ---
 
