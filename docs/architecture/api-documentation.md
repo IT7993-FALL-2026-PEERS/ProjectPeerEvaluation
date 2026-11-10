@@ -152,6 +152,7 @@ on 404 instead of this shape.
 | POST | `/courses/:course_id/teams` | 🔒 | Create teams |
 | PUT | `/courses/:course_id/teams/:team_id` | 🔒 | Edit a team |
 | PUT | `/courses/:course_id/teams/:team_id/grade` | 🔒 | Set or clear the instructor's team grade (Contribution Multiplier) |
+| PUT | `/courses/:course_id/students/:student_id/grade` | 🔒 | Set or clear the instructor's final score for a student (Contribution Multiplier) |
 | DELETE | `/courses/:course_id/teams/:team_id` | 🔒 | Delete an empty team |
 | DELETE | `/courses/:course_id/teams` | 🔒 | Delete all teams |
 | POST | `/courses/:course_id/teams/auto-assign` | 🔒 | **501** — not implemented |
@@ -446,6 +447,7 @@ message quotes up to three problem rows.
 | `GET .../teams` | — | **200** array of teams, with each member's student record **without** `evaluation_token` or its expiry |
 | `POST .../teams` | `{ "teams": [{ "team_name": "Team 4", "team_status"? }, ...] }`. Only the name and status are read. Teams are created empty: add members with `POST .../teams/:team_id/students/:student_id` | **201** `{ "message": "Teams created.", "teams": [ids] }`. **400** `VALIDATION_ERROR` for a missing, blank or not numbered name (one bad name refuses the whole list), an unknown status, or a non-empty `students` list |
 | `PUT .../teams/:team_id` | `team_name` and/or `team_status` (`Active` or `Inactive`); other fields are ignored | **200** `{ "message", "team" }`. Renaming also updates each member's `group_assignment`. **400** for a blank name, a new name that is not numbered (a team named before the rule keeps its name while the name is left alone) or an unknown status |
+| `PUT .../students/:student_id/grade` | `{ "final_score": 0..100 }` or `{ "final_score": null }` (CICD-81: the instructor's final score for one student in the Contribution Multiplier report, used exactly as typed, not rounded; `null` goes back to the calculated grade) | **200** `{ "message", "student": { "_id", "student_id", "name", "final_grade_override" } }`. **400** `VALIDATION_ERROR` for anything that is not a finite number from 0 to 100 or `null`, or for an invalid student id. **404** for a student of another course (the student is looked up within the course in the URL) |
 | `PUT .../teams/:team_id/grade` | `{ "team_grade": 0..100 }` or `{ "team_grade": null }` (CICD-81: the instructor's grade for the team, used by the Contribution Multiplier report; `null` goes back to the grade the report proposes) | **200** `{ "message", "team" }`. **400** `VALIDATION_ERROR` for anything that is not a finite number from 0 to 100 or `null` (a missing field, a string, `101`), or for an invalid team id. **404** for a team of another course (the team is looked up within the course in the URL) |
 | `DELETE .../teams/:team_id` | — | **200** `{ "message" }`. **409** `CONSTRAINT_ERROR` if the team still has students |
 | `DELETE .../teams` | — | **200** `{ "message", "teams_deleted" }`. Students are kept and unassigned |
@@ -591,18 +593,26 @@ and the 85 for equal scores; they are to be confirmed with her. `mean` returns t
 per-team report endpoints below always show the regular scores.
 
 **Contribution Multiplier (`gradingMethod=multiplier`; CICD-81, built before the sponsor's decision at Khoa's request).** The rule is in
-`docs/requirements/contribution-multiplier-proposal.md`, the constants (cap 1.00, floor 70) in `utils/contributionMultiplier.js`. Each team is
+`docs/requirements/contribution-multiplier-proposal.md`, the constants (cap 1.00, flag below 70) in `utils/contributionMultiplier.js`. Each team is
 graded on its own, not against the rest of the class. A student's `contributionScore` is the median of the scores of the
 ratings they received (a rating's score is the mean of its six criteria × 20; their own rating of themselves is not used).
 The team grade is the instructor's (`Team.team_grade`, set with `PUT .../teams/:team_id/grade`) or, when none is set, the highest
 `contributionScore` in the team. `multiplier` = the student's score ÷ the average score of the other scored teammates, at most 1
-(1 for a student alone, and for a student with no team, who is graded alone). `finalScore` = `teamGrade × multiplier`, never
-below the lower of 70 and `teamGrade`. A student nobody rated has `contributionScore`, `multiplier` and the grade of `null`
+(1 for a student alone, and for a student with no team, who is graded alone). `finalScore` = `teamGrade × multiplier`, rounded to the nearest 5 (halves up, at most 100; so it can end up to 2.5 above
+`teamGrade`, e.g. 99 becomes 100). There is no floor: a student the multiplier takes below 70 (and below `teamGrade`) keeps
+the real grade and has `flagged: true` (checked on the rounded grade, and only for a multiplier below 1), so the instructor can review the ratings behind it. A student nobody rated has `contributionScore`, `multiplier` and the grade of `null`
 and keeps `letterGrade: "No evaluations"`. `originalScore` stays the pooled mean, and the other methods' responses are unchanged. In this
-method each student also has `contributionScore`, `multiplier`, `teamGrade` and `teamGradeSource` (`automatic` or `instructor`),
+method each student also has `contributionScore`, `multiplier`, `flagged`, `teamGrade` and `teamGradeSource` (`automatic` or `instructor`),
 each team has `teamGrade`, `teamGradeSource` (`null` when nobody in the team has a rating and no grade was set),
 `automaticTeamGrade` (the proposed grade, `null` when nobody has a rating) and `team_grade` (the instructor's grade or `null`),
-and `gradingSettings` is `{ "cap": 1, "floor": 70 }`.
+`summary.flaggedStudents` counts the flagged students, `gradingSettings` is `{ "cap": 1, "flagBelow": 70 }`, and the CSV export has a
+`Flag` column ("Review: grade below 70" for a flagged student). The instructor can replace the final score of any student
+(`PUT .../students/:student_id/grade`, stored as `Student.final_grade_override`, `null` = calculated): in this method the student's
+`finalScore` is then the typed number, `finalScoreSource` is `instructor` (otherwise `calculated`, or `null` when nobody rated the
+student and no score was typed), `calculatedScore` is the grade the formula gives (`null` without ratings), `flagged` is `false`
+and `letterGrade` follows the typed score. A student with a typed score counts as graded in the class average, the grade
+distribution and the team average (`summary.studentsWithEvaluations` still counts only students somebody rated). The other
+methods ignore the typed score. The CSV has `Calculated Score` and `Final Score Source` columns.
 
 **200**
 ```json

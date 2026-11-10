@@ -144,14 +144,17 @@ test('E2E-53: the Contribution Multiplier report gives each team a grade; the pr
   await page.getByRole('button', { name: 'Regenerate Report' }).click();
 
   // The seeded scores are Ann 100 and Ben 76.67 (Team 1), Cy 90 and Di 56.67 (Team 2). The team grade is the highest
-  // score: 100 and 90. Ben 76.67 / 100 = 0.77; Di 56.67 / 90 = 0.63, which the floor of 70 lifts to 70.
+  // score: 100 and 90. Ben 76.67 / 100 = 0.77; Di 56.67 / 90 = 0.63. There is no floor, so
+  // Di keeps her grade (55 after rounding to a step of 5) and the report flags her for the instructor.
   await expect(page.getByRole('heading', { name: 'Team Grades' })).toBeVisible();
   const team2 = page.getByRole('row', { name: /^Team 2/ });
   await expect(team2).toContainText('90%');
   await expect(team2).toContainText('Automatic');
   const di = page.getByRole('row', { name: /Di Diaz/ });
   await expect(di).toContainText('0.63');
-  await expect(di).toContainText('70%');
+  await expect(di).toContainText('55%');
+  await expect(di).toContainText('Review');
+  await expect(page.getByText(/1 student is flagged for review/)).toBeVisible();
   const cy = page.getByRole('row', { name: /Cy Cole/ });
   await expect(cy).toContainText('90%');
   await expect(page.getByRole('row', { name: /Ben Baker/ })).toContainText('0.77');
@@ -171,6 +174,30 @@ test('E2E-53: the Contribution Multiplier report gives each team a grade; the pr
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(team2).toContainText('Automatic');
   await expect(cy).toContainText('90%');
+
+  // The professor opens the Review mark of the flagged student and sets the final score: it is used as typed, marked as
+  // adjusted, and the flag is gone because the professor has dealt with it.
+  await di.getByRole('button', { name: 'Review Di Diaz' }).click();
+  await page.getByLabel('Final score (0 to 100)').fill('62.5');
+  await page.getByRole('button', { name: 'Save' }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(di).toContainText('62.5%');
+  await expect(di).toContainText('Adjusted');
+  await expect(di).not.toContainText('Review');
+  await expect(page.getByText(/flagged for review/)).toHaveCount(0);
+
+  // Any student can be set: Ben gets 80, then goes back to the calculated grade.
+  const ben = page.getByRole('row', { name: /Ben Baker/ });
+  await ben.getByRole('button', { name: 'Edit the final score of Ben Baker' }).click();
+  await page.getByLabel('Final score (0 to 100)').fill('80');
+  await page.getByRole('button', { name: 'Save' }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(ben).toContainText('80%');
+  await ben.getByRole('button', { name: 'Edit the final score of Ben Baker' }).click();
+  await page.getByRole('button', { name: 'Use calculated grade' }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(ben).toContainText('75%');
+  await expect(ben).not.toContainText('Adjusted');
 });
 
 // The team list used to keep showing the old teams after a create, edit or delete, because the

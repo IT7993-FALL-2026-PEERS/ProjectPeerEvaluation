@@ -480,8 +480,11 @@ passed while it ran saves nothing.
 **Contribution Multiplier (CICD-81, the team's proposal, built before the sponsor's decision).** **Given** a generated report with the
 method "Contribution Multiplier", **when** the professor reads it, **then** each team has one grade (the highest student score in the
 team, or the grade the professor set for it), each student's final grade is the team grade times their multiplier (their median score
-divided by the average of their teammates, at most 1.00, never below 70 or the team grade if that is lower), and a student nobody rated
-has no grade. **Given** a team grade, **when** the professor changes it or goes back to the automatic one, **then** the report uses it
+divided by the average of their teammates, at most 1.00, rounded to the nearest 5; there is no floor, so a student the multiplier takes below 70 keeps that grade and
+is flagged for the professor in the report and the CSV), and a student nobody rated has no grade. **Given** a student in that report, **when**
+the professor opens the Review mark or the Edit button of the row and types a final score from 0 to 100, **then** the report uses it as
+typed (not rounded), marks it as adjusted and no longer flags the student; "back to calculated" removes it. This works for any student,
+also one nobody rated. **Given** a team grade, **when** the professor changes it or goes back to the automatic one, **then** the report uses it
 at once. Curved grading stays the default. See `docs/requirements/contribution-multiplier-proposal.md`.
 
 ### FR-18 — Average score per criterion
