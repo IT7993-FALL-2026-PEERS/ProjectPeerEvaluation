@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Dialog, DialogTitle, DialogContent, DialogActions, Box, Typography, Button, Alert,
   LinearProgress, CircularProgress, Grid, Card, CardContent, Chip,
@@ -7,12 +7,36 @@ import SendIcon from '@mui/icons-material/Send';
 import GroupIcon from '@mui/icons-material/Group';
 import ClearIcon from '@mui/icons-material/Clear';
 import { groupStudentsByTeam } from '../services/evaluationStatus';
+import { describeSendEstimate, sendProgressPercent } from '../services/sendPreview';
+
+// CICD-86: a send is one long request, because the server spaces the emails. While it runs this says how many
+// invitations are going out and about how long that takes, with a bar that moves at that pace. The bar is an
+// estimate from the clock, not a report from the server: it stops short of the end, and the message after the
+// send still says what was sent and who was skipped.
+function SendProgress({ estimate }) {
+  const [elapsedMs, setElapsedMs] = useState(() => Date.now() - estimate.startedAt);
+  useEffect(() => {
+    const timer = setInterval(() => setElapsedMs(Date.now() - estimate.startedAt), 500);
+    return () => clearInterval(timer);
+  }, [estimate.startedAt]);
+  const percent = sendProgressPercent(estimate, elapsedMs);
+  return (
+    <Box sx={{ mt: 2, mx: 'auto', maxWidth: 480 }}>
+      <Typography variant="body2" sx={{ mb: 1 }}>{describeSendEstimate(estimate)}</Typography>
+      <LinearProgress
+        aria-label="Estimated sending progress"
+        variant={percent === null ? 'indeterminate' : 'determinate'}
+        value={percent === null ? undefined : percent}
+      />
+    </Box>
+  );
+}
 
 // The Evaluation Status dialog on the course row, moved out of CourseManagement.js (CICD-57, step 3).
 // The page owns the status, the requests and the sending and resetting flags; this shows them, one
 // card per team, and reports what the professor presses.
 function EvaluationStatusDialog({
-  open, course, status, loading, sending, resetting, onSend, onRemind, onReset, onClose, onExtend, onAllowResubmission,
+  open, course, status, loading, sending, sendEstimate, resetting, onSend, onRemind, onReset, onClose, onExtend, onAllowResubmission,
 }) {
   return (
     <Dialog
@@ -56,6 +80,7 @@ function EvaluationStatusDialog({
                 >
                   {sending ? 'Sending Evaluations...' : 'Send Evaluations Now'}
                 </Button>
+                {sending && sendEstimate && <SendProgress estimate={sendEstimate} />}
               </Alert>
             ) : (
               <>

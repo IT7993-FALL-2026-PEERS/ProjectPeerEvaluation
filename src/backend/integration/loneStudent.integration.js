@@ -240,6 +240,21 @@ test('TC-10-85: the team send preview names a student alone on the team, and is 
   assert.equal(sentEmails.length, 0);
 });
 
+test('TC-10-89: the send preview says how long the send will take at the current pace', async () => {
+  const before = process.env.EMAIL_SEND_INTERVAL_MS;
+  try {
+    delete process.env.EMAIL_SEND_INTERVAL_MS;
+    assert.equal((await preview()).body.estimated_seconds, 0, 'emails are not spaced');
+    process.env.EMAIL_SEND_INTERVAL_MS = '11000';
+    const paced = await preview();
+    assert.equal(paced.body.will_invite, 3);
+    assert.equal(paced.body.estimated_seconds, 22, 'three emails, two gaps of 11 s');
+    assert.equal((await preview(`teams/${IDS.teamAlpha}/evaluations/send-preview`)).body.estimated_seconds, 0, 'nobody to email');
+  } finally {
+    if (before === undefined) delete process.env.EMAIL_SEND_INTERVAL_MS; else process.env.EMAIL_SEND_INTERVAL_MS = before;
+  }
+});
+
 test('TC-10-86: the send previews are for the course\'s own professor, and a team of another course is not found', async () => {
   const bo = app.tokenFor(IDS.bo, 'bo@example.edu');
   assert.equal((await preview('evaluations/send-preview', bo)).status, 404, 'another professor, course');

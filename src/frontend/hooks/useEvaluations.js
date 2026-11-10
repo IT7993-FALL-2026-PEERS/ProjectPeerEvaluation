@@ -4,7 +4,7 @@ import { getApiBaseUrl } from '../services/apiUrl';
 import { describeExtendResult, describeInvitationResult, describeReminderResult } from '../services/emailResult';
 import { prefillDeadline, toDeadlinePayload } from '../services/deadline';
 import { getErrorMessage } from '../services/apiError';
-import { describeNobodyToRate, fetchNobodyToRate } from '../services/sendPreview';
+import { describeNobodyToRate, fetchSendPreview } from '../services/sendPreview';
 
 // The evaluations of a course, moved out of CourseManagement.js (CICD-57, step 6b-4): sending the
 // invitations, sending reminders, the Evaluation Status dialog, and resetting the evaluation state.
@@ -35,6 +35,10 @@ export default function useEvaluations({ setAlert }) {
   const [sendWarning, setSendWarning] = useState('');
   const [sendChecking, setSendChecking] = useState(false); // Send stays off until the answer is in
   const warningRequest = useRef(0);
+  // CICD-86: what the same preview said about each course's send ({ count, seconds }), and the sends that are
+  // running now ({ [course id]: { count, seconds, startedAt } }), for the status dialog to show while it waits.
+  const sendEstimates = useRef({});
+  const [sendProgress, setSendProgress] = useState({});
   // The deadline each course was last sent with in this session, to prefill the next send: the course
   // list is not reloaded after a send, so its copy of the last deadline would be out of date.
   const [lastDeadlines, setLastDeadlines] = useState({});
@@ -73,6 +77,8 @@ export default function useEvaluations({ setAlert }) {
       console.log('API Base URL:', api.defaults.baseURL);
       console.log('Full URL:', `${api.defaults.baseURL}/courses/${courseId}/evaluations/send`);
 
+      const estimate = sendEstimates.current[courseId];
+      if (estimate) setSendProgress(prev => ({ ...prev, [courseId]: { ...estimate, startedAt: Date.now() } }));
       const response = await api.post(`/courses/${courseId}/evaluations/send`, deadlinePayload);
       setAlert(describeInvitationResult(response.data));
       if (response.data.emails_sent > 0 && response.data.deadline) {
@@ -107,6 +113,8 @@ export default function useEvaluations({ setAlert }) {
       });
     } finally {
       setSendingEvaluations(prev => ({ ...prev, [courseId]: false }));
+      delete sendEstimates.current[courseId];
+      setSendProgress(prev => ({ ...prev, [courseId]: null }));
     }
   };
 
@@ -175,8 +183,11 @@ export default function useEvaluations({ setAlert }) {
     warningRequest.current = request;
     setSendWarning('');
     setSendChecking(true);
-    fetchNobodyToRate(`/courses/${course._id || course.id}/evaluations/send-preview`).then((names) => {
+    const courseId = course._id || course.id;
+    delete sendEstimates.current[courseId];
+    fetchSendPreview(`/courses/${courseId}/evaluations/send-preview`).then(({ names, estimate }) => {
       if (warningRequest.current !== request) return;
+      if (estimate) sendEstimates.current[courseId] = estimate;
       setSendWarning(describeNobodyToRate(names));
       setSendChecking(false);
     });
@@ -273,6 +284,7 @@ export default function useEvaluations({ setAlert }) {
       status: evaluationStatus,
       loading: evaluationStatusLoading,
       sending: Boolean(selectedCourseForEval && sendingEvaluations[selectedCourseForEval._id || selectedCourseForEval.id]),
+      sendEstimate: (selectedCourseForEval && sendProgress[selectedCourseForEval._id || selectedCourseForEval.id]) || null,
       resetting: resettingEvaluations,
       onSend: () => requestSend(selectedCourseForEval),
       onRemind: () => handleSendReminders(selectedCourseForEval._id || selectedCourseForEval.id),
