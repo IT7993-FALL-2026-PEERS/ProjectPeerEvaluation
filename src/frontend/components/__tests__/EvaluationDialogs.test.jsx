@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, within } from '@testing-library/react';
+import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import EvaluationResetDialog from '../EvaluationResetDialog';
 import EvaluationStatusDialog from '../EvaluationStatusDialog';
@@ -88,6 +88,50 @@ describe('EvaluationStatusDialog', () => {
 
   test('while sending, the button says so and cannot be pressed again', () => {
     render(<EvaluationStatusDialog {...statusProps({ status: { evaluations_sent: false }, sending: true })} />);
+    expect(screen.getByRole('button', { name: 'Sending Evaluations...' })).toBeDisabled();
+  });
+
+  // CICD-86: a send is one long request, so say how many invitations and about how long, with a bar that moves.
+  test('while sending, says how many invitations are going out and about how long it takes', () => {
+    render(<EvaluationStatusDialog {...statusProps({
+      status: { evaluations_sent: false }, sending: true, sendEstimate: { count: 5, seconds: 44, startedAt: Date.now() },
+    })} />);
+    expect(screen.getByText('Sending 5 invitations. This takes about 45 seconds. Keep this page open.')).toBeInTheDocument();
+    const bar = screen.getByRole('progressbar', { name: 'Estimated sending progress' });
+    expect(bar).toHaveAttribute('aria-valuenow', '0');
+  });
+
+  test('the bar moves with the time that has passed, and stops short of the end', () => {
+    vi.useFakeTimers();
+    try {
+      render(<EvaluationStatusDialog {...statusProps({
+        status: { evaluations_sent: false }, sending: true, sendEstimate: { count: 5, seconds: 40, startedAt: Date.now() },
+      })} />);
+      const bar = screen.getByRole('progressbar', { name: 'Estimated sending progress' });
+      act(() => { vi.advanceTimersByTime(20000); });
+      expect(bar).toHaveAttribute('aria-valuenow', '50');
+      act(() => { vi.advanceTimersByTime(60000); });
+      expect(bar).toHaveAttribute('aria-valuenow', '95');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  test('with no time known the bar just runs, and the count is still said', () => {
+    render(<EvaluationStatusDialog {...statusProps({
+      status: { evaluations_sent: false }, sending: true, sendEstimate: { count: 30, seconds: 0, startedAt: Date.now() },
+    })} />);
+    expect(screen.getByText('Sending 30 invitations. Keep this page open.')).toBeInTheDocument();
+    expect(screen.getByRole('progressbar', { name: 'Estimated sending progress' })).not.toHaveAttribute('aria-valuenow');
+  });
+
+  test('says nothing about a send when none is running, or when there is no estimate', () => {
+    const { rerender } = render(<EvaluationStatusDialog {...statusProps({
+      status: { evaluations_sent: false }, sending: false, sendEstimate: { count: 5, seconds: 44, startedAt: Date.now() },
+    })} />);
+    expect(screen.queryByText(/^Sending 5 invitations/)).not.toBeInTheDocument();
+    rerender(<EvaluationStatusDialog {...statusProps({ status: { evaluations_sent: false }, sending: true, sendEstimate: null })} />);
+    expect(screen.queryByRole('progressbar', { name: 'Estimated sending progress' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Sending Evaluations...' })).toBeDisabled();
   });
 

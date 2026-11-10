@@ -5,7 +5,7 @@ const Team = require('../models/Team');
 const Evaluation = require('../models/Evaluation');
 const EVALUATION_RUBRIC = require('../config/rubric');
 const { sendEvaluationInvitation, sendEvaluationReminder } = require('../utils/emailUtils');
-const { createEmailPacer, getEmailIntervalMs, getRecipientLimit } = require('../utils/emailPacer');
+const { createEmailPacer, estimateSendSeconds, getEmailIntervalMs, getRecipientLimit } = require('../utils/emailPacer');
 const { generateEvaluationToken, isLinkActive, isTokenExpired } = require('../utils/evaluationToken');
 const { parseDeadline } = require('../utils/evaluationDeadline');
 const evaluationStore = require('../utils/saveEvaluations');
@@ -181,7 +181,12 @@ function notFound(message) {
 // the assignment before anything goes out. Same students and same rule (planInvitations) as the send itself;
 // nothing is changed, no link is issued and no email is sent.
 function previewAnswer(plan) {
-  return { no_teammates: plan.noTeammates, will_invite: plan.recipients.length };
+  // estimated_seconds: how long the send will take at the current pace, for the page to show while it runs (CICD-86)
+  return {
+    no_teammates: plan.noTeammates,
+    will_invite: plan.recipients.length,
+    estimated_seconds: estimateSendSeconds(plan.recipients.length),
+  };
 }
 
 exports.previewTeamSend = async (req, res, next) => {
