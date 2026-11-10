@@ -293,6 +293,34 @@ test('E2E-54: coming back with an expired login shows a clean login page, and no
   expect(await page.evaluate(() => localStorage.getItem('user'))).toBeNull();
 });
 
+// CICD-85: a professor page opened with a login that has run out used to show the dashboard with no courses, 'Failed to
+// fetch courses' and the timed-out banner. A page that has only just opened has no work to keep: go to the login page.
+test('E2E-55: opening the dashboard with a login that has run out goes to a clean login page, and logging in works', async ({ page }) => {
+  await loginAsAda(page, passwords);
+  await expect(page).toHaveURL(/course-management/);
+  await expect(page.getByRole('row', { name: /Capstone/ })).toBeVisible();
+
+  // A token the browser can read as having run out an hour ago, with the professor still stored. The server refuses it.
+  await page.evaluate(() => {
+    const now = Math.floor(Date.now() / 1000);
+    const claims = btoa(JSON.stringify({ id: 'ada', iat: now - 7200, exp: now - 3600 }));
+    localStorage.setItem('peer_eval_token', `h.${claims}.s`);
+  });
+  await page.reload();
+
+  await expect(page).toHaveURL('/');
+  await expect(page.getByRole('heading', { name: 'Professor Login' })).toBeVisible();
+  await page.waitForTimeout(2500); // the session countdown ticks once a second
+  await expect(page.getByText('Session timed out. Log in again to keep your work.')).toHaveCount(0);
+  await expect(alertWith(page, 'Failed to fetch courses')).toHaveCount(0);
+  expect(await page.evaluate(() => localStorage.getItem('peer_eval_token'))).toBeNull();
+  expect(await page.evaluate(() => localStorage.getItem('user'))).toBeNull();
+
+  await loginAsAda(page, passwords);
+  await expect(page).toHaveURL(/course-management/);
+  await expect(page.getByRole('row', { name: /Capstone/ })).toBeVisible();
+});
+
 // CICD-69: a timed-out professor logs in again on the same page and keeps what was typed.
 test('E2E-46: after the login expires, logging in again keeps the half-filled Create Course form, and saving works', async ({ page }) => {
   await loginAsAda(page, passwords);
