@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { createEmailPacer, getEmailIntervalMs, getRecipientLimit, getRequestBudgetMs } = require('../utils/emailPacer');
+const { createEmailPacer, estimateSendSeconds, getEmailIntervalMs, getRecipientLimit, getRequestBudgetMs } = require('../utils/emailPacer');
 
 function recordingSleep() {
   const waits = [];
@@ -56,4 +56,18 @@ test('TC-10-36: the budget and interval come from the environment, and bad value
   assert.equal(getRequestBudgetMs({ EMAIL_REQUEST_BUDGET_MS: 'soon' }), 150000);
   assert.equal(getRequestBudgetMs({ EMAIL_REQUEST_BUDGET_MS: '-5' }), 150000);
   assert.equal(getRecipientLimit({ EMAIL_SEND_INTERVAL_MS: 'x' }), Infinity);
+});
+
+// CICD-86: the page tells the instructor how long a send will take. n recipients wait (n - 1) gaps.
+test('TC-10-87: a send is estimated at one interval for every email after the first', () => {
+  assert.equal(estimateSendSeconds(5, 11000), 44);
+  assert.equal(estimateSendSeconds(14, 11000), 143);
+  assert.equal(estimateSendSeconds(3, 1500), 3); // 3 s exactly
+  assert.equal(estimateSendSeconds(2, 1200), 2); // 1.2 s, rounded up
+});
+
+test('TC-10-88: nothing to wait for with one recipient, none, or no interval', () => {
+  assert.equal(estimateSendSeconds(1, 11000), 0);
+  assert.equal(estimateSendSeconds(0, 11000), 0);
+  assert.equal(estimateSendSeconds(5, 0), 0);
 });

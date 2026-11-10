@@ -495,9 +495,9 @@ with a message saying so and `emails_sent: 0`. Partial failures still answer 200
 
 ### `GET .../evaluations/send-preview` and `GET /courses/:course_id/teams/:team_id/evaluations/send-preview`
 
-What the send above would do, without doing it (CICD-80): **200** `{ "no_teammates": ["<names>"], "will_invite": <count> }`.
+What the send above would do, without doing it (CICD-80): **200** `{ "no_teammates": ["<names>"], "will_invite": <count>, "estimated_seconds": <seconds> }`.
 `no_teammates` names the students the send cannot reach because they have nobody to rate (alone on their team, or with
-no team assigned); `will_invite` is how many students it would email (no active link, not submitted, someone to rate).
+no team assigned); `will_invite` is how many students it would email (no active link, not submitted, someone to rate). `estimated_seconds` is about how long that send takes at the current pace: one `EMAIL_SEND_INTERVAL_MS` for every email after the first, `0` when emails are not spaced (CICD-86). The Evaluation Status dialog shows both while the send runs ("Sending 5 invitations. This takes about 45 seconds. Keep this page open.") with a bar that moves at that pace; the bar is an estimate, not a report of emails sent.
 It uses the same students and the same rule as the send (`planInvitations`), and changes nothing: no link is issued and
 no email is sent. The Send dialogs call it when they open and warn the instructor, who can then check the assignment
 before choosing a deadline. **404** for a course that is not the caller's, or a team that is not in the course.
