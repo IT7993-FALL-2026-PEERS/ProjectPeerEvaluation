@@ -15,6 +15,7 @@ settings and secrets are, and what to do when something is red. The design behin
 | Image build and push | `image-build.yml` | called by CD; by hand | Builds both images, checks them healthy, pushes to GHCR tagged with the commit |
 | Deployment status | `deployment-status.yml` | called by CD | Health check and "Deployment status" section in the CD summary |
 | Staging regression | `staging-regression.yml` | called by CD (smoke); weekly, Tue 06:00 UTC; by hand | Read-only health, frontend and `@staging` Playwright tests against staging. Never sends email |
+| Scheduled failure issue | `scheduled-failure-issue.yml` | after Staging regression or Security scan finishes; by hand (dry run) | When a run started by the schedule failed, opens a GitHub issue with a link to it, or comments on the open one. Skipped for every other run |
 | Promote release candidate | `promote.yml` | by hand, from an `rc-*` tag | Waits for approval in `production`, then publishes a GitHub Release ([release procedure](release-procedure.md#4-promote-a-release-candidate-optional)) |
 | Dependabot | `.github/dependabot.yml` | Mondays 06:00 New York | Update pull requests: npm frontend, npm backend, GitHub Actions |
 

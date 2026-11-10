@@ -192,6 +192,12 @@ Runs every Tuesday at 06:00 UTC (CICD-43), when CD calls it after a deploy, and 
 Tests with that tag must not send email (Mailtrap allows 50 a month) and must not need the local E2E control server.
 Set the `STAGING_URL` and `STAGING_API_URL` repository variables (the schedule reads them; they are not secrets). A manual run can override both: pointing it at a broken URL, such as `https://example.invalid`, must fail at the "Staging is up" step.
 
+## A failed scheduled run opens an issue (`scheduled-failure-issue.yml`)
+
+The two weekly runs (Staging regression on Tuesdays, Security scan on Mondays) start with nobody watching. When either finishes, `scheduled-failure-issue.yml` starts (CICD-88). If the run was started by the schedule and failed or timed out, it opens the issue "Scheduled run failed: <workflow>" with the date and a link to the run (`scripts/scheduled-failure-issue.js`). While that issue is open, a later failure adds a comment instead of a second issue. Close the issue once a later run passes.
+Runs started by a push, a pull request or by hand open nothing, so most runs of this workflow show as skipped. It is the only workflow with `issues: write`. It is a workflow of its own because CD calls `staging-regression.yml`, and a called workflow cannot have more permissions than its caller.
+To try it: Actions tab > Scheduled failure issue > Run workflow. The default is a dry run, which prints the issue it would open. Untick `dry_run` to open a real test issue, then close it.
+
 ## Environments and secrets (CICD-38)
 
 Production hosting is out of scope, so staging is the only deploy target. The `staging` environment holds the deploy
