@@ -18,6 +18,8 @@ describe('EvaluationResetDialog', () => {
     render(<EvaluationResetDialog open onCancel={() => {}} onConfirm={() => {}} />);
     expect(screen.getByRole('heading', { name: 'Evaluations Already Sent' })).toBeInTheDocument();
     expect(screen.getByText(/clear all evaluation tokens and responses/)).toBeInTheDocument();
+    // CICD-87: grades typed for this round go with it
+    expect(screen.getByText(/any final scores and team grades you typed in the report/)).toBeInTheDocument();
     expect(screen.getByText(/This action cannot be undone/)).toBeInTheDocument();
   });
 

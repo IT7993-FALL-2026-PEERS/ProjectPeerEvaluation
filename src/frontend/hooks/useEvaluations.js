@@ -114,9 +114,14 @@ export default function useEvaluations({ setAlert }) {
     setResettingEvaluations(true);
     try {
       const response = await api.delete(`/courses/${courseId}/evaluations/reset`);
+      // CICD-87: the grades typed in the Contribution Multiplier report go with the round; say so when there were any
+      const typed = response.data.grades_cleared;
+      const cleared = typed > 0
+        ? `${response.data.tokens_cleared} tokens, ${response.data.evaluations_deleted} evaluations and ${typed} typed grade${typed === 1 ? '' : 's'}`
+        : `${response.data.tokens_cleared} tokens and ${response.data.evaluations_deleted} evaluations`;
       setAlert({
         severity: 'success',
-        message: `✅ ${response.data.message} - Cleared ${response.data.tokens_cleared} tokens and ${response.data.evaluations_deleted} evaluations`
+        message: `✅ ${response.data.message} - Cleared ${cleared}`
       });
 
       // Refresh evaluation status after reset

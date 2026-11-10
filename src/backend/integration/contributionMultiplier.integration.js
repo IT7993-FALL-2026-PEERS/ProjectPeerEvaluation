@@ -292,3 +292,43 @@ test('TC-17-75: the other report methods ignore a typed final score, and the CSV
   const lines = (await res.text()).split('\n');
   assert.ok(lines.includes('1004,Di Diaz,di@example.edu,Team 2,56.67,56.67,90,automatic,0.6296,55,63.5,instructor,D,1,'));
 });
+
+// CICD-87: a typed grade belongs to the round of evaluations it was typed for. Resetting the evaluation state used to
+// keep it, so an old typed score replaced the calculated grade of the next round.
+const resetUrl = (courseId = IDS.courseAda) => `/api/courses/${courseId}/evaluations/reset`;
+
+test('TC-17-76: resetting the evaluation state clears the typed final scores and team grades of that course, and says how many', async () => {
+  await app.request('PUT', studentGradeUrl(IDS.ben), { token: ada, body: { final_score: 62.5 } });
+  await app.request('PUT', studentGradeUrl(IDS.di), { token: ada, body: { final_score: 70 } });
+  await app.request('PUT', gradeUrl(IDS.teamAlpha), { token: ada, body: { team_grade: 85 } });
+
+  const reset = await app.request('DELETE', resetUrl(), { token: ada });
+  assert.equal(reset.status, 200);
+  assert.equal(reset.body.grades_cleared, 3, 'two students and one team');
+
+  assert.equal((await Student.findById(IDS.ben)).final_grade_override, null);
+  assert.equal((await Student.findById(IDS.di)).final_grade_override, null);
+  assert.equal((await Team.findById(IDS.teamAlpha)).team_grade, null);
+
+  // The report no longer shows a grade nobody calculated or typed for this round.
+  const s = byName((await app.request('GET', report(), { token: ada })).body.students);
+  assert.equal(s.ben.finalScoreSource, null);
+  assert.equal(s.ben.calculatedScore, null);
+});
+
+test('TC-17-77: a reset with nothing typed clears no grades, and leaves another course alone', async () => {
+  await Student.updateOne({ _id: IDS.eve }, { final_grade_override: 88 });
+
+  const reset = await app.request('DELETE', resetUrl(), { token: ada });
+  assert.equal(reset.status, 200);
+  assert.equal(reset.body.grades_cleared, 0);
+  assert.equal((await Student.findById(IDS.eve)).final_grade_override, 88, 'a student of another course keeps the typed score');
+});
+
+test('TC-17-78: a roster upload keeps a typed final score: the students are the same', async () => {
+  await app.request('PUT', studentGradeUrl(IDS.ben), { token: ada, body: { final_score: 62.5 } });
+  const csv = 'student_id,name,email,group_assignment\n1002,Ben Baker,ben@example.edu,Team 1\n9999,New Person,new@example.edu,Team 1\n';
+  const upload = await app.uploadCsv(`/api/courses/${IDS.courseAda}/roster`, csv, { token: ada });
+  assert.equal(upload.status, 200);
+  assert.equal((await Student.findById(IDS.ben)).final_grade_override, 62.5);
+});

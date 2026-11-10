@@ -9,7 +9,7 @@ function EvaluationResetDialog({ open, onCancel, onConfirm }) {
       <DialogTitle>Evaluations Already Sent</DialogTitle>
       <DialogContent>
         <Typography variant="body1" sx={{ mb: 2 }}>
-          Evaluations have already been sent for this course. If you continue, the evaluation state will be reset and you will need to resend evaluations. This will clear all evaluation tokens and responses for this course.
+          Evaluations have already been sent for this course. If you continue, the evaluation state will be reset and you will need to resend evaluations. This will clear all evaluation tokens and responses for this course, and any final scores and team grades you typed in the report.
         </Typography>
         <Typography variant="body2" color="error" sx={{ mb: 2 }}>
           This action cannot be undone. Do you want to continue?
