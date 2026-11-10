@@ -16,7 +16,7 @@ test('TC-29-81: the first failure opens an issue with the workflow name, the dat
   assert.equal(step.title, TITLE);
   assert.match(step.body, /Security scan/);
   assert.match(step.body, /Nov 10, 2026/);
-  assert.ok(step.body.includes(RUN_URL));
+  assert.equal(step.body.split('\n')[2], `Run: ${RUN_URL}`);
 });
 
 test('TC-29-82: a failure while the issue is open adds a comment instead of a second issue', () => {
@@ -28,8 +28,7 @@ test('TC-29-82: a failure while the issue is open adds a comment instead of a se
   const step = plan({ workflow: 'Security scan', runUrl: RUN_URL, repo: REPO, issues, date: DATE });
   assert.equal(step.action, 'comment');
   assert.equal(step.number, 9);
-  assert.match(step.body, /Nov 10, 2026/);
-  assert.ok(step.body.includes(RUN_URL));
+  assert.equal(step.body, `The scheduled run failed again on Nov 10, 2026 (UTC): ${RUN_URL}`);
 });
 
 test('TC-29-83: it refuses a workflow it does not watch and a link that is not a run of this repository', () => {
