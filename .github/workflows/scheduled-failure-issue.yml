@@ -1,0 +1,77 @@
+name: Scheduled failure issue
+
+# Opens a GitHub issue when a scheduled run fails (backlog CICD-88).
+#
+# The weekly runs (Staging regression, Security scan) start with nobody watching. When one of them
+# finishes, this workflow starts; it does something only if that run was started by the schedule and
+# failed or timed out. Then it opens one issue with a link to the run, or comments on the issue that
+# is already open for that workflow. Runs started by a push, a pull request or by hand are skipped,
+# so most runs of this workflow show as skipped: that is expected.
+#
+# It is a workflow of its own, not a job in the two workflows, because cd.yml calls
+# staging-regression.yml and a called workflow cannot ask for more permissions than its caller
+# gives: a job with `issues: write` there would stop every CD run.
+#
+# `workflows:` matches by each workflow's `name:`. Keep the list the same as WATCHED in
+# scripts/scheduled-failure-issue.js (a test checks it). GitHub runs workflow_run only from the file
+# on the default branch (main).
+#
+# By hand (Actions tab > Run workflow): a dry run prints the issue it would open and changes
+# nothing. Untick "dry_run" to open a real test issue, and close it afterwards.
+
+on:
+  workflow_run:
+    workflows: ["Staging regression", "Security scan"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      workflow:
+        description: Workflow to report as failed.
+        type: choice
+        options:
+          - Staging regression
+          - Security scan
+        required: true
+      dry_run:
+        description: Only print what would be done.
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  issue:
+    name: Open or update the issue
+    if: >-
+      ${{ github.event_name == 'workflow_dispatch'
+      || (github.event.workflow_run.event == 'schedule'
+      && contains(fromJSON('["failure", "timed_out"]'), github.event.workflow_run.conclusion)) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    # One report at a time per workflow, so two failures cannot both open the issue. On the job, not
+    # the workflow: a group keeps only one waiting run, and at workflow level the skipped runs (every
+    # push and pull request finishes a Security scan) would push a waiting report out of the queue.
+    concurrency:
+      group: scheduled-failure-issue-${{ github.event.workflow_run.name || inputs.workflow }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+
+      # A manual run has no failed run to link to, so it links to itself.
+      - name: Open the issue, or comment on the open one
+        run: node scripts/scheduled-failure-issue.js
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WORKFLOW_NAME: ${{ github.event.workflow_run.name || inputs.workflow }}
+          RUN_URL: ${{ github.event.workflow_run.html_url || format('{0}/{1}/actions/runs/{2}', github.server_url, github.repository, github.run_id) }}
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
