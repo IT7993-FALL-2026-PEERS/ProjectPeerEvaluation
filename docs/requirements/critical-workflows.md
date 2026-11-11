@@ -175,7 +175,8 @@ so the two are never confused.
   choose a password → log in
 - **Requirements:** none — not in the inherited FR list
 - **Implementation:** `LoginPage.jsx` (`isRegistering` mode) → `POST /auth/register`, then
-  `VerifyEmail.jsx` → `POST /auth/verify-email` (`authController.js`, `utils/registrationPolicy.js`,
+  `VerifyEmail.jsx` → `POST /auth/verify-email/check` when the page opens, then
+  `POST /auth/verify-email` (`authController.js`, `utils/registrationPolicy.js`,
   `utils/emailVerification.js`, `routes/auth.js`)
 - **Status:** Implemented (12 and 13 Oct 2026). The email domain must be one of `ALLOWED_EMAIL_DOMAINS`
   (default `kennesaw.edu`, exact match: subdomains and look-alikes are refused). Registration takes
