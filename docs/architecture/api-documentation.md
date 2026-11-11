@@ -97,7 +97,7 @@ takes the student's **university ID** string (for example `S0012345`).
 | `POST /auth/login` | 10 per 15 minutes | failed attempts only; a successful login is free |
 | `POST /auth/register` | 10 per hour | every request |
 | `POST /auth/reset-password` | 5 per hour | every request (each one sends an email) |
-| `POST /auth/verify-email` | 20 per hour, shared with the row below | every request |
+| `POST /auth/verify-email` and `POST /auth/verify-email/check` | 20 per hour, shared between the two | every request (opening the link and confirming use two) |
 | `POST /auth/update-password` | 20 per hour, separate | every request; kept apart from the row above so a burst of reset requests from a shared address cannot stop someone using the link they were just sent |
 | `/evaluate/*` (student links) | 600 per 15 minutes | every request; generous because a class can share one campus address |
 | everything else under `/api` | 1000 per 15 minutes | every request; `/api/health` is never limited |
@@ -127,6 +127,7 @@ on 404 instead of this shape.
 | GET | `/health` | 🌐 | Service and database health |
 | POST | `/auth/register` | 🌐 | Create a professor account (instructor email domains only) |
 | POST | `/auth/verify-email` | 🌐 | Confirm a new account's email address |
+| POST | `/auth/verify-email/check` | 🌐 | Is this confirmation link still usable? Changes nothing |
 | POST | `/auth/login` | 🌐 | Log in, get a token |
 | POST | `/auth/logout` | 🔒 | No-op; the client discards the token |
 | POST | `/auth/reset-password` | 🌐 | Email a password reset link |
@@ -233,6 +234,15 @@ is enforced). The token is 32 random bytes valid for 48 hours; only its SHA-256 
 works once: confirming is one conditional update that needs the account to be pending and the token unexpired, so two confirmations at once cannot both succeed. **200** `{ "message": "Email confirmed. You can now log in." }` · **400** `VALIDATION_ERROR`
 missing or non-text token or password (checked before the lookup, so the link is not used up) ·
 **400** `TOKEN_ERROR` unknown, already used or expired.
+
+### `POST /auth/verify-email/check`
+
+Body: `{ "token" }`. The confirmation page calls it when it opens, so a dead link is said before a
+password is typed. It reads only: nothing is confirmed and the link is not used up. It is a POST so the
+token stays out of URLs and request logs. **200** `{ "valid": true }` · **400** `VALIDATION_ERROR`
+missing or non-text token · **400** `TOKEN_ERROR` unknown, already used or expired (one answer for
+all three, with no account details). If the check cannot be made, the page shows the form anyway;
+`POST /auth/verify-email` still decides.
 
 ### `POST /auth/login`
 

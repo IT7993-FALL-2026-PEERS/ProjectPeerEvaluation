@@ -177,6 +177,36 @@ exports.register = async (req, res, next) => {
 // lookup is by hash. Both fields are checked before the lookup, so a request that lacks the password does
 // not use the link up. The account is changed in one conditional update that needs the account to be
 // pending and the link unexpired, so two confirmations at once cannot both succeed.
+// One answer for an unknown, used or expired confirmation link, so the reply does not say which it was.
+const invalidLink = () => {
+	const err = new Error('This confirmation link is invalid or has expired. Register again with the same email to get a new one.');
+	err.code = 'TOKEN_ERROR';
+	err.status = 400;
+	return err;
+};
+
+// True while a pending account holds this link and its 48 hours have not run out. Reads only.
+const linkIsLive = async (tokenHash) => {
+	const professor = await Professor.findOne({ email_verification_token_hash: tokenHash });
+	return Boolean(professor && professor.email_verification_expires && professor.email_verification_expires >= Date.now());
+};
+
+// Asked by the confirmation page when it opens (CICD-77), so a dead link is said before a password is typed.
+// It changes nothing and names no account: the answer is only whether this link can still be used.
+exports.checkEmailLink = async (req, res, next) => {
+	try {
+		const { token } = req.body || {};
+		if (firstNonText(req.body, ['token'])) return next(validationError('token must be text.'));
+		if (!token) return next(validationError('A confirmation token is required.'));
+		if (!(await linkIsLive(hashVerificationToken(asText(token))))) return next(invalidLink());
+		res.status(200).json({ valid: true });
+	} catch (err) {
+		err.code = err.code || 'SERVER_ERROR';
+		err.status = err.status || 500;
+		next(err);
+	}
+};
+
 exports.verifyEmail = async (req, res, next) => {
 	try {
 		const { token, password } = req.body;
@@ -184,17 +214,8 @@ exports.verifyEmail = async (req, res, next) => {
 		if (nonText) return next(validationError(`${nonText} must be text.`));
 		if (!token || !password) return next(validationError('A confirmation token and a password are required.'));
 		const tokenHash = hashVerificationToken(asText(token));
-		const invalidLink = () => {
-			const err = new Error('This confirmation link is invalid or has expired. Register again with the same email to get a new one.');
-			err.code = 'TOKEN_ERROR';
-			err.status = 400;
-			return err;
-		};
 		// A cheap look first, so a made-up link does not cost a password hash.
-		const professor = await Professor.findOne({ email_verification_token_hash: tokenHash });
-		if (!professor || !professor.email_verification_expires || professor.email_verification_expires < Date.now()) {
-			return next(invalidLink());
-		}
+		if (!(await linkIsLive(tokenHash))) return next(invalidLink());
 		const hashed = await bcrypt.hash(password, 10);
 		const confirmed = await Professor.findOneAndUpdate(
 			{ email_verification_token_hash: tokenHash, email_verification_expires: { $gt: new Date() }, email_verified: false },

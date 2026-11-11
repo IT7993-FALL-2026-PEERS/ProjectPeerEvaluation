@@ -135,6 +135,40 @@ test('TC-01-63: a confirmation link works once; a second use, an expired link an
   assert.equal(late.password, undefined);
 });
 
+test('TC-01-81: checking a confirmation link changes nothing: a good link reads valid and still works; an expired, made-up or used link is refused', async () => {
+  const check = (token) => app.request('POST', '/api/auth/verify-email/check', { body: { token } });
+  await register();
+  const token = tokenFromEmail();
+
+  const good = await check(token);
+  assert.equal(good.status, 200);
+  assert.deepEqual(good.body, { valid: true });
+  const pending = await Professor.findOne({ email: 'new@example.edu' });
+  assert.equal(pending.email_verified, false, 'a check does not confirm the account');
+  assert.equal(pending.password, undefined);
+  assert.equal((await check(token)).status, 200, 'and does not use the link up');
+
+  for (const bad of [undefined, '', { $ne: null }, ['x']]) {
+    const res = await check(bad);
+    assert.equal(res.status, 400);
+    assert.equal(res.body.error.code, 'VALIDATION_ERROR');
+  }
+  const madeUp = await check('a'.repeat(64));
+  assert.equal(madeUp.status, 400);
+  assert.equal(madeUp.body.error.code, 'TOKEN_ERROR');
+  assert.match(madeUp.body.error.message, /invalid or has expired/);
+
+  await register({ ...newProfessor, email: 'late@example.edu' });
+  await Professor.updateOne({ email: 'late@example.edu' }, { email_verification_expires: new Date(Date.now() - 1000) });
+  const expired = await check(tokenFromEmail(1));
+  assert.equal(expired.status, 400);
+  assert.equal(expired.body.error.code, 'TOKEN_ERROR');
+  assert.deepEqual(expired.body.error.message, madeUp.body.error.message, 'expired and made-up links get the same answer');
+
+  assert.equal((await confirm(token)).status, 200, 'the checked link still sets the password');
+  assert.equal((await check(token)).status, 400, 'and a used link no longer reads valid');
+});
+
 test('TC-01-64: registering a pending address again after the wait sends a new link, and the old one stops working', async () => {
   await register();
   const oldToken = tokenFromEmail(0);
