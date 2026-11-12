@@ -254,7 +254,7 @@ test('TC-01-53: register: an unconfirmed address registered again after the wait
   assert.equal(result.res.body.professor_id, undefined, 'the id of a pending account is not given out');
 });
 
-test('TC-01-66: register: registering an unconfirmed address again within the wait changes nothing and sends nothing', async (t) => {
+test('TC-01-83: register: registering an unconfirmed address again within the wait changes nothing and sends nothing', async (t) => {
   const { professor } = pendingProfessor({ email_verification_sent_at: new Date(Date.now() - 1 * MIN) });
   const calls = mockRegistrationDb(t, { existing: professor });
   const result = await call('register', fields);
@@ -264,7 +264,7 @@ test('TC-01-66: register: registering an unconfirmed address again within the wa
   assert.match(result.res.body.message, /recently/i);
 });
 
-test('TC-01-67: register: if the new link cannot be sent, the send slot is given back and the link already in the mailbox stays valid', async (t) => {
+test('TC-01-84: register: if the new link cannot be sent, the send slot is given back and the link already in the mailbox stays valid', async (t) => {
   const { professor } = pendingProfessor();
   const calls = mockRegistrationDb(t, { existing: professor });
   sendConfirmation.mock.mockImplementation(async () => ({ success: false, error: 'SMTP down' }));
