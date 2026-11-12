@@ -282,6 +282,22 @@ describe('useEvaluations: resetting the evaluation state', () => {
     expect(view.result.current.evaluationStatusDialog).toMatchObject({ open: true, status: NOT_SENT });
   });
 
+  // CICD-87: the reset also clears the grades the instructor typed, and says so when there were any.
+  test('says how many typed grades were cleared, when there were any', async () => {
+    const view = render();
+    api.delete.mockResolvedValue({ data: { message: 'Evaluation state reset', tokens_cleared: 4, evaluations_deleted: 2, grades_cleared: 3 } });
+    await act(() => view.result.current.resetEvaluationState('c1'));
+    expect(setAlert).toHaveBeenCalledWith({ severity: 'success', message: '✅ Evaluation state reset - Cleared 4 tokens, 2 evaluations and 3 typed grades' });
+
+    api.delete.mockResolvedValue({ data: { message: 'Evaluation state reset', tokens_cleared: 4, evaluations_deleted: 2, grades_cleared: 1 } });
+    await act(() => view.result.current.resetEvaluationState('c1'));
+    expect(setAlert).toHaveBeenLastCalledWith({ severity: 'success', message: '✅ Evaluation state reset - Cleared 4 tokens, 2 evaluations and 1 typed grade' });
+
+    api.delete.mockResolvedValue({ data: { message: 'Evaluation state reset', tokens_cleared: 4, evaluations_deleted: 2, grades_cleared: 0 } });
+    await act(() => view.result.current.resetEvaluationState('c1'));
+    expect(setAlert).toHaveBeenLastCalledWith({ severity: 'success', message: '✅ Evaluation state reset - Cleared 4 tokens and 2 evaluations' });
+  });
+
   test('is resetting only while the request runs', async () => {
     const view = render();
     let release;
@@ -524,6 +540,45 @@ describe('useEvaluations: telling the instructor who a send cannot reach (CICD-8
     api.get.mockRejectedValue(new Error('offline'));
     await act(async () => { view.result.current.requestSend(COURSE); });
     expect(view.result.current.sendDeadlineDialog.warning).toBe('');
+  });
+
+  // CICD-86: the same preview answer gives the status dialog what to say while the send runs.
+  test('while the send runs the status dialog has the estimate from the preview, and none before or after', async () => {
+    api.get.mockImplementation(async (url) => (
+      url === '/courses/c1/evaluations/send-preview' ? { data: { no_teammates: [], will_invite: 5, estimated_seconds: 44 } } : { data: statusBody }
+    ));
+    const view = await opened();
+    await act(async () => { view.result.current.evaluationStatusDialog.onSend(); });
+    expect(view.result.current.evaluationStatusDialog.sendEstimate).toBeNull();
+
+    let release;
+    api.post.mockReturnValue(new Promise((resolve) => { release = resolve; }));
+    let sending;
+    act(() => { sending = view.result.current.sendDeadlineDialog.onConfirm(CHOSEN); });
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    const estimate = view.result.current.evaluationStatusDialog.sendEstimate;
+    expect(estimate).toMatchObject({ count: 5, seconds: 44 });
+    expect(typeof estimate.startedAt).toBe('number');
+
+    await act(async () => { release({ data: { message: 'm', emails_sent: 5, total_students: 5, failed: [] } }); await sending; });
+    expect(view.result.current.evaluationStatusDialog.sendEstimate).toBeNull();
+  });
+
+  test('there is no estimate when the preview could not be loaded, and the send still runs', async () => {
+    api.get.mockImplementation(async (url) => {
+      if (url === '/courses/c1/evaluations/send-preview') throw new Error('offline');
+      return { data: statusBody };
+    });
+    const view = await opened();
+    await act(async () => { view.result.current.evaluationStatusDialog.onSend(); });
+    let release;
+    api.post.mockReturnValue(new Promise((resolve) => { release = resolve; }));
+    let sending;
+    act(() => { sending = view.result.current.sendDeadlineDialog.onConfirm(CHOSEN); });
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    expect(view.result.current.evaluationStatusDialog.sending).toBe(true);
+    expect(view.result.current.evaluationStatusDialog.sendEstimate).toBeNull();
+    await act(async () => { release({ data: { message: 'm', emails_sent: 1, total_students: 1, failed: [] } }); await sending; });
   });
 
   test('closing or confirming clears the warning, so the next send does not show an old one', async () => {

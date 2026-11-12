@@ -6,16 +6,22 @@ run-name: "${{ inputs.rollback_to != '' && format('CD: roll back to {0}', inputs
 
 # Delivery pipeline for staging (backlog CICD-12 and CICD-28). Runs after CI passes on a push to main:
 #
-#   prepare -> images -> deploy -> smoke -> release           (and rollback if deploy or smoke fails)
-#                          \-> report (deployment status)
+#   prepare -> images -> deploy -> smoke -> pointer -> release   (and rollback if deploy or smoke fails)
+#                          \-> report (deployment status; also when images failed)
 #
 #   prepare  works out the commit, the mode and the previous good release (rollback target)
 #   images   image-build.yml: builds, health-checks and pushes both images to ghcr.io, tagged with the SHA
-#   deploy   each service's Render deploy hook for that commit, then waits until the service reports it
+#   deploy   each service's Render deploy hook, then waits until the service reports the commit. The
+#            frontend is built from the commit; the backend runs the image by digest (BACKEND_DEPLOY=image)
 #   smoke    staging-regression.yml: health, frontend and the Playwright tests tagged @staging
+#   pointer  image mode: moves backend:staging, the image Render restarts from, to the digest that passed
 #   release  an rc-* tag and a GitHub release whose record lists both components' commits, the images,
 #            the smoke result and how to recover. Only when every step before it passed.
-#   rollback redeploys the previous release's commits when deploy or smoke failed. The run still fails.
+#   rollback redeploys the previous release's commits (backend: its digest) when deploy or smoke failed,
+#            then rollback-report, rollback-smoke and rollback-pointer check it. The run still fails.
+#
+# A failed run started after a merge opens the issue "CD run failed after a merge to main"
+# (scheduled-failure-issue.yml).
 #
 # The release stages (images, smoke, release, rollback) are switched off until the repository variable
 # CD_RELEASE is "on" (Settings > Secrets and variables > Actions > Variables). While it is off, deploy
@@ -389,9 +395,9 @@ jobs:
           # Redeploy even when nothing changed, but never an older commit than the live one.
           FORCE: ${{ inputs.force || false }}
 
-  # Provisional until the Render spike (CICD-73 Task 2) shows whether Render re-pulls a moved tag: the
-  # deploy above is by digest, so this only keeps Render's configured image (`backend:staging`) on the
-  # version that passed, which is what a restart or scale-out pulls. Image mode only.
+  # The deploy above is by digest, so this only keeps Render's configured image (`backend:staging`) on the
+  # version that passed, which is what a restart or scale-out pulls. The Render spike (CICD-73 Task 2, #228)
+  # confirmed Render re-pulls a moved tag. Image mode only.
   pointer:
     name: Move the staging image pointer
     needs: [prepare, images, deploy, smoke]
@@ -506,11 +512,12 @@ jobs:
           PREVIOUS_BACKEND_REPORTS_COMMIT: ${{ needs.prepare.outputs.previous_backend_reports_commit }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
-      # A pre-release: staging only. Production is out of scope (CICD-38).
+      # A pre-release: staging only. Production is out of scope (CICD-38). When main has moved on with a
+      # workflow change, GitHub won't let this token tag the older commit, so the step stands down with a
+      # warning and the newer commit's run tags (#286). Other failures are tried up to four times, 45 s apart
+      # (#279); a release that was made anyway is kept, and gets its record attached if that is what failed.
       - name: Create the rc tag and release
-        run: >-
-          gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --target "$SHA" --prerelease
-          --title "$TAG" --notes-file release/release-record.md release/release-record.json
+        run: node scripts/create-release.js
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.record.outputs.tag }}
@@ -606,6 +613,8 @@ jobs:
           ROLLBACK: "true"
 
   # A rollback is checked like a deploy: health and a deployment status report, then the smoke tests.
+  # The report names the release restored and each service's commit (they often differ), and in image
+  # mode the backend digest gone back to.
   rollback-report:
     needs: [prepare, rollback]
     if: ${{ !cancelled() && needs.rollback.result != 'skipped' }}
@@ -615,7 +624,10 @@ jobs:
       result: ${{ needs.rollback.result }}
       url: https://peers-frontend-staging.onrender.com
       health_url: https://peers-backend-staging.onrender.com/api/health
+      release: ${{ needs.prepare.outputs.previous_tag }}
       commit: ${{ needs.prepare.outputs.previous_backend }}
+      frontend_commit: ${{ needs.prepare.outputs.previous_frontend }}
+      backend_image: ${{ needs.prepare.outputs.backend_mode == 'image' && needs.prepare.outputs.previous_backend_ref || '' }}
 
   rollback-smoke:
     needs: [rollback]
@@ -663,13 +675,24 @@ jobs:
         if: ${{ always() }}
         run: docker logout ghcr.io
 
+  # Names what went live: the commit, the image tag, and in image mode the backend image by digest, which
+  # is what Render runs. While CD_RELEASE is off there are no images, so both stay empty. A failed image
+  # build skips deploy, so it is reported here as a failure that deployed nothing (CICD-29: every CD run
+  # that got as far as building or deploying has a deployment status).
   report:
-    needs: [prepare, deploy]
-    if: ${{ !cancelled() && needs.deploy.result != 'skipped' }}
+    needs: [prepare, images, deploy]
+    if: ${{ !cancelled() && (needs.deploy.result != 'skipped' || needs.images.result == 'failure') }}
     uses: ./.github/workflows/deployment-status.yml
     with:
       environment: staging
-      result: ${{ needs.deploy.result }}
+      result: ${{ needs.images.result == 'failure' && 'failure' || needs.deploy.result }}
+      note: >-
+        ${{ needs.images.result == 'failure'
+        && 'Nothing was deployed: the image build failed, so the deploy did not run. Staging is unchanged.' || '' }}
       url: https://peers-frontend-staging.onrender.com
       health_url: https://peers-backend-staging.onrender.com/api/health
       commit: ${{ needs.prepare.outputs.sha }}
+      image_tag: ${{ needs.images.outputs.tag }}
+      backend_image: >-
+        ${{ needs.prepare.outputs.backend_mode == 'image' && needs.images.outputs.backend_digest != ''
+        && format('{0}@{1}', needs.images.outputs.backend_image, needs.images.outputs.backend_digest) || '' }}

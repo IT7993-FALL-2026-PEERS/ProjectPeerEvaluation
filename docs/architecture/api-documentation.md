@@ -97,7 +97,7 @@ takes the student's **university ID** string (for example `S0012345`).
 | `POST /auth/login` | 10 per 15 minutes | failed attempts only; a successful login is free |
 | `POST /auth/register` | 10 per hour | every request |
 | `POST /auth/reset-password` | 5 per hour | every request (each one sends an email) |
-| `POST /auth/verify-email` | 20 per hour, shared with the row below | every request |
+| `POST /auth/verify-email` and `POST /auth/verify-email/check` | 20 per hour, shared between the two | every request (opening the link and confirming use two) |
 | `POST /auth/update-password` | 20 per hour, separate | every request; kept apart from the row above so a burst of reset requests from a shared address cannot stop someone using the link they were just sent |
 | `/evaluate/*` (student links) | 600 per 15 minutes | every request; generous because a class can share one campus address |
 | everything else under `/api` | 1000 per 15 minutes | every request; `/api/health` is never limited |
@@ -127,6 +127,7 @@ on 404 instead of this shape.
 | GET | `/health` | 🌐 | Service and database health |
 | POST | `/auth/register` | 🌐 | Create a professor account (instructor email domains only) |
 | POST | `/auth/verify-email` | 🌐 | Confirm a new account's email address |
+| POST | `/auth/verify-email/check` | 🌐 | Is this confirmation link still usable? Changes nothing |
 | POST | `/auth/login` | 🌐 | Log in, get a token |
 | POST | `/auth/logout` | 🔒 | No-op; the client discards the token |
 | POST | `/auth/reset-password` | 🌐 | Email a password reset link |
@@ -152,6 +153,7 @@ on 404 instead of this shape.
 | POST | `/courses/:course_id/teams` | 🔒 | Create teams |
 | PUT | `/courses/:course_id/teams/:team_id` | 🔒 | Edit a team |
 | PUT | `/courses/:course_id/teams/:team_id/grade` | 🔒 | Set or clear the instructor's team grade (Contribution Multiplier) |
+| PUT | `/courses/:course_id/students/:student_id/grade` | 🔒 | Set or clear the instructor's final score for a student (Contribution Multiplier) |
 | DELETE | `/courses/:course_id/teams/:team_id` | 🔒 | Delete an empty team |
 | DELETE | `/courses/:course_id/teams` | 🔒 | Delete all teams |
 | POST | `/courses/:course_id/teams/auto-assign` | 🔒 | **501** — not implemented |
@@ -232,6 +234,15 @@ is enforced). The token is 32 random bytes valid for 48 hours; only its SHA-256 
 works once: confirming is one conditional update that needs the account to be pending and the token unexpired, so two confirmations at once cannot both succeed. **200** `{ "message": "Email confirmed. You can now log in." }` · **400** `VALIDATION_ERROR`
 missing or non-text token or password (checked before the lookup, so the link is not used up) ·
 **400** `TOKEN_ERROR` unknown, already used or expired.
+
+### `POST /auth/verify-email/check`
+
+Body: `{ "token" }`. The confirmation page calls it when it opens, so a dead link is said before a
+password is typed. It reads only: nothing is confirmed and the link is not used up. It is a POST so the
+token stays out of URLs and request logs. **200** `{ "valid": true }` · **400** `VALIDATION_ERROR`
+missing or non-text token · **400** `TOKEN_ERROR` unknown, already used or expired (one answer for
+all three, with no account details). If the check cannot be made, the page shows the form anyway;
+`POST /auth/verify-email` still decides.
 
 ### `POST /auth/login`
 
@@ -446,6 +457,7 @@ message quotes up to three problem rows.
 | `GET .../teams` | — | **200** array of teams, with each member's student record **without** `evaluation_token` or its expiry |
 | `POST .../teams` | `{ "teams": [{ "team_name": "Team 4", "team_status"? }, ...] }`. Only the name and status are read. Teams are created empty: add members with `POST .../teams/:team_id/students/:student_id` | **201** `{ "message": "Teams created.", "teams": [ids] }`. **400** `VALIDATION_ERROR` for a missing, blank or not numbered name (one bad name refuses the whole list), an unknown status, or a non-empty `students` list |
 | `PUT .../teams/:team_id` | `team_name` and/or `team_status` (`Active` or `Inactive`); other fields are ignored | **200** `{ "message", "team" }`. Renaming also updates each member's `group_assignment`. **400** for a blank name, a new name that is not numbered (a team named before the rule keeps its name while the name is left alone) or an unknown status |
+| `PUT .../students/:student_id/grade` | `{ "final_score": 0..100 }` or `{ "final_score": null }` (CICD-81: the instructor's final score for one student in the Contribution Multiplier report, used exactly as typed, not rounded; `null` goes back to the calculated grade) | **200** `{ "message", "student": { "_id", "student_id", "name", "final_grade_override" } }`. **400** `VALIDATION_ERROR` for anything that is not a finite number from 0 to 100 or `null`, or for an invalid student id. **404** for a student of another course (the student is looked up within the course in the URL) |
 | `PUT .../teams/:team_id/grade` | `{ "team_grade": 0..100 }` or `{ "team_grade": null }` (CICD-81: the instructor's grade for the team, used by the Contribution Multiplier report; `null` goes back to the grade the report proposes) | **200** `{ "message", "team" }`. **400** `VALIDATION_ERROR` for anything that is not a finite number from 0 to 100 or `null` (a missing field, a string, `101`), or for an invalid team id. **404** for a team of another course (the team is looked up within the course in the URL) |
 | `DELETE .../teams/:team_id` | — | **200** `{ "message" }`. **409** `CONSTRAINT_ERROR` if the team still has students |
 | `DELETE .../teams` | — | **200** `{ "message", "teams_deleted" }`. Students are kept and unassigned |
@@ -493,9 +505,9 @@ with a message saying so and `emails_sent: 0`. Partial failures still answer 200
 
 ### `GET .../evaluations/send-preview` and `GET /courses/:course_id/teams/:team_id/evaluations/send-preview`
 
-What the send above would do, without doing it (CICD-80): **200** `{ "no_teammates": ["<names>"], "will_invite": <count> }`.
+What the send above would do, without doing it (CICD-80): **200** `{ "no_teammates": ["<names>"], "will_invite": <count>, "estimated_seconds": <seconds> }`.
 `no_teammates` names the students the send cannot reach because they have nobody to rate (alone on their team, or with
-no team assigned); `will_invite` is how many students it would email (no active link, not submitted, someone to rate).
+no team assigned); `will_invite` is how many students it would email (no active link, not submitted, someone to rate). `estimated_seconds` is about how long that send takes at the current pace: one `EMAIL_SEND_INTERVAL_MS` for every email after the first, `0` when emails are not spaced (CICD-86). The Evaluation Status dialog shows both while the send runs ("Sending 5 invitations. This takes about 45 seconds. Keep this page open.") with a bar that moves at that pace; the bar is an estimate, not a report of emails sent.
 It uses the same students and the same rule as the send (`planInvitations`), and changes nothing: no link is issued and
 no email is sent. The Send dialogs call it when they open and warn the instructor, who can then check the assignment
 before choosing a deadline. **404** for a course that is not the caller's, or a team that is not in the course.
@@ -561,8 +573,8 @@ approval back); no copy of the earlier evaluations is kept. **200** `{ "message"
 
 ### `DELETE .../evaluations/reset`
 
-Deletes every evaluation in the course and clears all tokens, each student's submitted mark and any approved resubmission, so old links stop working and the next send reaches everyone again.
-**200** `{ "message", "tokens_cleared", "evaluations_deleted" }`.
+Deletes every evaluation in the course and clears all tokens, each student's submitted mark and any approved resubmission, so old links stop working and the next send reaches everyone again. It also clears the grades the instructor typed in the Contribution Multiplier report for this course (each student's `final_grade_override` and each team's `team_grade`), because they belong to the round being cleared (CICD-87); a roster upload does not clear them.
+**200** `{ "message", "tokens_cleared", "evaluations_deleted", "grades_cleared" }` (`grades_cleared`: typed final scores plus typed team grades).
 
 ---
 
@@ -591,18 +603,26 @@ and the 85 for equal scores; they are to be confirmed with her. `mean` returns t
 per-team report endpoints below always show the regular scores.
 
 **Contribution Multiplier (`gradingMethod=multiplier`; CICD-81, built before the sponsor's decision at Khoa's request).** The rule is in
-`docs/requirements/contribution-multiplier-proposal.md`, the constants (cap 1.00, floor 70) in `utils/contributionMultiplier.js`. Each team is
+`docs/requirements/contribution-multiplier-proposal.md`, the constants (cap 1.00, flag below 70) in `utils/contributionMultiplier.js`. Each team is
 graded on its own, not against the rest of the class. A student's `contributionScore` is the median of the scores of the
 ratings they received (a rating's score is the mean of its six criteria × 20; their own rating of themselves is not used).
 The team grade is the instructor's (`Team.team_grade`, set with `PUT .../teams/:team_id/grade`) or, when none is set, the highest
 `contributionScore` in the team. `multiplier` = the student's score ÷ the average score of the other scored teammates, at most 1
-(1 for a student alone, and for a student with no team, who is graded alone). `finalScore` = `teamGrade × multiplier`, never
-below the lower of 70 and `teamGrade`. A student nobody rated has `contributionScore`, `multiplier` and the grade of `null`
+(1 for a student alone, and for a student with no team, who is graded alone). `finalScore` = `teamGrade × multiplier`, rounded to the nearest 5 (halves up, at most 100; so it can end up to 2.5 above
+`teamGrade`, e.g. 99 becomes 100). There is no floor: a student the multiplier takes below 70 (and below `teamGrade`) keeps
+the real grade and has `flagged: true` (checked on the rounded grade, and only for a multiplier below 1), so the instructor can review the ratings behind it. A student nobody rated has `contributionScore`, `multiplier` and the grade of `null`
 and keeps `letterGrade: "No evaluations"`. `originalScore` stays the pooled mean, and the other methods' responses are unchanged. In this
-method each student also has `contributionScore`, `multiplier`, `teamGrade` and `teamGradeSource` (`automatic` or `instructor`),
+method each student also has `contributionScore`, `multiplier`, `flagged`, `teamGrade` and `teamGradeSource` (`automatic` or `instructor`),
 each team has `teamGrade`, `teamGradeSource` (`null` when nobody in the team has a rating and no grade was set),
 `automaticTeamGrade` (the proposed grade, `null` when nobody has a rating) and `team_grade` (the instructor's grade or `null`),
-and `gradingSettings` is `{ "cap": 1, "floor": 70 }`.
+`summary.flaggedStudents` counts the flagged students, `gradingSettings` is `{ "cap": 1, "flagBelow": 70 }`, and the CSV export has a
+`Flag` column ("Review: grade below 70" for a flagged student). The instructor can replace the final score of any student
+(`PUT .../students/:student_id/grade`, stored as `Student.final_grade_override`, `null` = calculated): in this method the student's
+`finalScore` is then the typed number, `finalScoreSource` is `instructor` (otherwise `calculated`, or `null` when nobody rated the
+student and no score was typed), `calculatedScore` is the grade the formula gives (`null` without ratings), `flagged` is `false`
+and `letterGrade` follows the typed score. A student with a typed score counts as graded in the class average, the grade
+distribution and the team average (`summary.studentsWithEvaluations` still counts only students somebody rated). The other
+methods ignore the typed score. The CSV has `Calculated Score` and `Final Score Source` columns.
 
 **200**
 ```json

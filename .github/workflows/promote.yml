@@ -12,7 +12,9 @@ name: Promote release candidate
 #   - deployment tags: rc-* only, so a run from main or any other ref is refused.
 #
 # check    the ref is an rc-* tag, its pre-release exists, and its release record names this commit, links
-#          the CD run that made it and says the smoke tests passed
+#          the CD run that made it and says the smoke tests passed. For a real promotion, also that main has
+#          not changed workflow files since the rc (#288): GitHub won't let the Actions token tag a commit
+#          whose workflows differ from main's, so publishing would fail after the approval
 # promote  waits for approval, runs the production deploy placeholder, then publishes the release
 #
 # Production hosting is out of scope for this project (CICD-38), so the deploy step is a documented
@@ -81,6 +83,17 @@ jobs:
           if gh release view "$release" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "::error::${release} already exists (a draft from an earlier dry run counts too). Delete it first to promote again."
             exit 1
+          fi
+          # A real promotion creates the release-* tag on this commit with the Actions token, which GitHub
+          # refuses (HTTP 403) when the commit's workflow files differ from main's (#286, #288). Refuse here,
+          # before anyone is asked to approve. A dry run makes a draft, which creates no tag.
+          if [ "$DRY_RUN" != "true" ]; then
+            changed=$(gh api "repos/${GITHUB_REPOSITORY}/compare/${GITHUB_SHA}...main" \
+              --jq 'if .status == "ahead" then [.files[]?.filename | select(startswith(".github/workflows/"))] | length else 0 end')
+            if [ "$changed" != "0" ]; then
+              echo "::error::main has changed workflow files since ${rc}, and GitHub does not let the Actions token tag a commit whose workflows differ from main's. Promote the newest rc-* release instead (made after the last workflow change), or run a dry run."
+              exit 1
+            fi
           fi
           { echo "rc_tag=${rc}"; echo "release_tag=${release}"; } >> "$GITHUB_OUTPUT"
           publish="\`${release}\`"

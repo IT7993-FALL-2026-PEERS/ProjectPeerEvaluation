@@ -32,6 +32,7 @@ async function startApp(t, limits = TINY) {
   app.post('/api/auth/reset-password', (req, res) => res.json({ ok: true }));
   app.post('/api/auth/update-password', (req, res) => res.json({ ok: true }));
   app.post('/api/auth/verify-email', (req, res) => res.json({ ok: true }));
+  app.post('/api/auth/verify-email/check', (req, res) => res.json({ valid: true }));
   app.get('/api/evaluate/:token', (req, res) => res.json({ form: true }));
   app.get('/api/courses', (req, res) => res.json([]));
   app.use(errorHandler);
@@ -134,6 +135,13 @@ test('TC-01-61: confirming an email address is limited like a password update, a
   const call = await startApp(t);
   assert.deepEqual(await statuses(call, 4, 'POST', '/api/auth/verify-email'), [200, 200, 200, 429]);
   assert.equal((await call('POST', '/api/auth/register')).status, 201);
+});
+
+test('TC-01-82: checking a confirmation link counts against the same limit as confirming, so the check cannot be used to try links without end', async (t) => {
+  const call = await startApp(t);
+  assert.deepEqual(await statuses(call, 2, 'POST', '/api/auth/verify-email/check'), [200, 200]);
+  assert.deepEqual(await statuses(call, 2, 'POST', '/api/auth/verify-email'), [200, 429]);
+  assert.equal((await call('POST', '/api/auth/verify-email/check')).status, 429);
 });
 
 test('TC-01-06: sign-up has its own limit', async (t) => {

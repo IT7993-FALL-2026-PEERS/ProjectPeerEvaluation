@@ -13,6 +13,7 @@ const StudentSchema = new mongoose.Schema({
 	evaluation_deadline_zone: { type: String, default: null }, // Zone the deadline is written in for this student's emails (CICD-67)
 	evaluation_completed: { type: Boolean, default: false },
 	resubmission_allowed: { type: Boolean, default: false }, // The instructor allowed one more submission (CICD-68); the next submit clears it
+	final_grade_override: { type: Number, min: 0, max: 100, default: null }, // The instructor's final score for the Contribution Multiplier report, used as typed; null = the calculated grade
 	created_at: { type: Date, default: Date.now }
 });
 

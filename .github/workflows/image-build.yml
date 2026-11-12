@@ -2,8 +2,9 @@ name: Image build and push
 
 # Builds the backend and frontend images from their Dockerfiles, starts them with Compose, checks
 # /api/health, and only then pushes both to GitHub Container Registry (backlog CICD-28). This is the
-# first job Donald's cd.yml calls. Per the Docker ADR (option C) the images are built, pushed and
-# tested, while Render still builds from the same commit.
+# first job Donald's cd.yml calls. Since CICD-73 the staging backend runs this backend image, deployed
+# by digest (BACKEND_DEPLOY=image); the frontend image is for testing and the release record, because the
+# staging frontend is a Render static site built from the same commit.
 #
 #   jobs:
 #     images:

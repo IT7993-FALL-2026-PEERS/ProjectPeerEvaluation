@@ -116,6 +116,24 @@ describe('a login that has run out, on the pages a visitor can open', () => {
     expect(localStorage.getItem('peer_eval_token')).toBe('a-newer-login');
   });
 
+  // CICD-85: the same visitor opening a professor page (a bookmark, a tab left open) got the dashboard with no
+  // courses under the banner. There is no work to keep on a page that has only just opened.
+  test.each(['/course-management', '/reports', '/settings'])(
+    '%s goes to a clean login page once the server refuses the login',
+    async (path) => {
+      vi.spyOn(api, 'post').mockRejectedValue({ response: { status: 401 } });
+      const get = vi.spyOn(api, 'get').mockRejectedValue({ response: { status: 401 } });
+      storeExpiredLogin();
+      renderAt(path);
+      expect(await screen.findByRole('heading', { name: 'Professor Login' })).toBeInTheDocument();
+      expect(screen.queryByText(MESSAGE)).not.toBeInTheDocument();
+      expect(localStorage.getItem('peer_eval_token')).toBeNull();
+      expect(localStorage.getItem('user')).toBeNull();
+      // The page behind the guard never opened, so it asked for nothing.
+      expect(get).not.toHaveBeenCalled();
+    }
+  );
+
   test('the login page keeps a login that is still good', async () => {
     const now = Math.floor(Date.now() / 1000);
     localStorage.setItem('peer_eval_token', `${encode({ alg: 'HS256' })}.${encode({ id: 'p1', iat: now - 600, exp: now + 3000 })}.sig`);

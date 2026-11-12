@@ -18,5 +18,7 @@ router.post('/update-password', authController.updatePassword);
 
 // Email confirmation for a newly registered professor (CW-11)
 router.post('/verify-email', authController.verifyEmail);
+// Read-only: is this confirmation link still usable? A POST so the token stays out of URLs and logs.
+router.post('/verify-email/check', authController.checkEmailLink);
 
 module.exports = router;
