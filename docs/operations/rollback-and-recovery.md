@@ -96,7 +96,9 @@ A rollback only changes what runs on staging. It does not change the code on `ma
 1. CD puts both services back on the last good release (the backend as its recorded image digest), checks them with
    the deployment status report and the smoke tests, and moves the `backend:staging` tag back, so a restart also lands
    on the good version. Staging works again without anyone clicking anything.
-2. The run stays red and no `rc-*` tag is made. That red run is the signal to act.
+2. The run stays red and no `rc-*` tag is made. That red run is the signal to act: it also opens (or comments on) the
+   issue "CD run failed after a merge to main", which lists the failed jobs. If it says the rollback did not finish,
+   staging may be broken: start at step 1 of R1.
 3. **The bad commit is still on `main`.** The next merge, even an unrelated one, deploys `main` again, bad change
    included, and fails the same way. So someone must either open a pull request with the fix, or revert the bad merge
    (R1, option C), and merge it once CI passes. CD then deploys the good code like any other change.
