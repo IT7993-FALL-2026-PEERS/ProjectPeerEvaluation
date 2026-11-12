@@ -99,3 +99,14 @@ test('TC-29-98: if main moves on with a workflow change while the step runs, a f
   const plain = fakeGh({ create: [1], compare: [''] });
   assert.equal(await main(env, { ...plain, ...noWait }), 1);
 });
+
+// #288: a real promotion tags the rc's commit with the same token, so it is refused before approval when
+// main has changed workflow files since; a dry run (a draft, no tag) is not.
+test('TC-29-99: promote.yml refuses, before approval, a real promotion of an rc that main has overtaken with a workflow change', () => {
+  const promote = fs.readFileSync(path.join(__dirname, '../../../.github/workflows/promote.yml'), 'utf8');
+  const check = promote.slice(promote.indexOf('  check:'), promote.indexOf('  promote:'));
+  assert.match(check, /if \[ "\$DRY_RUN" != "true" \]; then\n\s+changed=\$\(gh api "repos\/\$\{GITHUB_REPOSITORY\}\/compare\/\$\{GITHUB_SHA\}\.\.\.main"/);
+  assert.match(check, /select\(startswith\("\.github\/workflows\/"\)\)/);
+  assert.match(check, /::error::main has changed workflow files since/);
+  assert.doesNotMatch(check, /environment:/, 'the check runs before the production approval');
+});
