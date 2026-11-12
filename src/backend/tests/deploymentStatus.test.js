@@ -69,7 +69,7 @@ test('TC-29-49: the backend image deployed by digest is listed, and left out whe
 });
 
 // A rollback restores each service's own recorded commit, which often differ, so the report names both (#270).
-test('TC-29-50: a rollback report names the release and both commits; a plain deploy keeps one Commit row', () => {
+test('TC-29-91: a rollback report names the release and both commits; a plain deploy keeps one Commit row', () => {
   const md = formatMarkdown(buildStatus({ ENVIRONMENT: 'staging-rollback', RESULT: 'success', RELEASE: 'rc-20261105-1432-1a2b3c4', COMMIT: 'bbb222', FRONTEND_COMMIT: 'fff111' }, null));
   assert.match(md, /\| Release \| `rc-20261105-1432-1a2b3c4` \|/);
   assert.match(md, /\| Backend commit \| `bbb222` \|/);
@@ -80,7 +80,7 @@ test('TC-29-50: a rollback report names the release and both commits; a plain de
 });
 
 // A failed image build skips the deploy; the report still runs and says why nothing went out (#271).
-test('TC-29-51: a note explains a run that deployed nothing, and no health check is made for it', async (t) => {
+test('TC-29-92: a note explains a run that deployed nothing, and no health check is made for it', async (t) => {
   t.mock.method(console, 'log', () => {});
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'deployment-status-'));
   try {

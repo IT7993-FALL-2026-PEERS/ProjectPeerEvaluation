@@ -188,7 +188,7 @@ test('TC-10-83: a course send skips a student with no team, names them, and emai
   assert.ok(!(await Student.findById(IDS.ann)).evaluation_token, 'no link was issued');
 });
 
-test('TC-16-77: a student with no team gets an empty form, and a submit is refused with the no-teammates reason', async () => {
+test('TC-16-79: a student with no team gets an empty form, and a submit is refused with the no-teammates reason', async () => {
   const token = await giveAnnALink();
   await takeAnnOutOfHerTeam();
 
