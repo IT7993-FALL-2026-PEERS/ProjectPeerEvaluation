@@ -48,7 +48,7 @@ prepare ──► images ──► deploy (backend, frontend) ──► smoke �
 | `release` | Writes the release record (`scripts/release-record.js`), creates the `rc-<yyyymmdd>-<hhmm>-<sha7>` tag and a GitHub pre-release with the record attached. Refuses, with no tag, unless at least one `@staging` test ran and passed | `CD_RELEASE` on, images, deploy and smoke all passed |
 | `rollback` | Redeploys both services to the previous release's commits in rollback mode, the only mode allowed to go back to an older commit. The run stays failed | `CD_RELEASE` on, deploy or smoke failed, and an earlier pipeline release exists; or `rollback_to` |
 | `rollback-report`, `rollback-smoke` | A rollback is checked like a deploy: deployment status with the health check (naming the release restored, both services' commits and, in image mode, the backend digest), then Staging regression | rollback ran |
-| `report` | `deployment-status.yml`: deployment status in the summary, with the image tag and, in image mode, the backend image by digest | deploy ran |
+| `report` | `deployment-status.yml`: deployment status in the summary, with the image tag and, in image mode, the backend image by digest | deploy ran, or the image build failed (reported as *Failed*, nothing deployed) |
 
 **Release record.** It holds the release commit, the commit each component is actually running (read from staging, not
 assumed), both image references and digests, the smoke result with the number of `@staging` tests that ran, the CI run

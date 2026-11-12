@@ -669,14 +669,19 @@ jobs:
         run: docker logout ghcr.io
 
   # Names what went live: the commit, the image tag, and in image mode the backend image by digest, which
-  # is what Render runs. While CD_RELEASE is off there are no images, so both stay empty.
+  # is what Render runs. While CD_RELEASE is off there are no images, so both stay empty. A failed image
+  # build skips deploy, so it is reported here as a failure that deployed nothing (CICD-29: every CD run
+  # that got as far as building or deploying has a deployment status).
   report:
     needs: [prepare, images, deploy]
-    if: ${{ !cancelled() && needs.deploy.result != 'skipped' }}
+    if: ${{ !cancelled() && (needs.deploy.result != 'skipped' || needs.images.result == 'failure') }}
     uses: ./.github/workflows/deployment-status.yml
     with:
       environment: staging
-      result: ${{ needs.deploy.result }}
+      result: ${{ needs.images.result == 'failure' && 'failure' || needs.deploy.result }}
+      note: >-
+        ${{ needs.images.result == 'failure'
+        && 'Nothing was deployed: the image build failed, so the deploy did not run. Staging is unchanged.' || '' }}
       url: https://peers-frontend-staging.onrender.com
       health_url: https://peers-backend-staging.onrender.com/api/health
       commit: ${{ needs.prepare.outputs.sha }}
