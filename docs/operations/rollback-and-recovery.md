@@ -62,6 +62,10 @@ with C.
 
 ## R2. A CD run failed
 
+A CD run that started after a merge and failed opens the issue "CD run failed after a merge to main" (or comments on
+the open one), with the failed jobs listed. If it says the rollback did not finish, start with R1. Close the issue once a
+later CD run passes.
+
 Open the run and find the first red job.
 
 | Failed job | Meaning | Do |
@@ -81,6 +85,8 @@ Open the run and find the first red job.
 | Deploy: "was not live after 20 minutes" | Render's build failed, the service is suspended, or the new version doesn't start | Render > service > **Events / Logs**. Suspended: R3. Build or start error: fix in a pull request, or roll back (R1) |
 | smoke | Staging regression failed after the deploy | Its report artifact names the failing test. CD has already rolled back (`Roll back` jobs) if an earlier release exists |
 | Tag release candidate: "staging did not report its commits" | A service couldn't be asked which commit it runs | Check both URLs above. Re-run CD by hand once they answer |
+| Tag release candidate: warning "No rc-…: main has moved on to …, which changes workflow files" (run green) | `main` moved on during the run with a change under `.github/workflows/`, and GitHub does not let the Actions token tag a commit whose workflows differ from `main`'s (it answers `HTTP 403: Resource not accessible by integration`, #286). Nothing is wrong with the deploy | Nothing to do: the CD run for the newer commit deploys and tags it. Only this commit has no `rc-*` release |
+| Tag release candidate: "Could not publish rc-… after 4 attempts" | GitHub's API kept failing for another reason | Read the `gh` error above it. Don't use **Re-run failed jobs** once `main` has moved on: the record reads its commits from staging. If `/api/health` still reports this commit, run CD by hand on `main` (Actions > CD > Run workflow): it redeploys the same image, which is never overwritten, and tags it. Otherwise the next merge's run tags its own commit |
 | Tag release candidate: "no @staging tests ran" | Smoke passed with only the health and frontend checks | Tag at least one read-only Playwright test `@staging` (see `staging-regression.yml`) |
 | rollback-report or rollback-smoke | The rollback finished, but the old release isn't healthy either | The problem isn't the new code (database, settings, Render). Work through R3 to R6 |
 | report: "Deployment status: set ENVIRONMENT and RESULT" | Should no longer happen (an `abandoned` result was fixed in #156) | Re-run the run |
@@ -96,7 +102,9 @@ A rollback only changes what runs on staging. It does not change the code on `ma
 1. CD puts both services back on the last good release (the backend as its recorded image digest), checks them with
    the deployment status report and the smoke tests, and moves the `backend:staging` tag back, so a restart also lands
    on the good version. Staging works again without anyone clicking anything.
-2. The run stays red and no `rc-*` tag is made. That red run is the signal to act.
+2. The run stays red and no `rc-*` tag is made. That red run is the signal to act: it also opens (or comments on) the
+   issue "CD run failed after a merge to main", which lists the failed jobs. If it says the rollback did not finish,
+   staging may be broken: start at step 1 of R1.
 3. **The bad commit is still on `main`.** The next merge, even an unrelated one, deploys `main` again, bad change
    included, and fails the same way. So someone must either open a pull request with the fix, or revert the bad merge
    (R1, option C), and merge it once CI passes. CD then deploys the good code like any other change.

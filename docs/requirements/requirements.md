@@ -150,7 +150,7 @@ the server's clock (`X-Server-Time`), and a login that only looks expired is che
 the timeout message is shown. When the time runs out the page stays as it is and a Log in dialog signs the
 same professor back in on that page (the same login request; the new token replaces the old one), so what was typed in
 an open form is kept (with a form open, whose dialog traps the keyboard, the Log in dialog opens by itself above it);
-"Use the login page" leaves instead. The banner and the dialog appear only on the pages a professor reaches after logging in: not on the login page, password reset, email confirmation or a student's evaluation link, where there is no work to keep, and the login page forgets a stored login that has run out, so a professor who comes back to it sees a clean form (CICD-76). A log-in that is given up, or whose stored login changed meanwhile, stores nothing (CICD-69). A session
+"Use the login page" leaves instead. The banner and the dialog appear only on the pages a professor reaches after logging in: not on the login page, password reset, email confirmation or a student's evaluation link, where there is no work to keep, and the login page forgets a stored login that has run out, so a professor who comes back to it sees a clean form (CICD-76). A professor page that is opened with a stored login that has run out (a bookmark, a tab opened again) does the same: the server is asked first, because the browser's clock can be wrong, and if it refuses the login the login is forgotten and the login page is shown, not an empty page under the banner (CICD-85). A login that runs out while the page is open still gets the banner, so nothing typed is lost. A log-in that is given up, or whose stored login changed meanwhile, stores nothing (CICD-69). A session
 is capped at 8 hours since login (`SESSION_MAX_HOURS`). Before this change the expiry was
 absolute, one hour after login. **Still open for the sponsor:** the inherited requirement says
 30 minutes, the app uses 60, and the 8-hour cap is the team's own choice.
@@ -480,8 +480,11 @@ passed while it ran saves nothing.
 **Contribution Multiplier (CICD-81, the team's proposal, built before the sponsor's decision).** **Given** a generated report with the
 method "Contribution Multiplier", **when** the professor reads it, **then** each team has one grade (the highest student score in the
 team, or the grade the professor set for it), each student's final grade is the team grade times their multiplier (their median score
-divided by the average of their teammates, at most 1.00, never below 70 or the team grade if that is lower), and a student nobody rated
-has no grade. **Given** a team grade, **when** the professor changes it or goes back to the automatic one, **then** the report uses it
+divided by the average of their teammates, at most 1.00, rounded to the nearest 5; there is no floor, so a student the multiplier takes below 70 keeps that grade and
+is flagged for the professor in the report and the CSV), and a student nobody rated has no grade. **Given** a student in that report, **when**
+the professor opens the Review mark or the Edit button of the row and types a final score from 0 to 100, **then** the report uses it as
+typed (not rounded), marks it as adjusted and no longer flags the student; "back to calculated" removes it. This works for any student,
+also one nobody rated. **Given** a team grade, **when** the professor changes it or goes back to the automatic one, **then** the report uses it
 at once. Curved grading stays the default. See `docs/requirements/contribution-multiplier-proposal.md`.
 
 ### FR-18 — Average score per criterion

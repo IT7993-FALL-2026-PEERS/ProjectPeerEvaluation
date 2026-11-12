@@ -188,7 +188,7 @@ test('TC-10-83: a course send skips a student with no team, names them, and emai
   assert.ok(!(await Student.findById(IDS.ann)).evaluation_token, 'no link was issued');
 });
 
-test('TC-16-77: a student with no team gets an empty form, and a submit is refused with the no-teammates reason', async () => {
+test('TC-16-79: a student with no team gets an empty form, and a submit is refused with the no-teammates reason', async () => {
   const token = await giveAnnALink();
   await takeAnnOutOfHerTeam();
 
@@ -238,6 +238,21 @@ test('TC-10-85: the team send preview names a student alone on the team, and is 
   assert.deepEqual(three.body.no_teammates, []);
   assert.equal(three.body.will_invite, 3);
   assert.equal(sentEmails.length, 0);
+});
+
+test('TC-10-89: the send preview says how long the send will take at the current pace', async () => {
+  const before = process.env.EMAIL_SEND_INTERVAL_MS;
+  try {
+    delete process.env.EMAIL_SEND_INTERVAL_MS;
+    assert.equal((await preview()).body.estimated_seconds, 0, 'emails are not spaced');
+    process.env.EMAIL_SEND_INTERVAL_MS = '11000';
+    const paced = await preview();
+    assert.equal(paced.body.will_invite, 3);
+    assert.equal(paced.body.estimated_seconds, 22, 'three emails, two gaps of 11 s');
+    assert.equal((await preview(`teams/${IDS.teamAlpha}/evaluations/send-preview`)).body.estimated_seconds, 0, 'nobody to email');
+  } finally {
+    if (before === undefined) delete process.env.EMAIL_SEND_INTERVAL_MS; else process.env.EMAIL_SEND_INTERVAL_MS = before;
+  }
 });
 
 test('TC-10-86: the send previews are for the course\'s own professor, and a team of another course is not found', async () => {

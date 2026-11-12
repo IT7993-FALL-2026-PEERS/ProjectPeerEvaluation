@@ -26,6 +26,13 @@ function getRecipientLimit(env = process.env) {
   return Math.floor(getRequestBudgetMs(env) / intervalMs) + 1; // the first email needs no wait
 }
 
+// About how long a send to `recipients` students takes, in whole seconds: one interval for every email after the
+// first (CICD-86). The page shows it while the request runs. The mail server's own time is not counted.
+function estimateSendSeconds(recipients, intervalMs = getEmailIntervalMs()) {
+  if (!(recipients > 1) || !(intervalMs > 0)) return 0;
+  return Math.ceil(((recipients - 1) * intervalMs) / 1000);
+}
+
 const defaultSleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function createEmailPacer({ intervalMs = getEmailIntervalMs(), sleep = defaultSleep } = {}) {
@@ -39,4 +46,4 @@ function createEmailPacer({ intervalMs = getEmailIntervalMs(), sleep = defaultSl
   };
 }
 
-module.exports = { createEmailPacer, getEmailIntervalMs, getRecipientLimit, getRequestBudgetMs };
+module.exports = { createEmailPacer, estimateSendSeconds, getEmailIntervalMs, getRecipientLimit, getRequestBudgetMs };

@@ -4,10 +4,15 @@
 // .github/workflows/deployment-status.yml.
 //
 //   ENVIRONMENT=staging RESULT=success URL=https://... HEALTH_URL=https://.../api/health \
-//   COMMIT=<sha> IMAGE_TAG=<sha> RUN_URL=<run url> node scripts/deployment-status.js [output file]
+//   COMMIT=<sha> IMAGE_TAG=<sha> [BACKEND_IMAGE=<image>@sha256:<digest>] RUN_URL=<run url> \
+//   node scripts/deployment-status.js [output file]
 //
-//   RESULT      the deploy job's result: success, failure, cancelled, skipped or abandoned
-//   HEALTH_URL  optional; when set and RESULT is success, the app must answer 200 with status OK
+//   RESULT         the deploy job's result: success, failure, cancelled, skipped or abandoned
+//   BACKEND_IMAGE  optional; the backend image deployed by digest (BACKEND_DEPLOY=image)
+//   FRONTEND_COMMIT, RELEASE  optional; a rollback restores each service's own commit from an rc-* release.
+//                  With FRONTEND_COMMIT set, COMMIT is shown as the backend commit.
+//   NOTE           optional; why nothing was deployed, e.g. the image build failed and the deploy never ran
+//   HEALTH_URL     optional; when set and RESULT is success, the app must answer 200 with status OK
 //
 // Exit codes: 0 reported (including a failed deploy: the deploy job is what fails), 1 the deploy
 // succeeded but the health check did not, 2 missing or unusable settings.
@@ -48,8 +53,12 @@ function buildStatus(env, health, now = new Date()) {
     status: describe(env.RESULT, health),
     result: env.RESULT,
     url: env.URL || null,
+    release: env.RELEASE || null,
     commit: env.COMMIT || null,
+    frontendCommit: env.FRONTEND_COMMIT || null,
     imageTag: env.IMAGE_TAG || null,
+    backendImage: env.BACKEND_IMAGE || null,
+    note: env.NOTE || null,
     health: health ? health.detail : null,
     run: env.RUN_URL || null,
     checkedAt: now.toISOString(),
@@ -61,8 +70,12 @@ function formatMarkdown(status) {
     ['Environment', status.environment],
     ['Status', `**${status.status}**`],
     ['URL', status.url],
-    ['Commit', status.commit && `\`${status.commit}\``],
+    ['Release', status.release && `\`${status.release}\``],
+    [status.frontendCommit ? 'Backend commit' : 'Commit', status.commit && `\`${status.commit}\``],
+    ['Frontend commit', status.frontendCommit && `\`${status.frontendCommit}\``],
     ['Image tag', status.imageTag && `\`${status.imageTag}\``],
+    ['Backend image', status.backendImage && `\`${status.backendImage}\``],
+    ['Note', status.note],
     ['Health check', status.health],
     ['Checked at (UTC)', status.checkedAt],
   ].filter(([, value]) => value);

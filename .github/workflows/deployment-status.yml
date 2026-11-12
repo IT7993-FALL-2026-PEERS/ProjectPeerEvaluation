@@ -1,12 +1,13 @@
 name: Deployment status
 
-# Reusable. cd.yml calls it after its deploy job, even when the deploy failed, so every CD run
-# shows a "Deployment status" section in its summary and keeps deployment-status.json as an
-# artifact (backlog CICD-29). It does not deploy anything and needs no token.
+# Reusable. cd.yml calls it after its deploy job, even when the deploy failed or never ran because the
+# image build failed, so every CD run that built or deployed shows a "Deployment status" section in its
+# summary and keeps deployment-status.json as an artifact (backlog CICD-29); a run that stands down (main
+# moved on) has none. cd.yml also calls it after a rollback. It does not deploy anything and needs no token.
 #
 #   report:
-#     needs: [images, deploy]
-#     if: ${{ !cancelled() }}
+#     needs: [prepare, images, deploy]
+#     if: ${{ !cancelled() && (needs.deploy.result != 'skipped' || needs.images.result == 'failure') }}
 #     uses: ./.github/workflows/deployment-status.yml
 #     with:
 #       environment: staging
@@ -14,6 +15,7 @@ name: Deployment status
 #       url: https://<staging frontend>
 #       health_url: https://<staging backend>/api/health
 #       image_tag: ${{ needs.images.outputs.tag }}
+#       backend_image: ghcr.io/<owner>/<repo>/backend:<sha>@sha256:<digest>   # image mode only
 
 on:
   workflow_call:
@@ -41,8 +43,32 @@ on:
         type: string
         required: false
         default: ""
+      backend_image:
+        description: >-
+          Backend image that was deployed, pinned to its digest (image mode only), e.g.
+          ghcr.io/owner/repo/backend:<sha>@sha256:... Empty when the backend was built from source.
+        type: string
+        required: false
+        default: ""
       commit:
         description: Commit that was deployed. Defaults to the commit the run started from.
+        type: string
+        required: false
+        default: ""
+      frontend_commit:
+        description: >-
+          Frontend commit, when it can differ from `commit` (a rollback restores each service's own
+          recorded commit). When set, `commit` is reported as the backend commit.
+        type: string
+        required: false
+        default: ""
+      release:
+        description: The rc-* release that was restored (rollbacks only).
+        type: string
+        required: false
+        default: ""
+      note:
+        description: Why nothing was deployed, when that is not plain from the result (e.g. the image build failed).
         type: string
         required: false
         default: ""
@@ -72,7 +98,11 @@ jobs:
           URL: ${{ inputs.url }}
           HEALTH_URL: ${{ inputs.health_url }}
           IMAGE_TAG: ${{ inputs.image_tag }}
+          BACKEND_IMAGE: ${{ inputs.backend_image }}
           COMMIT: ${{ inputs.commit || github.sha }}
+          FRONTEND_COMMIT: ${{ inputs.frontend_commit }}
+          RELEASE: ${{ inputs.release }}
+          NOTE: ${{ inputs.note }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
       - name: Upload deployment status

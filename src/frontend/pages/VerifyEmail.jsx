@@ -1,7 +1,10 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { getApiBaseUrl } from '../services/apiUrl';
 import { useParams, useNavigate } from 'react-router-dom';
+
+// How long the page waits for the link check before showing the form anyway.
+const CHECK_TIMEOUT_MS = 10000;
 
 // The page the confirmation email links to (CW-11). Opening the link proves the professor owns the
 // mailbox, so this is where the password is chosen: a new account has none until now, which means nobody
@@ -11,7 +14,24 @@ function VerifyEmail() {
   const navigate = useNavigate();
   const [password, setPassword] = useState('');
   const [confirmation, setConfirmation] = useState('');
-  const [status, setStatus] = useState({ state: 'form', message: '' });
+  const [status, setStatus] = useState({ state: 'checking', message: '' });
+
+  // Ask the server about the link before showing the form, so a professor with an old email learns it
+  // is dead before typing a password (CICD-77). Only a refusal of the link itself hides the form: if the
+  // check cannot be made, or does not answer in time, the form is shown and the server still decides
+  // when the password is sent.
+  useEffect(() => {
+    let current = true;
+    axios.post(`${getApiBaseUrl()}/auth/verify-email/check`, { token }, { timeout: CHECK_TIMEOUT_MS })
+      .then(() => { if (current) setStatus({ state: 'form', message: '' }); })
+      .catch((err) => {
+        if (!current) return;
+        const error = err.response?.data?.error;
+        if (error?.code === 'TOKEN_ERROR') setStatus({ state: 'dead', message: error.message });
+        else setStatus({ state: 'form', message: '' });
+      });
+    return () => { current = false; };
+  }, [token]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -39,7 +59,9 @@ function VerifyEmail() {
   return (
     <div style={{ maxWidth: '400px', margin: 'auto', paddingTop: '50px' }}>
       <h2>Confirm Your Email</h2>
-      {status.state === 'done' ? (
+      {status.state === 'checking' ? (
+        <p role="status">Checking your link...</p>
+      ) : status.state === 'done' || status.state === 'dead' ? (
         <>
           <p role="status">{status.message}</p>
           <button type="button" onClick={() => navigate('/')} style={{ width: '100%', padding: '10px' }}>

@@ -35,10 +35,12 @@ import {
   People,
   School,
   ArrowBack,
-  Comment
+  Comment,
+  Edit
 } from '@mui/icons-material';
 import api from '../services/api';
 import TeamGradesPanel from '../components/TeamGradesPanel';
+import StudentGradeDialog from '../components/StudentGradeDialog';
 
 function Reports() {
   const [searchParams] = useSearchParams();
@@ -54,6 +56,7 @@ function Reports() {
   const [courseInfo, setCourseInfo] = useState(null); // Store individual course info
   const [commentsDialogOpen, setCommentsDialogOpen] = useState(false);
   const [selectedStudentComments, setSelectedStudentComments] = useState(null);
+  const [gradeEditing, setGradeEditing] = useState(null); // The student whose final score is being set (Contribution Multiplier)
 
   // Helper function to generate report for a specific course (the method is the one chosen in the box, unless one is given)
   const generateReportForCourse = useCallback(async (courseId, method = gradingMethod) => {
@@ -369,7 +372,8 @@ function Reports() {
                 <strong>Contribution Multiplier (the team&apos;s proposal, not yet decided by the sponsor):</strong> each team has one grade,
                 the highest student score in the team unless you set it. A student&apos;s score is the median of the ratings received;
                 the multiplier is that score ÷ the average of the other teammates, at most 1.00; the final grade is the team grade × the
-                multiplier, never below 70 (or the team grade, if that is lower). A student with no ratings has no grade.
+                multiplier, rounded to the nearest 5. There is no floor: a student the multiplier takes below 70 keeps that grade and is
+                flagged for you to review. A student with no ratings has no grade.
               </Alert>
             </Grid>
           )}
@@ -390,6 +394,20 @@ function Reports() {
       {/* Report Results */}
       {reportData && reportData.summary && (
         <>
+          {/* Contribution Multiplier: the students it took below 70 are flagged, the grade is not raised. The notice is
+              at the top so the instructor sees it first; each flagged student has a Review mark in the table. */}
+          {reportData.gradingMethod === 'multiplier' && reportData.summary?.flaggedStudents > 0 && (
+            <Alert severity="warning" sx={{ mb: 3 }}>
+              <strong>
+                {reportData.summary.flaggedStudents === 1
+                  ? '1 student is flagged for review'
+                  : `${reportData.summary.flaggedStudents} students are flagged for review`}
+              </strong>
+              : the multiplier took their grade below 70. They keep the grade it gives; look for the Review mark in
+              Student Results and check the ratings behind it before the grade is final.
+            </Alert>
+          )}
+
           {/* Summary Statistics */}
           <Grid container spacing={3} sx={{ mb: 3 }}>
             <Grid item xs={12} md={3}>
@@ -506,6 +524,16 @@ function Reports() {
             />
           )}
 
+          {/* The final score of one student: from the Review mark or the Edit button of a row */}
+          {reportData.gradingMethod === 'multiplier' && reportData.course?._id && (
+            <StudentGradeDialog
+              courseId={reportData.course._id}
+              student={gradeEditing}
+              onClose={() => setGradeEditing(null)}
+              onChanged={() => generateReportForCourse(reportData.course._id, 'multiplier')}
+            />
+          )}
+
           {/* Student Results Table */}
           <Paper sx={{ p: 3 }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
@@ -558,6 +586,16 @@ function Reports() {
                       )}
                       <TableCell align="center">
                         <strong>{student.finalScore}%</strong>
+                        {student.flagged && (
+                          <Tooltip title="The multiplier took this grade below 70. Click to check it and set the final score yourself.">
+                            <Chip label="Review" color="warning" size="small" sx={{ ml: 1 }} onClick={() => setGradeEditing(student)} aria-label={`Review ${student.name}`} />
+                          </Tooltip>
+                        )}
+                        {student.finalScoreSource === 'instructor' && (
+                          <Tooltip title={`You set this grade.${student.calculatedScore == null ? '' : ` Calculated: ${student.calculatedScore}%.`}`}>
+                            <Chip label="Adjusted" color="primary" size="small" sx={{ ml: 1 }} />
+                          </Tooltip>
+                        )}
                       </TableCell>
                       <TableCell align="center">
                         <Chip
@@ -594,6 +632,17 @@ function Reports() {
                           {Array.isArray(student.evaluationDetails) && student.evaluationDetails.some(ev => ev.aiFlags?.flagged) && (
                             <Tooltip title="Flagged Evaluation">
                               <span role="img" aria-label="flag" style={{ color: '#d32f2f', fontWeight: 'bold', fontSize: '1.5em', marginRight: 12 }}>🚩</span>
+                            </Tooltip>
+                          )}
+                          {reportData.gradingMethod === 'multiplier' && (
+                            <Tooltip title="Set the final score">
+                              <IconButton
+                                size="small"
+                                onClick={() => setGradeEditing(student)}
+                                aria-label={`Edit the final score of ${student.name}`}
+                              >
+                                <Edit />
+                              </IconButton>
                             </Tooltip>
                           )}
                           <Tooltip title="View Comments">

@@ -57,6 +57,48 @@ test('TC-29-45: the section lists environment, status, commit and image tag, and
   assert.doesNotMatch(md, /\| URL \|/);
 });
 
+// In image mode (BACKEND_DEPLOY=image) Render runs the backend image by digest, so the report names it (#269).
+test('TC-29-49: the backend image deployed by digest is listed, and left out when the backend was built from source', () => {
+  const image = `ghcr.io/o/r/backend:abc123@sha256:${'a'.repeat(64)}`;
+  const status = buildStatus({ ENVIRONMENT: 'staging', RESULT: 'success', COMMIT: 'abc123', BACKEND_IMAGE: image }, null);
+  assert.equal(status.backendImage, image);
+  assert.ok(formatMarkdown(status).includes(`| Backend image | \`${image}\` |`));
+  const source = buildStatus({ ENVIRONMENT: 'staging', RESULT: 'success', COMMIT: 'abc123', BACKEND_IMAGE: '' }, null);
+  assert.equal(source.backendImage, null);
+  assert.doesNotMatch(formatMarkdown(source), /Backend image/);
+});
+
+// A rollback restores each service's own recorded commit, which often differ, so the report names both (#270).
+test('TC-29-91: a rollback report names the release and both commits; a plain deploy keeps one Commit row', () => {
+  const md = formatMarkdown(buildStatus({ ENVIRONMENT: 'staging-rollback', RESULT: 'success', RELEASE: 'rc-20261105-1432-1a2b3c4', COMMIT: 'bbb222', FRONTEND_COMMIT: 'fff111' }, null));
+  assert.match(md, /\| Release \| `rc-20261105-1432-1a2b3c4` \|/);
+  assert.match(md, /\| Backend commit \| `bbb222` \|/);
+  assert.match(md, /\| Frontend commit \| `fff111` \|/);
+  const plain = formatMarkdown(buildStatus({ ENVIRONMENT: 'staging', RESULT: 'success', COMMIT: 'bbb222' }, null));
+  assert.match(plain, /\| Commit \| `bbb222` \|/);
+  assert.doesNotMatch(plain, /Release|Backend commit|Frontend commit/);
+});
+
+// A failed image build skips the deploy; the report still runs and says why nothing went out (#271).
+test('TC-29-92: a note explains a run that deployed nothing, and no health check is made for it', async (t) => {
+  t.mock.method(console, 'log', () => {});
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'deployment-status-'));
+  try {
+    const file = path.join(dir, 'status.json');
+    const note = 'Nothing was deployed: the image build failed, so the deploy did not run. Staging is unchanged.';
+    let probed = false;
+    const fetchImpl = async () => { probed = true; return reply(200, '{"status":"OK"}')(); };
+    assert.equal(await main({ ENVIRONMENT: 'staging', RESULT: 'failure', HEALTH_URL: 'https://x/api/health', NOTE: note }, file, { ...fast, fetchImpl }), 0);
+    const status = JSON.parse(fs.readFileSync(file, 'utf8'));
+    assert.equal(status.status, 'Failed');
+    assert.equal(status.note, note);
+    assert.equal(probed, false);
+    assert.ok(formatMarkdown(status).includes(`| Note | ${note} |`));
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('TC-29-46: main writes the summary and JSON file, and exits 1 only when a deploy that succeeded is unhealthy', async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'deploy-status-'));
   try {

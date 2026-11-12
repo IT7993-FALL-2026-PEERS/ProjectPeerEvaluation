@@ -2,7 +2,7 @@
 
 Decisions and outcomes from sponsor meetings. Earlier weekly updates are in the team's weekly log documents.
 
-## Oct 30, 2026 — the sponsor's answers to our Milestone 2 questions
+## October 30, 2026 — the sponsor's answers to our Milestone 2 questions
 
 - **Outcome:** the sponsor approved the Milestone 2 deliverables.
 - **A team of one:** the instructor should be notified *before* the evaluation about a single-member team, so they can verify the assignment; sending the form to a single member does not make sense. Today the instructor is told only after clicking Send. Not built yet.
