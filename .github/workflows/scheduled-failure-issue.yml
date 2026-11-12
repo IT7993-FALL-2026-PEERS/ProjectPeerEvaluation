@@ -1,14 +1,20 @@
 name: Scheduled failure issue
 
-# Opens a GitHub issue when a scheduled run fails (backlog CICD-88).
+# Opens a GitHub issue when an unattended run fails (backlog CICD-88, #272).
 #
-# The weekly runs (Staging regression, Security scan) start with nobody watching. When one of them
-# finishes, this workflow starts; it does something only if that run was started by the schedule and
-# failed or timed out. Then it opens one issue with a link to the run, or comments on the issue that
-# is already open for that workflow. Runs started by a push, a pull request or by hand are skipped,
-# so most runs of this workflow show as skipped: that is expected.
+# Two kinds of run start with nobody watching: the weekly runs (Staging regression, Security scan), and
+# CD, which deploys staging after every merge to main and rolls back by itself when the deploy or the
+# smoke tests fail. When one of them finishes, this workflow starts. It does something only if the run
+# failed or timed out and was started by the schedule (the weekly runs) or by CI finishing on main (CD,
+# event workflow_run). Then it opens one issue with a link to the run, or comments on the issue that is
+# already open for that workflow; for CD it also lists the failed jobs and warns first when the
+# rollback itself failed. Runs started by a push, a pull request or by hand are skipped, so most runs
+# of this workflow show as skipped: that is expected.
 #
-# It is a workflow of its own, not a job in the two workflows, because cd.yml calls
+# CI (push) -> CD (workflow_run) -> this workflow (workflow_run) is three levels, the most GitHub
+# chains with workflow_run.
+#
+# It is a workflow of its own, not a job in the watched workflows, because cd.yml calls
 # staging-regression.yml and a called workflow cannot ask for more permissions than its caller
 # gives: a job with `issues: write` there would stop every CD run.
 #
@@ -21,7 +27,7 @@ name: Scheduled failure issue
 
 on:
   workflow_run:
-    workflows: ["Staging regression", "Security scan"]
+    workflows: ["Staging regression", "Security scan", "CD"]
     types: [completed]
   workflow_dispatch:
     inputs:
@@ -31,6 +37,7 @@ on:
         options:
           - Staging regression
           - Security scan
+          - CD
         required: true
       dry_run:
         description: Only print what would be done.
@@ -45,7 +52,8 @@ jobs:
     name: Open or update the issue
     if: >-
       ${{ github.event_name == 'workflow_dispatch'
-      || (github.event.workflow_run.event == 'schedule'
+      || ((github.event.workflow_run.event == 'schedule'
+      || (github.event.workflow_run.name == 'CD' && github.event.workflow_run.event == 'workflow_run'))
       && contains(fromJSON('["failure", "timed_out"]'), github.event.workflow_run.conclusion)) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -55,8 +63,10 @@ jobs:
     concurrency:
       group: scheduled-failure-issue-${{ github.event.workflow_run.name || inputs.workflow }}
       cancel-in-progress: false
+    # actions: read, to list a failed CD run's failed jobs for the issue.
     permissions:
       contents: read
+      actions: read
       issues: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
