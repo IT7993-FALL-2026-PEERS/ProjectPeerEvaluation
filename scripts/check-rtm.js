@@ -5,7 +5,8 @@
 //   - every test file it names in backticks exists (a * stands for any run of characters);
 //   - every requirement row whose status is not Unsupported or Planned cites at least one test ID that
 //     exists, so a "covered" row is never covered only in words;
-//   - every requirement in docs/requirements/requirements.md has a row.
+//   - every requirement in docs/requirements/requirements.md has a row;
+//   - no test ID is the title of more than one test, so a citation always points at one test.
 //
 //   node scripts/check-rtm.js [--root <repo>] [--rtm <file>] [--requirements FR-01,FR-02,...]
 //
@@ -38,15 +39,18 @@ function walk(dir, files = []) {
   return files;
 }
 
-// The test IDs defined by test titles in the three test folders.
-function findKnownIds(root) {
+// The test IDs defined by test titles in the three test folders. `places` collects where each ID is
+// defined (file:line), so an ID used by two tests can be reported.
+function findKnownIds(root, places = new Map()) {
   const known = new Set();
   for (const parts of TEST_DIRS) {
     for (const file of walk(path.join(root, ...parts))) {
-      for (const line of fs.readFileSync(file, 'utf8').split(/\r?\n/)) {
+      fs.readFileSync(file, 'utf8').split(/\r?\n/).forEach((line, index) => {
         const match = TEST_TITLE.exec(line);
-        if (match) known.add(match[1]);
-      }
+        if (!match) return;
+        known.add(match[1]);
+        places.set(match[1], [...(places.get(match[1]) || []), `${path.relative(root, file)}:${index + 1}`]);
+      });
     }
   }
   return known;
@@ -107,7 +111,8 @@ function checkRtm({ root = path.join(__dirname, '..'), rtmPath, requirements } =
   const file = rtmPath || path.join(root, 'docs', 'requirements', 'rtm.md');
   const text = fs.readFileSync(file, 'utf8');
   const lines = text.split(/\r?\n/);
-  const known = findKnownIds(root);
+  const places = new Map();
+  const known = findKnownIds(root, places);
   const knownFiles = new Set(
     [path.join(root, 'src'), path.join(root, 'e2e')].flatMap((dir) => walk(dir)).map((f) => path.basename(f)),
   );
@@ -143,6 +148,11 @@ function checkRtm({ root = path.join(__dirname, '..'), rtmPath, requirements } =
     if (ids.length === 0) {
       problems.push(`${requirementName(row.cells)} (${row.status.split(' ')[0] || 'no status'}) cites no test ID that exists in the code`);
     }
+  }
+
+  // A test ID names one test: the matrix cites IDs, and a duplicate makes the citation ambiguous.
+  for (const [id, where] of places) {
+    if (where.length > 1) problems.push(`${id} is the title of more than one test (${where.join(', ')})`);
   }
 
   // Every requirement has a row.

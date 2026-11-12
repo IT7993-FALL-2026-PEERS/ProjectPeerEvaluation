@@ -157,3 +157,14 @@ test('TC-RTM-12: the command exits 2 when the matrix cannot be read', () => {
 
   assert.equal(run.status, 2);
 });
+
+// #280: two tests once shared TC-29-50 and TC-29-51, and the matrix still pointed at the old one.
+test('TC-RTM-13: a test ID used by more than one test is reported with both places', () => {
+  const result = check({
+    'src/backend/tests/a.test.js': ['TC-01-01', 'TC-01-02'],
+    'src/backend/tests/b.test.js': ['TC-01-02'],
+  }, matrix(row('FR-01', 'TC-01-01')));
+
+  assert.equal(result.problems.length, 1);
+  assert.match(result.problems[0], /TC-01-02 is the title of more than one test \(src\/backend\/tests\/a\.test\.js:2, src\/backend\/tests\/b\.test\.js:1\)/);
+});
