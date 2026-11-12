@@ -68,6 +68,17 @@ test('TC-29-49: the backend image deployed by digest is listed, and left out whe
   assert.doesNotMatch(formatMarkdown(source), /Backend image/);
 });
 
+// A rollback restores each service's own recorded commit, which often differ, so the report names both (#270).
+test('TC-29-50: a rollback report names the release and both commits; a plain deploy keeps one Commit row', () => {
+  const md = formatMarkdown(buildStatus({ ENVIRONMENT: 'staging-rollback', RESULT: 'success', RELEASE: 'rc-20261105-1432-1a2b3c4', COMMIT: 'bbb222', FRONTEND_COMMIT: 'fff111' }, null));
+  assert.match(md, /\| Release \| `rc-20261105-1432-1a2b3c4` \|/);
+  assert.match(md, /\| Backend commit \| `bbb222` \|/);
+  assert.match(md, /\| Frontend commit \| `fff111` \|/);
+  const plain = formatMarkdown(buildStatus({ ENVIRONMENT: 'staging', RESULT: 'success', COMMIT: 'bbb222' }, null));
+  assert.match(plain, /\| Commit \| `bbb222` \|/);
+  assert.doesNotMatch(plain, /Release|Backend commit|Frontend commit/);
+});
+
 test('TC-29-46: main writes the summary and JSON file, and exits 1 only when a deploy that succeeded is unhealthy', async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'deploy-status-'));
   try {
