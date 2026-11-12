@@ -83,7 +83,10 @@ The production deploy step is a placeholder.
 1. Actions > **Promote release candidate** > Run workflow > **Use workflow from > Tags >** `rc-…`.
    Leave **dry_run** ticked for a rehearsal. A dry run publishes a *draft* release, which only maintainers can see.
 2. `Check the release candidate` confirms it's a real `rc-*` from CD: its record names the tag's commit, links the
-   CD run that made it, and says the smoke tests passed. A hand-made release candidate is refused.
+   CD run that made it, and says the smoke tests passed. A hand-made release candidate is refused. For a real
+   promotion (dry_run unticked) it also refuses a candidate made before the last change to `.github/workflows/` on
+   `main`: GitHub won't let the workflow's token tag a commit whose workflows differ from `main`'s, so publishing
+   would fail after the approval. Promote the newest `rc-*` release instead. A dry run is never refused for this.
 3. `Promote to production` **waits for approval**. Ask Dr. Vyas or Khoa: one approval is enough, and whoever
    started the run can't approve it. The approver opens the run > **Review deployments** > tick `production` >
    **Approve and deploy**.
