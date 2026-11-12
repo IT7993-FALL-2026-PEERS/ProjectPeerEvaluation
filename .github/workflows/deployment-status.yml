@@ -54,6 +54,18 @@ on:
         type: string
         required: false
         default: ""
+      frontend_commit:
+        description: >-
+          Frontend commit, when it can differ from `commit` (a rollback restores each service's own
+          recorded commit). When set, `commit` is reported as the backend commit.
+        type: string
+        required: false
+        default: ""
+      release:
+        description: The rc-* release that was restored (rollbacks only).
+        type: string
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -82,6 +94,8 @@ jobs:
           IMAGE_TAG: ${{ inputs.image_tag }}
           BACKEND_IMAGE: ${{ inputs.backend_image }}
           COMMIT: ${{ inputs.commit || github.sha }}
+          FRONTEND_COMMIT: ${{ inputs.frontend_commit }}
+          RELEASE: ${{ inputs.release }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
       - name: Upload deployment status

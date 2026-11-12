@@ -606,6 +606,8 @@ jobs:
           ROLLBACK: "true"
 
   # A rollback is checked like a deploy: health and a deployment status report, then the smoke tests.
+  # The report names the release restored and each service's commit (they often differ), and in image
+  # mode the backend digest gone back to.
   rollback-report:
     needs: [prepare, rollback]
     if: ${{ !cancelled() && needs.rollback.result != 'skipped' }}
@@ -615,7 +617,10 @@ jobs:
       result: ${{ needs.rollback.result }}
       url: https://peers-frontend-staging.onrender.com
       health_url: https://peers-backend-staging.onrender.com/api/health
+      release: ${{ needs.prepare.outputs.previous_tag }}
       commit: ${{ needs.prepare.outputs.previous_backend }}
+      frontend_commit: ${{ needs.prepare.outputs.previous_frontend }}
+      backend_image: ${{ needs.prepare.outputs.backend_mode == 'image' && needs.prepare.outputs.previous_backend_ref || '' }}
 
   rollback-smoke:
     needs: [rollback]

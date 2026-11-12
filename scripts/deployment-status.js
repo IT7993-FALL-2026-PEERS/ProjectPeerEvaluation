@@ -9,6 +9,8 @@
 //
 //   RESULT         the deploy job's result: success, failure, cancelled, skipped or abandoned
 //   BACKEND_IMAGE  optional; the backend image deployed by digest (BACKEND_DEPLOY=image)
+//   FRONTEND_COMMIT, RELEASE  optional; a rollback restores each service's own commit from an rc-* release.
+//                  With FRONTEND_COMMIT set, COMMIT is shown as the backend commit.
 //   HEALTH_URL     optional; when set and RESULT is success, the app must answer 200 with status OK
 //
 // Exit codes: 0 reported (including a failed deploy: the deploy job is what fails), 1 the deploy
@@ -50,7 +52,9 @@ function buildStatus(env, health, now = new Date()) {
     status: describe(env.RESULT, health),
     result: env.RESULT,
     url: env.URL || null,
+    release: env.RELEASE || null,
     commit: env.COMMIT || null,
+    frontendCommit: env.FRONTEND_COMMIT || null,
     imageTag: env.IMAGE_TAG || null,
     backendImage: env.BACKEND_IMAGE || null,
     health: health ? health.detail : null,
@@ -64,7 +68,9 @@ function formatMarkdown(status) {
     ['Environment', status.environment],
     ['Status', `**${status.status}**`],
     ['URL', status.url],
-    ['Commit', status.commit && `\`${status.commit}\``],
+    ['Release', status.release && `\`${status.release}\``],
+    [status.frontendCommit ? 'Backend commit' : 'Commit', status.commit && `\`${status.commit}\``],
+    ['Frontend commit', status.frontendCommit && `\`${status.frontendCommit}\``],
     ['Image tag', status.imageTag && `\`${status.imageTag}\``],
     ['Backend image', status.backendImage && `\`${status.backendImage}\``],
     ['Health check', status.health],
