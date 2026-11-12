@@ -79,6 +79,26 @@ test('TC-29-50: a rollback report names the release and both commits; a plain de
   assert.doesNotMatch(plain, /Release|Backend commit|Frontend commit/);
 });
 
+// A failed image build skips the deploy; the report still runs and says why nothing went out (#271).
+test('TC-29-51: a note explains a run that deployed nothing, and no health check is made for it', async (t) => {
+  t.mock.method(console, 'log', () => {});
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'deployment-status-'));
+  try {
+    const file = path.join(dir, 'status.json');
+    const note = 'Nothing was deployed: the image build failed, so the deploy did not run. Staging is unchanged.';
+    let probed = false;
+    const fetchImpl = async () => { probed = true; return reply(200, '{"status":"OK"}')(); };
+    assert.equal(await main({ ENVIRONMENT: 'staging', RESULT: 'failure', HEALTH_URL: 'https://x/api/health', NOTE: note }, file, { ...fast, fetchImpl }), 0);
+    const status = JSON.parse(fs.readFileSync(file, 'utf8'));
+    assert.equal(status.status, 'Failed');
+    assert.equal(status.note, note);
+    assert.equal(probed, false);
+    assert.ok(formatMarkdown(status).includes(`| Note | ${note} |`));
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('TC-29-46: main writes the summary and JSON file, and exits 1 only when a deploy that succeeded is unhealthy', async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'deploy-status-'));
   try {

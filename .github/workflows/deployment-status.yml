@@ -1,6 +1,7 @@
 name: Deployment status
 
-# Reusable. cd.yml calls it after its deploy job, even when the deploy failed, so every CD run
+# Reusable. cd.yml calls it after its deploy job, even when the deploy failed or never ran because
+# the image build failed, so every CD run
 # shows a "Deployment status" section in its summary and keeps deployment-status.json as an
 # artifact (backlog CICD-29). It does not deploy anything and needs no token.
 #
@@ -66,6 +67,11 @@ on:
         type: string
         required: false
         default: ""
+      note:
+        description: Why nothing was deployed, when that is not plain from the result (e.g. the image build failed).
+        type: string
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -96,6 +102,7 @@ jobs:
           COMMIT: ${{ inputs.commit || github.sha }}
           FRONTEND_COMMIT: ${{ inputs.frontend_commit }}
           RELEASE: ${{ inputs.release }}
+          NOTE: ${{ inputs.note }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
       - name: Upload deployment status
