@@ -136,8 +136,8 @@ and run CD by hand.
 
 ## Production approval gate (`promote.yml`, CICD-30)
 
-A separate, manual workflow that turns an `rc-*` release candidate from `cd.yml` into a GitHub Release once the sponsor
-or the team leader approves it. Production hosting is out of scope (CICD-38), so the production deploy step is a
+A separate, manual workflow that turns an `rc-*` release candidate from `cd.yml` into a GitHub Release once Dr. Vyas
+or Khoa approves it. Production hosting is out of scope (CICD-38), so the production deploy step is a
 documented placeholder that deploys nothing. The gate and the release are real.
 
 **Run it:** Actions > Promote release candidate > Run workflow > **Use workflow from > Tags > `rc-...`**. Leave
@@ -215,6 +215,13 @@ Production hosting is out of scope, so staging is the only deploy target. The `s
 hooks for `cd.yml`. The `production` environment is only the approval gate for `promote.yml`: it has reviewers and no
 secrets, and nothing deploys to it. `main - peers-backend-staging` and `main - peers-frontend-staging` are created by Render when it
 deploys `main`.
+
+**Staging has no required reviewers, on purpose** (#290). The project plan asks for required reviewers on both
+staging and production. Staging has only a deployment branch policy: only `main` can deploy to it. CD deploys it
+after every merge that passes CI, then runs the smoke tests and rolls back automatically if the deploy or the tests
+fail, so a broken change doesn't stay on staging. A reviewer there would hold up every merge without adding a
+check the smoke tests don't already make. The human decision is on `production`, where a release needs Dr. Vyas or
+Khoa and the person who started the run can't approve it (see Production approval gate above).
 
 On 5 October 2026 we removed the leftovers from the unmerged `with-test-coverage` branch (audit A-05, A-06):
 the `production-backend`, `production-frontend` and `with-test-coverage - peer-evaluation-backend` environments, the

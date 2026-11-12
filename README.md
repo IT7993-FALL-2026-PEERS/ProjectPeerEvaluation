@@ -110,7 +110,7 @@ flowchart TB
     RBCHECK --> FIX
 
     MERGE --> ARTIFACTS
-    DREPORT --> APPROVE{{"Manual approval required<br/>(sponsor or team leader)"}}
+    DREPORT --> APPROVE{{"Manual approval required<br/>(Dr. Vyas or Khoa)"}}
     APPROVE --> PROD(["Publish a GitHub release<br/>(production hosting is out of scope)"])
 
     classDef done fill:#dcfce7,stroke:#15803d,color:#14532d,stroke-width:3px
