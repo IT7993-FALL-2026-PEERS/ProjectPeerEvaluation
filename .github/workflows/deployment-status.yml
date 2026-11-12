@@ -14,6 +14,7 @@ name: Deployment status
 #       url: https://<staging frontend>
 #       health_url: https://<staging backend>/api/health
 #       image_tag: ${{ needs.images.outputs.tag }}
+#       backend_image: ghcr.io/<owner>/<repo>/backend:<sha>@sha256:<digest>   # image mode only
 
 on:
   workflow_call:
@@ -38,6 +39,13 @@ on:
         default: ""
       image_tag:
         description: Tag of the images that were deployed (the commit SHA).
+        type: string
+        required: false
+        default: ""
+      backend_image:
+        description: >-
+          Backend image that was deployed, pinned to its digest (image mode only), e.g.
+          ghcr.io/owner/repo/backend:<sha>@sha256:... Empty when the backend was built from source.
         type: string
         required: false
         default: ""
@@ -72,6 +80,7 @@ jobs:
           URL: ${{ inputs.url }}
           HEALTH_URL: ${{ inputs.health_url }}
           IMAGE_TAG: ${{ inputs.image_tag }}
+          BACKEND_IMAGE: ${{ inputs.backend_image }}
           COMMIT: ${{ inputs.commit || github.sha }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
