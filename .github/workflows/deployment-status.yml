@@ -1,13 +1,13 @@
 name: Deployment status
 
-# Reusable. cd.yml calls it after its deploy job, even when the deploy failed or never ran because
-# the image build failed, so every CD run
-# shows a "Deployment status" section in its summary and keeps deployment-status.json as an
-# artifact (backlog CICD-29). It does not deploy anything and needs no token.
+# Reusable. cd.yml calls it after its deploy job, even when the deploy failed or never ran because the
+# image build failed, so every CD run that built or deployed shows a "Deployment status" section in its
+# summary and keeps deployment-status.json as an artifact (backlog CICD-29); a run that stands down (main
+# moved on) has none. cd.yml also calls it after a rollback. It does not deploy anything and needs no token.
 #
 #   report:
-#     needs: [images, deploy]
-#     if: ${{ !cancelled() }}
+#     needs: [prepare, images, deploy]
+#     if: ${{ !cancelled() && (needs.deploy.result != 'skipped' || needs.images.result == 'failure') }}
 #     uses: ./.github/workflows/deployment-status.yml
 #     with:
 #       environment: staging

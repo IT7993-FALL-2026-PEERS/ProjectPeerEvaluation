@@ -6,16 +6,22 @@ run-name: "${{ inputs.rollback_to != '' && format('CD: roll back to {0}', inputs
 
 # Delivery pipeline for staging (backlog CICD-12 and CICD-28). Runs after CI passes on a push to main:
 #
-#   prepare -> images -> deploy -> smoke -> release           (and rollback if deploy or smoke fails)
-#                          \-> report (deployment status)
+#   prepare -> images -> deploy -> smoke -> pointer -> release   (and rollback if deploy or smoke fails)
+#                          \-> report (deployment status; also when images failed)
 #
 #   prepare  works out the commit, the mode and the previous good release (rollback target)
 #   images   image-build.yml: builds, health-checks and pushes both images to ghcr.io, tagged with the SHA
-#   deploy   each service's Render deploy hook for that commit, then waits until the service reports it
+#   deploy   each service's Render deploy hook, then waits until the service reports the commit. The
+#            frontend is built from the commit; the backend runs the image by digest (BACKEND_DEPLOY=image)
 #   smoke    staging-regression.yml: health, frontend and the Playwright tests tagged @staging
+#   pointer  image mode: moves backend:staging, the image Render restarts from, to the digest that passed
 #   release  an rc-* tag and a GitHub release whose record lists both components' commits, the images,
 #            the smoke result and how to recover. Only when every step before it passed.
-#   rollback redeploys the previous release's commits when deploy or smoke failed. The run still fails.
+#   rollback redeploys the previous release's commits (backend: its digest) when deploy or smoke failed,
+#            then rollback-report, rollback-smoke and rollback-pointer check it. The run still fails.
+#
+# A failed run started after a merge opens the issue "CD run failed after a merge to main"
+# (scheduled-failure-issue.yml).
 #
 # The release stages (images, smoke, release, rollback) are switched off until the repository variable
 # CD_RELEASE is "on" (Settings > Secrets and variables > Actions > Variables). While it is off, deploy
@@ -389,9 +395,9 @@ jobs:
           # Redeploy even when nothing changed, but never an older commit than the live one.
           FORCE: ${{ inputs.force || false }}
 
-  # Provisional until the Render spike (CICD-73 Task 2) shows whether Render re-pulls a moved tag: the
-  # deploy above is by digest, so this only keeps Render's configured image (`backend:staging`) on the
-  # version that passed, which is what a restart or scale-out pulls. Image mode only.
+  # The deploy above is by digest, so this only keeps Render's configured image (`backend:staging`) on the
+  # version that passed, which is what a restart or scale-out pulls. The Render spike (CICD-73 Task 2, #228)
+  # confirmed Render re-pulls a moved tag. Image mode only.
   pointer:
     name: Move the staging image pointer
     needs: [prepare, images, deploy, smoke]
