@@ -57,6 +57,17 @@ test('TC-29-45: the section lists environment, status, commit and image tag, and
   assert.doesNotMatch(md, /\| URL \|/);
 });
 
+// In image mode (BACKEND_DEPLOY=image) Render runs the backend image by digest, so the report names it (#269).
+test('TC-29-49: the backend image deployed by digest is listed, and left out when the backend was built from source', () => {
+  const image = `ghcr.io/o/r/backend:abc123@sha256:${'a'.repeat(64)}`;
+  const status = buildStatus({ ENVIRONMENT: 'staging', RESULT: 'success', COMMIT: 'abc123', BACKEND_IMAGE: image }, null);
+  assert.equal(status.backendImage, image);
+  assert.ok(formatMarkdown(status).includes(`| Backend image | \`${image}\` |`));
+  const source = buildStatus({ ENVIRONMENT: 'staging', RESULT: 'success', COMMIT: 'abc123', BACKEND_IMAGE: '' }, null);
+  assert.equal(source.backendImage, null);
+  assert.doesNotMatch(formatMarkdown(source), /Backend image/);
+});
+
 test('TC-29-46: main writes the summary and JSON file, and exits 1 only when a deploy that succeeded is unhealthy', async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'deploy-status-'));
   try {
