@@ -49,7 +49,7 @@ test('TC-SEC-03: every suppression says why, in the notes', () => {
   }
 });
 
-test('TC-SEC-04: a suppression covers one advisory of one exact package version, never a package or a pattern', () => {
+test('TC-SEC-13: a suppression covers one advisory of one exact package version, never a package or a pattern', () => {
   for (const { body } of blocks) {
     const purl = /<packageUrl regex="true">(\^pkg:npm\/[^<]+\$)<\/packageUrl>/.exec(body);
     assert.ok(purl, `packageUrl must be an anchored regular expression: ${body.slice(0, 100)}`);
