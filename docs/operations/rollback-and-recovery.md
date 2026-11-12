@@ -62,6 +62,10 @@ with C.
 
 ## R2. A CD run failed
 
+A CD run that started after a merge and failed opens the issue "CD run failed after a merge to main" (or comments on
+the open one), with the failed jobs listed. If it says the rollback did not finish, start with R1. Close the issue once a
+later CD run passes.
+
 Open the run and find the first red job.
 
 | Failed job | Meaning | Do |
