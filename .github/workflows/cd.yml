@@ -512,9 +512,10 @@ jobs:
           PREVIOUS_BACKEND_REPORTS_COMMIT: ${{ needs.prepare.outputs.previous_backend_reports_commit }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
-      # A pre-release: staging only. Production is out of scope (CICD-38). Tried up to four times, 45 s
-      # apart, so a brief GitHub API error doesn't lose the release (#279); a release that was made anyway
-      # is kept, and gets its record attached if that is what failed.
+      # A pre-release: staging only. Production is out of scope (CICD-38). When main has moved on with a
+      # workflow change, GitHub won't let this token tag the older commit, so the step stands down with a
+      # warning and the newer commit's run tags (#286). Other failures are tried up to four times, 45 s apart
+      # (#279); a release that was made anyway is kept, and gets its record attached if that is what failed.
       - name: Create the rc tag and release
         run: node scripts/create-release.js
         env:
