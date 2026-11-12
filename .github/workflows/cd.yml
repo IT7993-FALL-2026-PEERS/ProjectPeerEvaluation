@@ -663,8 +663,10 @@ jobs:
         if: ${{ always() }}
         run: docker logout ghcr.io
 
+  # Names what went live: the commit, the image tag, and in image mode the backend image by digest, which
+  # is what Render runs. While CD_RELEASE is off there are no images, so both stay empty.
   report:
-    needs: [prepare, deploy]
+    needs: [prepare, images, deploy]
     if: ${{ !cancelled() && needs.deploy.result != 'skipped' }}
     uses: ./.github/workflows/deployment-status.yml
     with:
@@ -673,3 +675,7 @@ jobs:
       url: https://peers-frontend-staging.onrender.com
       health_url: https://peers-backend-staging.onrender.com/api/health
       commit: ${{ needs.prepare.outputs.sha }}
+      image_tag: ${{ needs.images.outputs.tag }}
+      backend_image: >-
+        ${{ needs.prepare.outputs.backend_mode == 'image' && needs.images.outputs.backend_digest != ''
+        && format('{0}@{1}', needs.images.outputs.backend_image, needs.images.outputs.backend_digest) || '' }}

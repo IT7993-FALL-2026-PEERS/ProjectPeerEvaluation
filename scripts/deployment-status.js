@@ -4,10 +4,12 @@
 // .github/workflows/deployment-status.yml.
 //
 //   ENVIRONMENT=staging RESULT=success URL=https://... HEALTH_URL=https://.../api/health \
-//   COMMIT=<sha> IMAGE_TAG=<sha> RUN_URL=<run url> node scripts/deployment-status.js [output file]
+//   COMMIT=<sha> IMAGE_TAG=<sha> [BACKEND_IMAGE=<image>@sha256:<digest>] RUN_URL=<run url> \
+//   node scripts/deployment-status.js [output file]
 //
-//   RESULT      the deploy job's result: success, failure, cancelled, skipped or abandoned
-//   HEALTH_URL  optional; when set and RESULT is success, the app must answer 200 with status OK
+//   RESULT         the deploy job's result: success, failure, cancelled, skipped or abandoned
+//   BACKEND_IMAGE  optional; the backend image deployed by digest (BACKEND_DEPLOY=image)
+//   HEALTH_URL     optional; when set and RESULT is success, the app must answer 200 with status OK
 //
 // Exit codes: 0 reported (including a failed deploy: the deploy job is what fails), 1 the deploy
 // succeeded but the health check did not, 2 missing or unusable settings.
@@ -50,6 +52,7 @@ function buildStatus(env, health, now = new Date()) {
     url: env.URL || null,
     commit: env.COMMIT || null,
     imageTag: env.IMAGE_TAG || null,
+    backendImage: env.BACKEND_IMAGE || null,
     health: health ? health.detail : null,
     run: env.RUN_URL || null,
     checkedAt: now.toISOString(),
@@ -63,6 +66,7 @@ function formatMarkdown(status) {
     ['URL', status.url],
     ['Commit', status.commit && `\`${status.commit}\``],
     ['Image tag', status.imageTag && `\`${status.imageTag}\``],
+    ['Backend image', status.backendImage && `\`${status.backendImage}\``],
     ['Health check', status.health],
     ['Checked at (UTC)', status.checkedAt],
   ].filter(([, value]) => value);
