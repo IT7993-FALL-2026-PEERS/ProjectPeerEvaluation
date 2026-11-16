@@ -15,10 +15,21 @@ the steps work. A run by such a teammate would also prove the docs are clear eno
 | You need | Check |
 |---|---|
 | Write access to the repository | you can open and merge pull requests |
-| Node 24 and npm 11 | `node -v` → `v24.x` (`nvm use` reads `.nvmrc`) |
+| Node 24 or newer, npm 11 | `node -v` → `v24` or above (`package.json` requires `>=24`; `.nvmrc` pins 24 and `nvm use` reads it on Linux and macOS) |
 | Docker with Compose 2.24+ | `docker compose version` |
 | Free ports 3000, 5000, 27017 | `ss -ltn \| grep -E ':(3000\|5000\|27017)\b'` prints nothing |
 | Staging running (steps 4 and 5) | `curl -s https://peers-backend-staging.onrender.com/api/health` answers `"status":"OK"` |
+
+> **These commands are bash.** On Windows use **Git Bash**, which ships with Git; `cmd` and
+> PowerShell cannot run the `(cd ... && ...)` subshells in step 2 or the inline
+> `E2E_START_SERVER=1`. The port check there is
+> `netstat -ano | findstr ":3000 :5000 :27017"`, which also matches remote addresses that
+> merely contain `3000` — that is not a port conflict.
+>
+> **If `docker` is not recognised on Windows** while Docker Desktop is running, it was
+> installed per user, into `%LOCALAPPDATA%\Programs\DockerDesktop\resources\bin` rather
+> than `C:\Program Files\Docker\...`, and that folder is not on PATH. Add it and open a
+> new terminal.
 
 ## Step 1. Run it locally
 
@@ -39,6 +50,8 @@ Expect `✔ backend is up`, `✔ frontend is up`, `Environment healthy.`, and fr
 > **6 Oct 2026: passed.** Setup took 46 s. npm warned that `core-js` install scripts were held back for approval;
 > that's harmless (now noted in the README). Verify passed and health said `connected`.
 
+> **16 Nov 2026: passed on Windows, after a fix.** Setup took 2 min. `npm run verify` failed with `$'\r': command not found` because Git checks the shell scripts out with CRLF endings; the `.gitattributes` added in the same pull request is the fix. Health said `connected`, with `"commit":null`, which is expected locally.
+
 **1b. In containers** ([Docker setup](../docker-setup.md)). Stop `npm run dev` and `peers-dev-mongo` first: they use
 the same ports.
 
@@ -52,6 +65,8 @@ npm run docker:down
 Expect all three containers `(healthy)` in `docker compose ps`, then the same two ✔ lines.
 
 > **6 Oct 2026: passed.** All three containers were healthy after 71 s, and verify passed.
+
+> **16 Nov 2026: passed on Windows.** Images built in 87 s and all three containers were healthy. Compose pulls `mongo:8` while this page and `npm run setup` tell you to run `mongo:7` by hand, so local development and the Compose smoke test use different database majors.
 
 ## Step 2. Test it locally
 
@@ -93,6 +108,10 @@ Playwright's image (the README has the command).
 > has the browser download, the `install-deps` fix, and the no-sudo Docker command.
 
 ## Step 3. Change something through a pull request
+
+> **16 Nov 2026: passed on Windows, after the same fix.** Frontend 829 tests (lines 96.74%, branches 91.97%, functions 95.85%), E2E 55 passed and 7 skipped, backend 585 and integration 251. Four backend tests failed before the line-ending fix because they read workflow YAML and match it against patterns containing `\n`. A fifth, `TC-RTM-13`, fails for a different reason: the traceability checker builds paths with the OS separator, so on Windows it reports `src\backend\tests\a.test.js`. That one is not fixed here.
+
+> **This repository is a fork.** When you open the pull request, check that **base repository** reads `IT7993-FALL-2026-PEERS/ProjectPeerEvaluation`. GitHub defaults it to the upstream repository, and a pull request opened against that one runs none of the required checks and is seen by nobody on the team. The **Revert** button in step 5 scopes the base itself, so it is not affected.
 
 Make a small change on a branch, open a pull request, watch the eight required checks
 ([CI/CD operations](ci-cd-operations.md#required-checks)), and merge it yourself when they pass
@@ -177,6 +196,13 @@ Then watch CD deploy the revert, and check `/version.txt` (and `/api/health`) ag
   install-script warning.
 - **Release procedure:** check the two commit endpoints, not the page source.
 - This page, with the record of the run.
+- **This page, Before you start:** Node is 24 **or newer**, not exactly 24; the commands are
+  bash; the Windows port check; and the Docker Desktop PATH gotcha.
+- **This page, step 3:** a warning that GitHub defaults a fork's pull request base to the
+  upstream repository.
+- **`.gitattributes` (new):** forces LF for `*.sh`, `*.yml` and `*.yaml`. Without it a Windows
+  clone cannot run `npm run verify` and four backend tests fail.
+- **Pull request template:** no longer hard-codes a number of required checks.
 
 ## Run log
 
@@ -185,5 +211,6 @@ Then watch CD deploy the revert, and check `/version.txt` (and `/api/health`) ag
 | 6 Oct 2026 | Donald | `d98b4a7` | Steps 1–3 ✔, step 4 deploy ✔, step 5 option C ✔ | Release candidate, promotion and rollback option A not possible while `CD_RELEASE` is off. Two README gaps fixed (Playwright browser and libraries) |
 | 17 Oct 2026 | Khoa | `1541bb9` | Step 5 option A ✔ | `rollback_to` a release made before the image carried its commit was refused before anything changed ([run 39001504990](https://github.com/IT7993-FALL-2026-PEERS/ProjectPeerEvaluation/actions/runs/39001504990)); `rollback_to` `rc-20261017-0322-6440ed0` put both services and the backend image digest back, smoke tests green, `staging` pointer moved back ([run 39001530607](https://github.com/IT7993-FALL-2026-PEERS/ProjectPeerEvaluation/actions/runs/39001530607)); a forced CD run brought staging back to `main` ([run 39001716639](https://github.com/IT7993-FALL-2026-PEERS/ProjectPeerEvaluation/actions/runs/39001716639)) |
 | 17 Oct 2026 | Donald, approved by Khoa | — | Step 4 promotion dry run ✔ | `Promote release candidate` from `rc-20261017-0322-6440ed0` with dry run on: the check passed, an approver released the `production` gate, the placeholder deploy step was skipped and a draft release was made ([run 39033612573](https://github.com/IT7993-FALL-2026-PEERS/ProjectPeerEvaluation/actions/runs/39033612573)). A draft left behind blocks promoting the same tag again |
+| 16 Nov 2026 | Laeticia (M3) | `b0cb72c` | Steps 1-5 all passed, on Windows | First run by someone who did not build the pipeline, and the first on Windows. PR [#292](https://github.com/IT7993-FALL-2026-PEERS/ProjectPeerEvaluation/pull/292) reached staging (CD #124, 5m 22s, `rc-20261116-0228-c4de9b8`); the revert PR [#293](https://github.com/IT7993-FALL-2026-PEERS/ProjectPeerEvaluation/pull/293) put it back (CD #125) and both staging endpoints reported `465fbe2` again. Local suites: frontend 829, E2E 55, backend 585, integration 251. Nine doc gaps found. Without the `.gitattributes` added here, `npm run verify` cannot run and four backend tests fail on any Windows clone. |
 
-Not yet repeated (Nov 6, 2026): a run by a teammate who did not build the pipeline (Kylee or Laeticia). Every run above was done by the people who built it. Add a row above when it is done.
+Repeated on 16 Nov 2026 by Laeticia (M3), who did not build the pipeline, on Windows — see the row above. CICD-31's done condition is met.
