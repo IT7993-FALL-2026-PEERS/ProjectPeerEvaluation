@@ -1,0 +1,15 @@
+# Accepted risks for the image scan (CICD-90; cd.yml, job "scan"). Empty on purpose.
+#
+# The scan blocks a deploy when the backend image has a HIGH or CRITICAL operating-system finding that
+# has a fix. To accept one, add an entry below, with the reason and an expiry date, and write it up in
+# docs/security/security-policy.md. Same rules as .github/dependency-check-suppressions.xml:
+#   - one advisory per entry (a CVE or GHSA id), never a package or a pattern;
+#   - expired_at is a date; the entry stops applying that day, and src/backend/tests/imageScan.test.js
+#     (TC-SEC-28) fails 14 days before it, so the review happens while CI is green;
+#   - statement says why the risk is accepted (at least 40 characters).
+#
+# vulnerabilities:
+#   - id: CVE-2026-00000
+#     expired_at: 2026-12-31
+#     statement: The reason, for example: not reachable, no fixed package yet, waiting for the next base image.
+vulnerabilities: []
