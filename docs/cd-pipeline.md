@@ -36,10 +36,10 @@ commit with the new value. Force can't do that, because the commit is already li
 The deploy above is the middle of a longer pipeline. The other stages run when the repository variable `CD_RELEASE` is `on` (Settings > Secrets and variables > Actions > Variables). **It has been on since 7 Oct 2026.** With it off, each CD run deploys as above, the `Prepare` job writes a dry-run plan to the run summary showing what the other stages would have done, and those jobs show as skipped.
 
 ```
-prepare ──► images ──► deploy (backend, frontend) ──► smoke ──► pointer* ──► release (rc-* tag)
+prepare ──► images ──► scan ──► deploy (backend, frontend) ──► smoke ──► pointer* ──► release (rc-* tag)
               │               │                         │
               └───────────────┴──► report               └──► rollback ──► rollback-report, rollback-smoke ──► rollback-pointer*
-          (images failed)   (deploy ran)          (deploy or smoke failed)
+   (images or scan failed)   (deploy ran)       (deploy or smoke failed)
 
 * image mode (BACKEND_DEPLOY=image) only
 ```
@@ -48,6 +48,7 @@ prepare ──► images ──► deploy (backend, frontend) ──► smoke �
 |---|---|---|
 | `prepare` | Works out the commit, the mode, the CI run that tested it (a manual run without a passing CI run on `main` stops here), and the previous good release: the newest `rc-*` release **the pipeline made**. Tags that don't match `rc-<date>-<time>-<sha7>`, and hand-made releases, are skipped. If `main` has moved on since CI started, the run stands down, and the run for the newer commit deploys instead. Writes the plan | always |
 | `images` | Calls `image-build.yml` (Aaron): builds both images, starts them, checks health, and pushes `ghcr.io/.../backend\|frontend:<sha>`. Never `latest` | `CD_RELEASE` on |
+| `scan` | CICD-90. Pulls both images by digest, saves them to files, removes the registry login, and scans the files with Trivy (`aquasecurity/trivy-action`, pinned to a reviewed commit). **Blocks the deploy** on a HIGH or CRITICAL operating-system finding in the backend image that has a fix; the frontend image is scanned and reported only. npm packages are not checked here (OWASP Dependency-Check does that); accepted findings go in `.github/trivyignore.yaml` ([security policy](security/security-policy.md)). Read-only permissions: it never shares a job with the registry write token | `CD_RELEASE` on, images passed |
 | `deploy` | Deploys each service whose files changed, then waits until it reports the commit (backend `/api/health`, frontend `/version.txt`). The two services can be on different commits. In image mode the backend is the image the `images` job pushed, deployed by digest | always (CICD-12) |
 | `smoke` | Calls `staging-regression.yml`: health, the frontend, and Playwright tests tagged `@staging` (Kylee's smoke tests, read-only, no email) | `CD_RELEASE` on, deploy passed |
 | `pointer` | Image mode: moves `backend:staging`, the image Render restarts from, to the digest that passed (`scripts/staging-pointer.js`), only when staging reports that image's commit | `BACKEND_DEPLOY=image`, images, deploy and smoke passed |
@@ -110,7 +111,7 @@ staging runs the image CD built. `source` remains the way back: set the variable
 service to its git source again in the dashboard.
 
 **Permissions.** The workflow reads by default. `images`, `pointer` and `rollback-pointer` get `packages: write`,
-`prepare` gets `packages: read` (to check a rollback target's image), and only `release` gets `contents: write`. The deploy hooks are `staging` environment secrets, which only `main` can use. Every job runs the
+`prepare` gets `packages: read` (to check a rollback target's image), `scan` gets `packages: read` (to pull the images it scans), and only `release` gets `contents: write`. The deploy hooks are `staging` environment secrets, which only `main` can use. Every job runs the
 code from `main`; none checks out another ref.
 
 **How it was turned on** (done on 7 Oct 2026; kept as the record, and as the checklist for switching it off and on again):

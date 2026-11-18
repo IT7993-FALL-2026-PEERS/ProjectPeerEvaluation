@@ -13,6 +13,7 @@ not be merged.
 | Check | Blocks when | Notes |
 |---|---|---|
 | **OWASP Dependency-Check** (`Security scan` workflow) | A finding with **CVSS 7.0 or higher** is not in `.github/dependency-check-suppressions.xml` | Runs on every pull request, on `main` and every Monday |
+| **Image scan** (`Scan the images` job of the CD workflow, CICD-90) | The backend image has a **HIGH or CRITICAL** operating-system finding **that has a fix** and is not in `.github/trivyignore.yaml` | Runs in CD after the images are built and before anything deploys, so it stops a deploy; it is not a pull request check. The frontend image is reported only. npm packages stay with OWASP Dependency-Check |
 | **CodeQL** (GitHub code scanning, default setup) | The pull request introduces a **new** alert | Alerts that were already open on `main` do not block; see section 5 |
 | **Secret scanning with push protection** | A push contains a detected secret | Already on |
 | **Dependabot alerts** | Never blocks | Triaged here (section 4) and fixed by version updates where a patch exists |
@@ -33,7 +34,14 @@ that M3 or the team leader merges. An entry has to:
 - explain **why it is tolerable** in its notes, and appear in the table in section 3.
 
 `src/backend/tests/securitySuppressions.test.js` fails the build if an entry is missing any of these, so
-a suppression cannot be added quietly. Fixing the finding (upgrading) is always preferred; if a suppression
+a suppression cannot be added quietly.
+
+The image scan has its own list, `.github/trivyignore.yaml` (empty). Its entries follow the same rules: one advisory
+(a CVE or GHSA id), an `expired_at` date, and a statement of why it is tolerable; `src/backend/tests/imageScan.test.js`
+(TC-SEC-27, TC-SEC-28) checks them and fails 14 days before an expiry. The scan is Trivy (`aquasecurity/trivy-action`
+pinned to a commit, explicit Trivy version): the action was hijacked on 19 March 2026 (GHSA-69fq-xp46-6x23), so it
+runs in a job with read-only permissions, on saved copies of the images, with no registry login, and never inside the
+job that can write packages. Fixing the finding (upgrading) is always preferred; if a suppression
 is no longer needed, delete it.
 
 ## 3. Accepted risks: OWASP Dependency-Check (2 Oct 2026)
