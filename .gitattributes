@@ -1,0 +1,7 @@
+# Line endings. Without this, a Windows clone gets CRLF in these files:
+# bash cannot parse the shell scripts (npm run verify fails), and the backend
+# tests that read workflow YAML and match it against patterns containing \n fail.
+# Found by the independent runbook walkthrough, 16 Nov 2026 (issue #282).
+*.sh   text eol=lf
+*.yml  text eol=lf
+*.yaml text eol=lf

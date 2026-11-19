@@ -6,11 +6,13 @@ run-name: "${{ inputs.rollback_to != '' && format('CD: roll back to {0}', inputs
 
 # Delivery pipeline for staging (backlog CICD-12 and CICD-28). Runs after CI passes on a push to main:
 #
-#   prepare -> images -> deploy -> smoke -> pointer -> release   (and rollback if deploy or smoke fails)
-#                          \-> report (deployment status; also when images failed)
+#   prepare -> images -> scan -> deploy -> smoke -> pointer -> release   (and rollback if deploy or smoke fails)
+#                               \-> report (deployment status; also when images or the scan failed)
 #
 #   prepare  works out the commit, the mode and the previous good release (rollback target)
 #   images   image-build.yml: builds, health-checks and pushes both images to ghcr.io, tagged with the SHA
+#   scan     read-only job (CICD-90): scans both images with Trivy; a fixable HIGH or CRITICAL operating-system
+#            finding in the backend image stops the run before deploy. The frontend image is reported only
 #   deploy   each service's Render deploy hook, then waits until the service reports the commit. The
 #            frontend is built from the commit; the backend runs the image by digest (BACKEND_DEPLOY=image)
 #   smoke    staging-regression.yml: health, frontend and the Playwright tests tagged @staging
@@ -23,7 +25,7 @@ run-name: "${{ inputs.rollback_to != '' && format('CD: roll back to {0}', inputs
 # A failed run started after a merge opens the issue "CD run failed after a merge to main"
 # (scheduled-failure-issue.yml).
 #
-# The release stages (images, smoke, release, rollback) are switched off until the repository variable
+# The release stages (images, scan, smoke, release, rollback) are switched off until the repository variable
 # CD_RELEASE is "on" (Settings > Secrets and variables > Actions > Variables). While it is off, deploy
 # works as it does today (CICD-12) and prepare writes a dry-run plan of the rest to the run summary.
 #
@@ -274,8 +276,10 @@ jobs:
               echo "|---|---|"
               if [ "$RELEASE" = "on" ]; then
                 echo "| Images | build, check and push \`ghcr.io/${repo}/{backend,frontend}:${SHA}\` |"
+                echo "| Scan | scan both images; a fixable HIGH or CRITICAL operating-system finding in the backend image stops the run before the deploy |"
               else
                 echo "| Images | would build, check and push \`ghcr.io/${repo}/{backend,frontend}:${SHA}\` |"
+                echo "| Scan | would scan both images and stop before the deploy on a fixable HIGH or CRITICAL finding in the backend image |"
               fi
               if [ "$BACKEND_MODE" = image ]; then
                 echo "| Deploy | backend: run this run's image by digest (image mode); frontend: deploy \`${short}\` if its files changed; wait until each reports it |"
@@ -306,15 +310,125 @@ jobs:
     with:
       frontend_api_url: https://peers-backend-staging.onrender.com/api
 
+  # CICD-90. Scans the images the images job pushed, before anything deploys. A job of its own with read-only
+  # permissions on purpose: the images job is the only one that can write packages, and a scanner (the March 2026
+  # Trivy attack, GHSA-69fq-xp46-6x23, stole secrets from the job it ran in) must never share a job with that
+  # permission. The images are pulled by digest, saved to files and the registry login is removed, so the scanner
+  # only ever sees the files. The backend scan blocks the deploy on fixable HIGH and CRITICAL operating-system
+  # findings (the CVSS 7 line of the security gate; npm packages stay with OWASP Dependency-Check). The frontend
+  # image is scanned and reported only: Render builds the frontend from source, so that image never runs.
+  # Accepted findings: .github/trivyignore.yaml. Skipped, like images, while CD_RELEASE is off.
+  scan:
+    name: Scan the images
+    needs: [images]
+    if: ${{ !cancelled() && needs.images.result == 'success' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Registry paths are lower case; the organisation name is not. The login is only for the pull and goes
+      # away before the scanner runs.
+      - name: Pull the backend image by digest and save it
+        env:
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DIGEST: ${{ needs.images.outputs.backend_digest }}
+        run: |
+          if ! [[ "$DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo "::error::The images job did not report a valid backend image digest (got '${DIGEST}'). Nothing was scanned."
+            exit 1
+          fi
+          repo="ghcr.io/${GITHUB_REPOSITORY,,}"
+          echo "$REGISTRY_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          mkdir scan
+          docker pull "${repo}/backend@${DIGEST}"
+          # By image ID: a digest reference has no tag for `docker save` to name.
+          docker save -o scan/backend.tar "$(docker image inspect --format '{{.Id}}' "${repo}/backend@${DIGEST}")"
+
+      # The frontend image is reported only, so a problem here (a failed pull, a bad digest) must never stop the
+      # backend from being scanned or the deploy from running: this step and its scan do not fail the job.
+      - name: Pull the frontend image by digest and save it
+        continue-on-error: true
+        env:
+          DIGEST: ${{ needs.images.outputs.frontend_digest }}
+        run: |
+          if ! [[ "$DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo "::error::The images job did not report a valid frontend image digest (got '${DIGEST}'). It was not scanned."
+            exit 1
+          fi
+          repo="ghcr.io/${GITHUB_REPOSITORY,,}"
+          docker pull "${repo}/frontend@${DIGEST}"
+          docker save -o scan/frontend.tar "$(docker image inspect --format '{{.Id}}' "${repo}/frontend@${DIGEST}")"
+
+      - name: Log out of ghcr.io
+        if: ${{ always() }}
+        run: docker logout ghcr.io
+
+      # v0.36.0 is the release GHSA-69fq-xp46-6x23 names as safe (immutable); keep this pin on a commit SHA.
+      - name: Scan the backend image (blocks fixable HIGH and CRITICAL operating-system findings)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          input: scan/backend.tar
+          version: v0.70.0
+          vuln-type: os
+          scanners: vuln
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+          trivyignores: .github/trivyignore.yaml
+          format: table
+          output: scan/backend.txt
+
+      - name: Scan the frontend image (reported, does not block)
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          input: scan/frontend.tar
+          version: v0.70.0
+          vuln-type: os
+          scanners: vuln
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '0'
+          trivyignores: .github/trivyignore.yaml
+          format: table
+          output: scan/frontend.txt
+
+      - name: Summarize findings
+        if: ${{ !cancelled() }}
+        run: |
+          {
+            echo "### Image scan (fixable HIGH and CRITICAL operating-system findings)"
+            echo ""
+            for image in backend frontend; do
+              if [ "$image" = backend ]; then rule="blocks the deploy"; else rule="reported only"; fi
+              echo "**${image}** (${rule})"
+              echo ""
+              echo '```'
+              if [ -s "scan/${image}.txt" ]; then head -c 6000 "scan/${image}.txt"; else echo "No report was produced."; fi
+              echo '```'
+              echo ""
+            done
+            echo "Accepted risks: \`.github/trivyignore.yaml\` (see docs/security/security-policy.md)."
+          } >> "$GITHUB_STEP_SUMMARY"
+
   deploy:
     # No matrix value in the name: GitHub adds "(backend)" itself, and a skipped job would
     # otherwise show the expression unexpanded.
     name: Deploy to staging
-    needs: [prepare, images]
-    # images is skipped while CD_RELEASE is off, which must not stop the deploy.
+    needs: [prepare, images, scan]
+    # images and scan are skipped while CD_RELEASE is off, which must not stop the deploy. A scan that found
+    # something, or could not run, does: nothing is deployed.
     if: >-
       !cancelled() && needs.prepare.result == 'success' && needs.prepare.outputs.stale != 'true'
       && inputs.rollback_to == '' && contains(fromJSON('["success", "skipped"]'), needs.images.result)
+      && contains(fromJSON('["success", "skipped"]'), needs.scan.result)
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     environment:
@@ -677,18 +791,22 @@ jobs:
 
   # Names what went live: the commit, the image tag, and in image mode the backend image by digest, which
   # is what Render runs. While CD_RELEASE is off there are no images, so both stay empty. A failed image
-  # build skips deploy, so it is reported here as a failure that deployed nothing (CICD-29: every CD run
+  # build or a failed image scan skips deploy, so it is reported here as a failure that deployed nothing (CICD-29: every CD run
   # that got as far as building or deploying has a deployment status).
   report:
-    needs: [prepare, images, deploy]
-    if: ${{ !cancelled() && (needs.deploy.result != 'skipped' || needs.images.result == 'failure') }}
+    needs: [prepare, images, scan, deploy]
+    if: >-
+      ${{ !cancelled() && (needs.deploy.result != 'skipped' || needs.images.result == 'failure'
+      || needs.scan.result == 'failure') }}
     uses: ./.github/workflows/deployment-status.yml
     with:
       environment: staging
-      result: ${{ needs.images.result == 'failure' && 'failure' || needs.deploy.result }}
+      result: ${{ (needs.images.result == 'failure' || needs.scan.result == 'failure') && 'failure' || needs.deploy.result }}
       note: >-
         ${{ needs.images.result == 'failure'
-        && 'Nothing was deployed: the image build failed, so the deploy did not run. Staging is unchanged.' || '' }}
+        && 'Nothing was deployed: the image build failed, so the deploy did not run. Staging is unchanged.'
+        || needs.scan.result == 'failure'
+        && 'Nothing was deployed: the image scan failed (a fixable HIGH or CRITICAL finding in the backend image, or the scan could not run), so the deploy did not run. Staging is unchanged.' || '' }}
       url: https://peers-frontend-staging.onrender.com
       health_url: https://peers-backend-staging.onrender.com/api/health
       commit: ${{ needs.prepare.outputs.sha }}
