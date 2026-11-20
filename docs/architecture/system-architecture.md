@@ -2,7 +2,7 @@
 
 **Gantt task:** Technical Assessment — *"Review software architecture & technology stack"* (M1)
 **Milestone:** 1 — Assessment & Planning
-**Status:** Complete for review. Describes `main` at commit `11cfd3d` (26 Sep 2026); later changes are marked where they apply (last updated 17 Oct 2026: the delivery diagram and the staging backend, which now runs the Docker image)
+**Status:** Complete for review. Describes `main` at commit `11cfd3d` (26 Sep 2026); later changes are marked where they apply (last updated 19 Nov 2026: read through, and the delivery diagram shows the image scan; 17 Oct 2026: the staging backend, which now runs the Docker image)
 **Related:** [api-documentation.md](api-documentation.md) ·
 [database-schema.md](database-schema.md) ·
 [../research-report/tech-stack-analysis.md](../research-report/tech-stack-analysis.md) ·
@@ -232,7 +232,7 @@ flowchart TB
     DEV(["Developer"]) -->|pull request| GH["GitHub<br/>IT7993-FALL-2026-PEERS/<br/>ProjectPeerEvaluation"]
     GH --> CI["GitHub Actions (ubuntu-24.04)<br/>ci.yml: frontend, backend, integration,<br/>E2E, containers, actionlint<br/>security.yml: OWASP · CodeQL"]
     CI -->|"8 required checks pass"| MAIN["merge to main"]
-    MAIN -->|"cd.yml after CI passes:<br/>build, test, push images"| IMG["Container images (GHCR)<br/>(pushed by digest)"]
+    MAIN -->|"cd.yml after CI passes:<br/>build, test, push images"| IMG["Container images (GHCR)<br/>(pushed by digest, scanned with Trivy before deploy)"]
     IMG -->|"Render deploy hook:<br/>backend by image digest"| STG["Render staging<br/>peers-backend-staging (Starter, runs the image)<br/>peers-frontend-staging (static, built from source)"]
     MAIN -->|"frontend: deploy hook,<br/>tested commit"| STG
     STG --> ATLAS[("MongoDB Atlas M0")]

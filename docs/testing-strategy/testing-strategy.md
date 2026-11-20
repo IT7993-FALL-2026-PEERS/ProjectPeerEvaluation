@@ -335,7 +335,7 @@ One of M4's open questions affects more than the frontend and belongs to the tea
 
 **Resolved since M4's document was written.** `ProtectedRoute` is no longer a passthrough —
 it reads the stored token and redirects to the login page when there is none
-(`src/frontend/components/ProtectedRoute.js`), and it has three tests. Route protection is
+(`src/frontend/components/ProtectedRoute.jsx`), and it has three tests. Route protection is
 implemented and covered; it is not an open gap.
 
 ## Related documents

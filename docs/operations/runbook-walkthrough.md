@@ -1,6 +1,6 @@
 # Runbook walkthrough: run, test, release, roll back
 
-**Backlog:** CICD-31 (#148) · **Last run:** 6 Oct 2026, against `main` at `d98b4a7`
+**Backlog:** CICD-31 (#148) · **Last run:** 16 Nov 2026 (Windows, by Laeticia), against `main` at `b0cb72c`; first run 6 Oct 2026 at `d98b4a7`
 
 This is the [operations runbook](README.md#walkthrough-run-test-release-roll-back) walkthrough written out step by
 step: the exact commands, what you should see, and what happened when it was run on 6 Oct 2026. Use it to repeat the

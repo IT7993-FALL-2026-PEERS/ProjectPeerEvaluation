@@ -591,11 +591,10 @@ from the sponsor.
 
 ## Non-functional requirements
 
-`docs/requirements/non-functional-requirements.md` is an unwritten stub (D-08). Performance,
-availability, security and accessibility requirements are therefore undefined for this
-project. Filling that file is proposed as an M3 task for the week of 28 Sep, to be
-confirmed with the sponsor — the security items in particular bear directly on the
-Milestone 2 security-scanning work.
+`docs/requirements/non-functional-requirements.md` was written on 19 Nov 2026 from the sponsor's own list of
+non-functional requirements (reliability, repeatable deployments, automated validation and so on), with the evidence
+for each. The specification sets no performance, availability or accessibility targets, so none are claimed
+(D-08 stays open for those).
 
 ## Open questions for the sponsor
 
