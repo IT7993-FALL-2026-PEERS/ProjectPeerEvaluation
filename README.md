@@ -38,8 +38,7 @@ stack, a commercial production hosting environment, or migrating databases.
 ## Deployment
 
 **Render.com only** — proposed by the team and approved by the sponsor; other platforms (Vercel, Railway,
-etc.) are not used for this project even though `DEPLOYMENT_GUIDE.md` documents them as
-historical alternatives. Continuous Integration runs on every pull request (see
+etc.) are not used for this project. Continuous Integration runs on every pull request (see
 [CI/CD Pipeline](#cicd-pipeline)). A staging environment is live on Render, defined in `render.yaml`:
 once CI passes on `main`, `cd.yml` deploys that exact commit to the frontend and backend. Staging uses
 MongoDB Atlas and a Mailtrap test inbox, so no real student ever receives an email from it; the backend
@@ -300,7 +299,7 @@ deliverables signed off by the sponsor)
 - Update Oct 8: the frontend is at about 93% of lines (the 70% target is met), staging and the CD release stages (images, smoke tests, `rc-*` tags, rollback) are live, and the frontend now builds with Vite and tests with Vitest
 - Update Oct 17: staging runs the backend as the Docker image CI built and pushed, deployed by its digest, with an automatic rollback to the last good image; participation is now rated 1 to 5 like the other criteria; the frontend build step takes about 2 s in CI (it was about 13 s with Create React App)
 
-📅 **Milestone 3 — Productionization** — Nov 2 – Dec 6, 2026 (submission Nov 22, review Nov 23, package for the sponsor Nov 29, final package for the professor Dec 6)
+📅 **Milestone 3 — Productionization** — Nov 2 – Dec 6, 2026 (package due Nov 22, review Nov 30, package for the sponsor Nov 29, final package for the professor Dec 6)
 - Continuous Delivery pipeline, automated staging deployment, smoke testing
 - Automated test/build reporting, finalized technical documentation
 - Final system demonstration and repository delivery
@@ -332,7 +331,7 @@ See [docs/docker-setup.md](docs/docker-setup.md).
 
 Top 3 problems:
 1. **Backend cannot connect to the database**: MongoDB is not running. Start one with
-   `docker run -d --name peers-dev-mongo -p 27017:27017 mongo:7` (or `docker start peers-dev-mongo`).
+   `docker run -d --name peers-dev-mongo -p 27017:27017 mongo:8` (or `docker start peers-dev-mongo`).
 2. **`Node 24+ is required`**: run `nvm use` (or install Node 24). A different Node makes `npm ci` fail in CI.
 3. **Port 3000/5000 already in use**: stop the other app (often a leftover `npm run dev`).
 
@@ -344,8 +343,8 @@ The step-by-step version follows.
    version is pinned in `.nvmrc`; with [nvm](https://github.com/nvm-sh/nvm) run `nvm use`. Other
    Node/npm versions can generate a different `package-lock.json`, which then fails `npm ci` in CI.
 2. **Install [Git](https://git-scm.com/)**
-3. **MongoDB 7** — the backend needs a running MongoDB. The easiest way is Docker:
-   `docker run -d --name peers-dev-mongo -p 27017:27017 mongo:7` (after the first time,
+3. **MongoDB 8** — the backend needs a running MongoDB. The easiest way is Docker:
+   `docker run -d --name peers-dev-mongo -p 27017:27017 mongo:8` (after the first time,
    `docker start peers-dev-mongo`). A local MongoDB Community Server or a MongoDB Atlas
    connection string also works.
 4. A code editor, e.g. [VS Code](https://code.visualstudio.com/)
@@ -518,7 +517,7 @@ docs/
   cd-pipeline.md         # CD design: staging deploy, release pipeline, approval gate, image build, reporting
   docker-setup.md, team-guide.md, csv-upload-format.md
   deployment-review.md, dev-environment-review.md, containerization-recommendations.md
-DEPLOYMENT_GUIDE.md      # historical deployment notes (Render.com is the one in use)
+DEPLOYMENT_GUIDE.md      # pointer to the current deployment docs (the old notes are in the git history)
 docker-compose.yml       # mongo + backend + frontend with health checks (docs/docker-setup.md)
 Dockerfile.frontend      # Vite build -> nginx
 docker/nginx.conf        # SPA fallback for the frontend image

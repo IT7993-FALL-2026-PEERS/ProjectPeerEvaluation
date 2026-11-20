@@ -1,25 +1,3 @@
-# Environment Variables for Render.com Deployment
-
-## Backend Service Environment Variables:
-
-### Database
-MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/peer-eval
-
-### Authentication and environment (both required)
-# JWT_SECRET signs login tokens: a long random string, at least 32 characters.
-# NODE_ENV must be "production" on Render. The app only enforces JWT_SECRET when it is.
-JWT_SECRET=a-long-random-string
-NODE_ENV=production
-
-### Email Configuration (Gmail example)
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=your-email@gmail.com
-SMTP_PASS=your-app-password
-SMTP_FROM=your-email@gmail.com
-
-### Frontend URL (will be provided after frontend deployment)
-FRONTEND_URL=https://your-frontend-url.onrender.com
-
-### Optional
-PORT=5000
+Replaced. The environment variables are described in docs/startup-and-environment.md and set in
+render.yaml; staging email goes through the Mailtrap sandbox only (see docs/operations/render-handover.md).
+No credentials are kept in the repository.

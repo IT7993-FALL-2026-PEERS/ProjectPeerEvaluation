@@ -132,15 +132,14 @@ under Prerequisites and `npm run setup` prints the command when it finishes. Eit
 MongoDB locally, or:
 
 ```
-docker run -d --name peers-dev-mongo -p 27017:27017 mongo:7
+docker run -d --name peers-dev-mongo -p 27017:27017 mongo:8
 ```
 
 After the first time, `docker start peers-dev-mongo`.
 
-Note the version: the README and `scripts/setup.js` both say `mongo:7`, while
-`docker-compose.yml` runs `mongo:8` and staging is on Atlas. Nothing breaks — the app does
-not depend on the difference — but it means a developer's local database and the Compose one
-are different major versions. Worth settling on one (see section 5).
+Note the version: the README, `scripts/setup.js` and `docker-compose.yml` all use `mongo:8`,
+the version the integration tests and staging run. (Until 19 Nov 2026 the README and
+`scripts/setup.js` said `mongo:7`; see section 5.)
 
 Then:
 
@@ -193,11 +192,10 @@ Recorded here rather than fixed silently, because each is a decision for someone
 need different values for the same names — but it needs saying out loud, which is why it is
 section 1 of this page.
 
-**MongoDB is two different major versions depending on how you start it.** The README's
-Prerequisites and `scripts/setup.js` both suggest `mongo:7`; `docker-compose.yml` runs
-`mongo:8`; staging is on Atlas. So a developer running `npm run dev` tests against 7 and the
-Compose smoke test runs against 8. Nothing currently depends on the difference, but it is an
-inconsistency waiting to produce a "works on my machine" report. Worth picking one.
+**MongoDB was two different major versions depending on how you started it (settled 19 Nov 2026).**
+The README's Prerequisites and `scripts/setup.js` said `mongo:7` while `docker-compose.yml` ran
+`mongo:8`. They now all say `mongo:8`. If you still have a `peers-dev-mongo` container made from
+`mongo:7`, remove it (`docker rm -f peers-dev-mongo`) before starting the new one.
 
 **Resolved since the first draft of this page**, and recorded so the history is clear:
 MongoDB now appears in the README's Prerequisites with a "Start MongoDB" step, `npm run setup`
