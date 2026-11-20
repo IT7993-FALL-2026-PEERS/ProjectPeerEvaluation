@@ -14,6 +14,7 @@ the walkthrough below. Each step links to the page that explains it.
 | [Rollback and recovery](rollback-and-recovery.md) | Staging is broken, a deploy went wrong, a secret leaked, CI is blocked |
 | [Runbook walkthrough](runbook-walkthrough.md) | Repeating the walkthrough below step by step, with commands, expected output and the record of past runs |
 | [Render handover](render-handover.md) | Who owns which account, and what happens to them when the project ends |
+| [Demo script](demo-script.md) | A written walk through the pipeline, the application and the rollback, with the demo data and the numbers to expect |
 | [CD pipeline design](../cd-pipeline.md) | How `cd.yml` and `promote.yml` work inside |
 | [Security policy](../security/security-policy.md) | A security check blocks a merge; accepting a risk |
 | [Team guide](../team-guide.md) | Pull requests, reviews, merge conflicts |
