@@ -4,7 +4,7 @@
 **Milestone:** 1 — Assessment & Planning (14 Sep – 30 Sep 2026), review 28 Sep
 **Gantt task:** Requirements Validation & RTM — *"Document required functionality, acceptance criteria & defects"*
 **Status:** Signed off by the sponsor at the 28 Sep milestone review, together with the other Milestone 1 deliverables; critical workflows approved by the sponsor on 25 Sep. The open questions below are still open.
-**Last updated:** 30 September 2026
+**Last updated:** 19 November 2026 (the summary counts below were re-read from the entries; each entry carries its own revision notes)
 
 ## Purpose and method
 
@@ -57,8 +57,8 @@ existing tests and its planned coverage are recorded in the Requirements Traceab
 
 | Status | Count |
 |---|---|
-| Validated | 12 |
-| Defective | 4 |
+| Validated | 14 |
+| Defective | 2 |
 | Needs verification | 3 |
 | Partial | 2 |
 | Unsupported | 2 |
@@ -67,7 +67,7 @@ existing tests and its planned coverage are recorded in the Requirements Traceab
 *Counts revised 27 Sep after a second pass over the backend controllers. Four statuses
 changed: FR-14 to Defective, FR-15 and FR-16 to Validated, FR-19 to Partial. Revised again
 on 7 Oct, when the tests were linked to the matrix: FR-07 to Partial (the email-format check
-does not exist), and on 17 Oct: FR-13 to Validated (participation is now rated 1–5). Each revised entry says what changed and why.*
+does not exist), and on 17 Oct: FR-13 to Validated (participation is now rated 1–5). Re-read on 19 Nov from the entries: FR-07 is Validated again (CICD-47, 12 Oct) and FR-14 is Validated (D-22 fixed on 6 Nov), so Validated is 14 and Defective is 2 (FR-03, FR-12). Each revised entry says what changed and why.*
 
 ---
 

@@ -39,7 +39,7 @@ the steps work. A run by such a teammate would also prove the docs are clear eno
 git clone https://github.com/IT7993-FALL-2026-PEERS/ProjectPeerEvaluation.git
 cd ProjectPeerEvaluation
 npm run setup                                             # checks Node, creates .env files, installs everything
-docker run -d --name peers-dev-mongo -p 27017:27017 mongo:7   # or: docker start peers-dev-mongo
+docker run -d --name peers-dev-mongo -p 27017:27017 mongo:8   # or: docker start peers-dev-mongo
 npm run dev                                               # leave running
 npm run verify                                            # in a second terminal
 ```
@@ -66,7 +66,7 @@ Expect all three containers `(healthy)` in `docker compose ps`, then the same tw
 
 > **6 Oct 2026: passed.** All three containers were healthy after 71 s, and verify passed.
 
-> **16 Nov 2026: passed on Windows.** Images built in 87 s and all three containers were healthy. Compose pulls `mongo:8` while this page and `npm run setup` tell you to run `mongo:7` by hand, so local development and the Compose smoke test use different database majors.
+> **16 Nov 2026: passed on Windows.** Images built in 87 s and all three containers were healthy. Compose pulls `mongo:8` while this page and `npm run setup` told you to run `mongo:7` by hand, so local development and the Compose smoke test used different database majors. Fixed on 19 Nov 2026: the README, `npm run setup` and this page now say `mongo:8`.
 
 ## Step 2. Test it locally
 

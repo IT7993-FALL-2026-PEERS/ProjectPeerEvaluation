@@ -94,7 +94,7 @@ log(`
 Setup complete. Next steps:
   1. Make sure MongoDB is reachable at MONGODB_URI in src/backend/.env
      (default mongodb://localhost:27017/peer-eval). No local MongoDB?
-       docker run -d --name peers-dev-mongo -p 27017:27017 mongo:7
+       docker run -d --name peers-dev-mongo -p 27017:27017 mongo:8
   2. npm run dev                      # frontend :3000 + backend :5000
   3. bash scripts/verify-env.sh       # in a second terminal, confirms both are up
 Prefer containers? Run: npm run docker:up   (see docs/docker-setup.md)
