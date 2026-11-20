@@ -81,7 +81,7 @@ Six collections:
 |---|---|---|
 | MongoDB (Atlas or local) | Primary data store | `MONGODB_URI` |
 | Nodemailer / SMTP | Email invitations and notifications | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` |
-| Render.com | Backend and frontend hosting | Deploy config (`render-build-info.txt`) |
+| Render.com | Backend and frontend hosting | Deploy config (`render.yaml`) |
 | jsonwebtoken + bcryptjs | Authentication (tokens, password hashing) | — |
 | multer + csv-parser | Roster CSV upload | — |
 

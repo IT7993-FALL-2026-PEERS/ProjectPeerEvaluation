@@ -4,7 +4,7 @@
 functional requirement (FR-01..FR-23) and every critical workflow (CW-01..CW-12) is traced to named
 automated tests, or says why there are none. Statuses match `docs/requirements/requirements.md`.
 The critical workflows were approved by the sponsor (25 Sep 2026).
-**Last updated:** 7 October 2026, against `main` at `0fb8f60`.
+**Last updated:** 19 November 2026, against `main` at `15398b0` (statuses and the coverage summary re-read; CI still checks that every cited test exists).
 
 **How to read the test column.** Every test the matrix cites by ID is the start of a test title in the
 code, and `npm test` fails if it is not (see *Keeping the IDs honest* below).
@@ -47,7 +47,7 @@ thing, or answers 501) is marked as such below and is not acceptance coverage.
 | FR3.3 | FR-11 Track completion status | CW-08 | Integration `status.integration.js`: TC-11-20..22 · Integration `submittedRule.integration.js`: TC-11-23..25 · Unit `submittedRule.test.js`: TC-11-30 · Unit `peers.test.js`: TC-11-31..33 (nobody to rate) · Integration `loneStudent.integration.js`: TC-11-34..38 (a student alone on a team, or with no team, is listed and not counted; named before anything is sent) · FE `EvaluationDialogs.test.jsx`, `evaluationStatus.test.js`, `useEvaluations.test.js` · E2E-21, E2E-47 | Integration + E2E | — | Validated |
 | FR3.4 | FR-12 Reminders | CW-08 | Integration `status.integration.js`: TC-12-20..25 · Integration `emailBatch.integration.js`: TC-12-30 · Integration `invitation.integration.js`: TC-10-46, TC-10-49 · Integration `submittedRule.integration.js`: TC-12-26, TC-12-27 · Unit `remindEvaluations.test.js`: TC-12-01, TC-12-02 · Integration `loneStudent.integration.js`: TC-12-28, TC-12-29 (a student alone on a team is not reminded or counted as not invited) · E2E-22, E2E-23 | Unit + integration + E2E | A scheduler, if the sponsor wants one | Defective — on-demand only, no scheduler (the tests cover the on-demand reminder) |
 | FR4.1 | FR-13 Ratings on a 1–5 scale | CW-07 | Unit `evaluationTargets.test.js`: TC-13-01..04 (who can be rated) · Integration `settings.integration.js`: TC-13-20 (the rubric: all six criteria 1–5, participation included) · Unit `rubric.test.js`: TC-13-21 (five levels each, the ids scoring relies on), TC-13-22..24 (the sponsor's wording of 19 Oct for every criterion and the feedback question), TC-13-25 (the feedback limits) · Integration `submission.integration.js`: TC-16-25 (out-of-range ratings are refused), TC-16-76 (participation 5 is accepted) · Unit `submitEvaluation.test.js`, `reportController.test.js` (participation counts like every other criterion; the all-fives flag includes it) | Unit + integration | None | Validated (D-19 fixed 17 Oct 2026) |
-| FR4.2 | FR-14 Feedback length limits | CW-07 | Integration `submission.integration.js`: TC-16-25 (feedback under 50 or over 500 characters, or not text, is refused) · Unit `submitEvaluation.test.js`: TC-16-47, TC-16-77 (49, 50, 500 and 501 characters), TC-16-78 (spaces do not count) · Unit `rubric.test.js`: TC-13-25 (the limits) · E2E-14 | Unit + integration + E2E | None | Validated (D-22 fixed 25 Oct 2026) |
+| FR4.2 | FR-14 Feedback length limits | CW-07 | Integration `submission.integration.js`: TC-16-25 (feedback under 50 or over 500 characters, or not text, is refused) · Unit `submitEvaluation.test.js`: TC-16-47, TC-16-77 (49, 50, 500 and 501 characters), TC-16-78 (spaces do not count) · Unit `rubric.test.js`: TC-13-25 (the limits) · E2E-14 | Unit + integration + E2E | None | Validated (D-22 fixed 6 Nov 2026) |
 | FR4.3 | FR-15 Timestamp all submissions | CW-07 | Integration `submission.integration.js`: TC-15-20 (the server sets the time when the evaluation is saved) | Integration | — | Validated |
 | FR4.4 | FR-16 Prevent duplicate submissions | CW-07 | Integration `submission.integration.js`: TC-16-20..27 · Integration `atomicSubmission.*.integration.js`: TC-16-30..34, TC-16-60, TC-16-61, TC-16-64, TC-16-65, TC-16-69..71 · Integration `resubmission.integration.js`: TC-16-63, TC-16-66..68, TC-16-72 · Integration `submittedRule.integration.js`: TC-16-73 · Integration `loneStudent.integration.js`: TC-16-74, TC-16-75, TC-16-79 (a student alone on a team, or with no team, is refused on submit and resubmit) · Unit `linkRotation.test.js`: TC-16-62 · Integration `duplicateEvaluations.integration.js`: TC-16-36, TC-16-37 · Integration `startup.integration.js`: TC-16-42, TC-16-43 · Unit `evaluationTargets.test.js`: TC-16-01 · Unit `submitEvaluation.test.js`: TC-16-46, TC-16-47 · Unit `saveEvaluations.test.js`: TC-16-38, TC-16-39, TC-16-45 · E2E-11, E2E-12, E2E-45 | Unit + integration + E2E | — | Validated |
 | FR5.1 | FR-17 Aggregated team reports | CW-09 | Integration `reports.integration.js`: TC-17-20..27 · Unit `reportController.test.js`: TC-17-01 · FE `Reports.test.jsx` · E2E-07 · E2E-53 (Contribution Multiplier: team grades, setting one, back to automatic) · Contribution Multiplier (CICD-81): Unit `contributionMultiplier.test.js`: TC-17-40..61 (the proposal's worked examples, the instructor's grade, no floor and the flag, rounding to 5, no ratings, a team of one) · Integration `contributionMultiplier.integration.js`: TC-17-62..78 (resetting the evaluation state clears the typed grades and a roster upload keeps them, CICD-87; the report, the team grade endpoint, validation, ownership, a student with no team, the CSV, a course with no evaluations yet, the instructor's final score for a student) · FE `TeamGradesPanel.test.jsx` and `Reports.test.jsx` (the method, the columns, the flag, the team grades panel, saving a team grade and a student's final score) | Unit + integration + E2E | — | Validated |
@@ -88,14 +88,14 @@ security) and to fixed defects. IDs here may use a backlog number or `SEC` inste
 | This matrix | `rtmTraceability.test.js`: TC-RTM-01..12 | CICD-23 |
 | CI can launch a browser | E2E `setup.spec.js` | Pipeline smoke |
 
-## Coverage summary (7 Oct 2026)
+## Coverage summary (19 Nov 2026)
 
 | | Requirements |
 |---|---|
 | Rows that cite at least one automated test that exists | 25 of 26 (all except CW-12, which has no feature to test) |
-| Validated, with tests | CW-11, FR-02, FR-05, FR-06, FR-07, FR-08, FR-09, FR-11, FR-13, FR-15, FR-16, FR-17, FR-18, FR-22, CW-02 |
+| Validated, with tests | CW-11, FR-02, FR-05, FR-06, FR-07, FR-08, FR-09, FR-11, FR-13, FR-14, FR-15, FR-16, FR-17, FR-18, FR-22, CW-02 |
 | Partial, with tests for what works | FR-04 (inactivity-based since 12 Oct; length still to be confirmed), FR-19 (PDF) |
-| Defective: the tests cover the working part or **only document the defect** | FR-03 (tests only document the defect); FR-12, FR-14 (the behaviour that exists is tested) |
+| Defective: the tests cover the working part or **only document the defect** | FR-03 (tests only document the defect); FR-12 (the behaviour that exists is tested) |
 | Needs verification | FR-01, FR-10, FR-20 |
 | Out of scope | FR-21, FR-23 (AI features; the 501 answers are documented by tests) |
 | Planned | CW-12 (rubric management, D-09) |
