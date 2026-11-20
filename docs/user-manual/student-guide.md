@@ -1,6 +1,38 @@
 # Student Guide
 
-(Instructions for students.)
+How to give your teammates peer feedback in PEERS.
+
+## 1. Open your link
+
+Your instructor sends you an email with a personal link. Open it in your browser; you do not log in or create an
+account. The link is yours: do not share it. It stops working at the deadline your instructor set, so submit before
+then.
+
+## 2. Rate each teammate
+
+For every teammate, give a rating from 1 to 5 on each of the six criteria: professionalism, communication, work
+ethic, content knowledge and skills, overall contribution, and participation. Each level has a short description on
+the form.
+
+## 3. Write your feedback
+
+Write feedback for each teammate: at least 50 and at most 500 characters. The form shows a running count and will
+not send until the length is right. Be specific and fair; your instructor reads it.
+
+## 4. Submit once
+
+Submit when you are done. A submission is final: a second one with the same link is refused. If you made a mistake,
+ask your instructor, who can approve one resubmission, which replaces your earlier answers.
+
+## 5. If something goes wrong
+
+- The link says it has expired: the deadline has passed, or your instructor sent a new link. Ask your instructor.
+- You did not get an email: look in your spam folder, then ask your instructor to check your address.
+
+# For testers: API quick start
+
+This part is for people who test the API directly, against their own local backend (`npm run dev`). It is not needed to
+submit an evaluation. Do not use it against the staging site: staging is shared, and its email allowance is needed for demonstrations.
 
 ## Quick Start with the API
 
@@ -11,7 +43,7 @@ from a link emailed to the address. Mail has to work for this (Mailtrap's sandbo
 development the link is also printed in the backend log.
 
 ```bash
-API_URL=https://projectpeerevaluation.onrender.com/api
+API_URL=http://localhost:5000/api
 
 curl -X POST "$API_URL/auth/register" \
 	-H "Content-Type: application/json" \

@@ -3,7 +3,7 @@
 **Owner:** Laeticia Neno Aloyem (M3) — Requirements, QA, security & documentation
 **Milestone:** 2 (5 Oct – 1 Nov 2026), review 26 Oct
 **Gantt task:** Dev Environment & Containerization — *"Write startup & environment documentation"*
-**Last updated:** 15 October 2026 (revised after M4's review on PR #216)
+**Last updated:** 19 November 2026 (MongoDB version settled); 15 October 2026 (revised after M4's review on PR #216)
 
 ## What this page is for
 

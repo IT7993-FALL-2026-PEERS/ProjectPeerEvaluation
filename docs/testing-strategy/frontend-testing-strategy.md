@@ -12,7 +12,7 @@ deliverable. This strategy only covers `src/frontend`.
 - Tooling (Jest through Create React App at first, Vitest since the move to Vite in Oct 2026): `@testing-library/react` +
   `@testing-library/user-event` (in `package.json`, previously unused — no `src/setupTests.js`
   existed, so `jest-dom` matchers weren't even wired up).
-- First unit tests landed in [PR #1](../../pull/1): `AuthContext` (login/logout + localStorage
+- First unit tests landed in [PR #1](https://github.com/IT7993-FALL-2026-PEERS/ProjectPeerEvaluation/pull/1): `AuthContext` (login/logout + localStorage
   persistence), the `login` service (axios call shape), and `ProtectedRoute` (currently a
   passthrough component — see open question 1).
 - No integration or end-to-end tests exist yet. No E2E tool (Cypress/Playwright) is installed.
@@ -87,7 +87,7 @@ Contribution to the team RTM — maps functional requirements to planned fronten
 
 ## Open questions for the team
 
-1. `ProtectedRoute` (`src/frontend/components/ProtectedRoute.js`) is currently a passthrough with
+1. `ProtectedRoute` (`src/frontend/components/ProtectedRoute.jsx`) is currently a passthrough with
    a `// Add your authentication logic here` comment — no real route protection exists yet. Who
    implements the actual guard logic, and when? Tests can't meaningfully cover it until then.
 2. `CourseManagement.js` is 2,687 lines in one file. Worth splitting into smaller components before

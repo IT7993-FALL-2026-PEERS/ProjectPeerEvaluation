@@ -18,8 +18,7 @@ code, and `npm test` fails if it is not (see *Keeping the IDs honest* below).
 - `E2E-nn` is a Playwright workflow test in `e2e/`, run against the real app on a throwaway database
   with email captured, never sent. The four `@staging` smoke tests in `staging.spec.js` have no ID: they
   run against the deployed staging, not in the normal E2E run.
-- Frontend tests (`FE`) are named by file only; they run in the Jest suite (`src/frontend/**/__tests__`
-  and `src/__tests__`).
+- Frontend tests (`FE`) are named by file only; they run in the Vitest suite (`src/frontend/**/__tests__`).
 - A file name in backticks must exist, and a `*` in it stands for any run of characters. An ID range
   such as `TC-16-20..27` means every number in it exists.
 
