@@ -380,7 +380,8 @@ its name is left alone, and renamed only to a numbered name (`backend/utils/team
 ### `GET .../students`
 
 **200** an array of students (`_id`, `student_id`, `name`, `email`, `team_id`,
-`group_assignment`, `evaluation_token`, `evaluation_completed`, `created_at`).
+`group_assignment`, `evaluation_token_expires_at`, `evaluation_completed`, `created_at`). The link token
+itself is never sent (CICD-94): it opens the student's form, and only the student's email carries it.
 
 ### `POST .../students`
 
@@ -519,7 +520,7 @@ before choosing a deadline. **404** for a course that is not the caller's, or a 
 { "total_count": 3, "completed_count": 1, "pending_count": 2, "completion_rate": 33,
   "evaluations_sent": true,
   "students": [{ "student_id": "S001", "name": "Alice", "email": "...", "team": "Team A",
-                 "completed": true, "evaluation_token": "...", "last_activity": "...",
+                 "completed": true, "last_activity": "...",
                  "id": "<ObjectId>", "team_id": "<ObjectId or null>", "resubmission_allowed": false,
                  "ratings_on_file": true }] }
 ```
@@ -579,6 +580,8 @@ Deletes every evaluation in the course and clears all tokens, each student's sub
 ---
 
 ## 10. Reports — `/api/courses/:course_id/reports` 🔒
+
+No report carries an `evaluation_token`, on a student or on an evaluation, nested ones included (CICD-94).
 
 ### `GET .../reports` (and `POST .../reports/generate`)
 

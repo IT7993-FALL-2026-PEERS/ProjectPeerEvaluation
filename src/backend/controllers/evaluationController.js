@@ -512,7 +512,6 @@ exports.evaluationStatus = async (req, res, next) => {
         resubmission_allowed: Boolean(student.resubmission_allowed),
         // CICD-72: true only for a student who has not submitted and has nobody to rate
         nobody_to_rate: !hasCompleted && hasNobodyToRate(student, peers),
-        evaluation_token: student.evaluation_token,
         last_activity: lastActivity              // Show actual submission date
       };
     }));

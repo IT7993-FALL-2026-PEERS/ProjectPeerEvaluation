@@ -82,6 +82,7 @@ security) and to fixed defects. IDs here may use a backlog number or `SEC` inste
 | Test and build reporting | `testSummary.test.js`: TC-29-01..12 · `runReport.test.js`: TC-29-30..35, TC-29-37 | CICD-29 |
 | One-command setup | `setupScript.test.js`: TC-50-01..06 | CICD-50 |
 | Security gate: the accepted-risk list | `securitySuppressions.test.js`: TC-SEC-01..06, TC-SEC-13 | CICD-24 |
+| No response carries an evaluation link token (reports in both grading methods, team and student reports, student list, evaluation status) | `linkTokenPrivacy.integration.js`: TC-SEC-38..41 · `reportController.test.js` | CICD-94 |
 | Image scan before staging runs the image (read-only job, pinned scanner, blocks the deploy, accepted-risk list) | `imageScan.test.js`: TC-SEC-20..29 | CICD-90 |
 | Repository hygiene and lint configuration | `repoHygiene.test.js` · `eslintConfig.test.js` · `requestLogger.test.js` | CICD-35, CICD-32 |
 | This matrix | `rtmTraceability.test.js`: TC-RTM-01..12 | CICD-23 |

@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { hideLinkToken } = require('./linkToken');
 
 const EvaluationSchema = new mongoose.Schema({
   course_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Course', required: true },
@@ -25,5 +26,7 @@ EvaluationSchema.index({ evaluation_token: 1 });
 // separate index. Run scripts/findDuplicateEvaluations.js before deploying to a database that
 // already holds data: the index cannot be built while duplicates exist.
 EvaluationSchema.index({ evaluator_id: 1, student_id: 1, course_id: 1 }, { unique: true });
+// The token stays out of every response (CICD-94)
+hideLinkToken(EvaluationSchema);
 
 module.exports = mongoose.model('Evaluation', EvaluationSchema);
