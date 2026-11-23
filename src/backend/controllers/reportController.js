@@ -5,6 +5,7 @@ const Team = require('../models/Team');
 const Evaluation = require('../models/Evaluation');
 const Professor = require('../models/Professor');
 const { toCsv } = require('../utils/csv');
+const { withoutLinkToken } = require('../models/linkToken');
 const { gradeCourse, CAP, FLAG_BELOW } = require('../utils/contributionMultiplier');
 const { errorText } = require('../utils/logSafe');
 
@@ -160,7 +161,7 @@ exports.getCourseReport = async (req, res, next) => {
       return res.status(200).json({
         course: course,
         students: students.map(student => ({
-          ...student.toObject(),
+          ...withoutLinkToken(student.toObject()),
           meanScore: 0,
           letterGrade: 'No evaluations',
           evaluationsReceived: 0
@@ -223,7 +224,7 @@ exports.getCourseReport = async (req, res, next) => {
       const meanScore = calculateMeanScore(studentEvaluations);
       // Add AI flags to each evaluation
       const evaluationDetails = studentEvaluations.map(evaluation => ({
-        ...evaluation.toObject(),
+        ...withoutLinkToken(evaluation.toObject()),
         aiFlags: flagEvaluation(evaluation)
       }));
       return {
@@ -280,7 +281,7 @@ exports.getCourseReport = async (req, res, next) => {
       if (override !== null) finalScore = override;
 
       return {
-        ...item.student.toObject(),
+        ...withoutLinkToken(item.student.toObject()),
         originalScore: item.originalScore,
         finalScore: finalScore,
         letterGrade: item.originalScore > 0 || override !== null ? getLetterGrade(finalScore) : 'No evaluations',
@@ -572,7 +573,7 @@ exports.getTeamReport = async (req, res, next) => {
       const meanScore = calculateMeanScore(memberEvaluations);
       
       return {
-        ...member.toObject(),
+        ...withoutLinkToken(member.toObject()),
         meanScore: parseFloat(meanScore.toFixed(2)),
         letterGrade: meanScore > 0 ? getLetterGrade(meanScore) : 'No evaluations',
         evaluationsReceived: memberEvaluations.length

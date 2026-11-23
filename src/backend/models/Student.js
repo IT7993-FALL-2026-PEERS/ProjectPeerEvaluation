@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-
+const { hideLinkToken } = require('./linkToken');
 
 const StudentSchema = new mongoose.Schema({
 	student_id: { type: String, required: true, trim: true }, // University ID
@@ -19,5 +19,7 @@ const StudentSchema = new mongoose.Schema({
 
 // Add unique index to prevent duplicate students in a course
 StudentSchema.index({ student_id: 1, course_id: 1 }, { unique: true });
+// The link token stays out of every response (CICD-94)
+hideLinkToken(StudentSchema);
 
 module.exports = mongoose.model('Student', StudentSchema);

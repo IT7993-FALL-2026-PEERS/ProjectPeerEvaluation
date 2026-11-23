@@ -105,9 +105,12 @@ test('getCourseReport: no evaluations gives every student No evaluations', async
   stubCourse(t, data);
   const body = ok(await call('getCourseReport'));
   assert.equal(body.message, 'No evaluations found for this course');
-  assert.deepEqual(body.students, data.students.map(student => ({
-    ...student.toObject(), meanScore: 0, letterGrade: 'No evaluations', evaluationsReceived: 0
-  })));
+  // every field of the student except the link token (CICD-94)
+  assert.deepEqual(body.students, data.students.map(student => {
+    const { evaluation_token: _token, ...fields } = student.toObject();
+    return { ...fields, meanScore: 0, letterGrade: 'No evaluations', evaluationsReceived: 0 };
+  }));
+  assert.ok(body.students.every(student => !('evaluation_token' in student)));
   assert.deepEqual(body.teams, []);
 });
 
