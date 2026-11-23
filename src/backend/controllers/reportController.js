@@ -7,6 +7,7 @@ const Professor = require('../models/Professor');
 const { toCsv } = require('../utils/csv');
 const { withoutLinkToken } = require('../models/linkToken');
 const { gradeCourse, CAP, FLAG_BELOW } = require('../utils/contributionMultiplier');
+const { errorText } = require('../utils/logSafe');
 
 /**
  * Calculate mean score for a student across all evaluation criteria
@@ -23,13 +24,11 @@ const calculateMeanScore = (evaluations) => {
   let totalCount = 0;
   
   evaluations.forEach((evaluation, index) => {
-    console.log(`📋 Processing evaluation ${index + 1}:`, evaluation.ratings);
     if (evaluation.ratings) {
       criteriaKeys.forEach(criterion => {
         if (evaluation.ratings[criterion] && evaluation.ratings[criterion] > 0) {
           // Every criterion, participation included, is rated 1-5, so ratings count as they are.
           const score = evaluation.ratings[criterion];
-          console.log(`  ${criterion}: ${score}`);
           totalSum += score;
           totalCount++;
         }
@@ -40,7 +39,6 @@ const calculateMeanScore = (evaluations) => {
   });
   
   const result = totalCount > 0 ? (totalSum / totalCount) * 20 : 0; // Convert to percentage (1-5 scale * 20 = 0-100%)
-  console.log(`🎯 Final result: totalSum=${totalSum}, totalCount=${totalCount}, meanScore=${result}`);
   return result;
 };
 
@@ -129,15 +127,6 @@ exports.getCourseReport = async (req, res, next) => {
     const students = await Student.find({ course_id: courseObjectId }).populate('team_id');
     console.log('📊 Students found:', students.length);
     
-    // Log a sample student to see the structure
-    if (students.length > 0) {
-      console.log('👤 Sample student structure:', {
-        _id: students[0]._id,
-        student_name: students[0].student_name,
-        course_id: students[0].course_id,
-        team_id: students[0].team_id
-      });
-    }
     
     if (students.length === 0) {
       console.log('⚠️ No students found in course');
@@ -211,7 +200,6 @@ exports.getCourseReport = async (req, res, next) => {
     // Calculate scores for each student
     console.log('🧮 Calculating scores for', students.length, 'students');
     const studentScores = students.map(student => {
-      console.log('Processing student:', student._id, 'name:', student.student_name);
       const studentEvaluations = evaluations.filter(
         evaluation => {
           // More robust checks for undefined values
@@ -227,13 +215,12 @@ exports.getCourseReport = async (req, res, next) => {
             }
             return evaluation.student_id.toString() === student._id.toString();
           } catch (error) {
-            console.error('❌ Error comparing IDs:', error, { eval: evaluation, student: student });
+            console.error('❌ Error comparing IDs:', errorText(error));
             return false;
           }
         }
       );
       
-      console.log(`📊 Found ${studentEvaluations.length} evaluations for ${student.student_name}`);
       const meanScore = calculateMeanScore(studentEvaluations);
       // Add AI flags to each evaluation
       const evaluationDetails = studentEvaluations.map(evaluation => ({
@@ -471,7 +458,7 @@ exports.downloadReport = async (req, res, next) => {
     await exports.getCourseReport(req, mockRes, next);
     
   } catch (err) {
-    console.error('Error downloading report:', err);
+    console.error('Error downloading report:', errorText(err));
     err.code = err.code || 'SERVER_ERROR';
     err.status = err.status || 500;
     next(err);
@@ -531,7 +518,7 @@ exports.getStudentReport = async (req, res, next) => {
     });
 
   } catch (err) {
-    console.error('Error getting student report:', err);
+    console.error('Error getting student report:', errorText(err));
     err.code = err.code || 'SERVER_ERROR';
     err.status = err.status || 500;
     next(err);
@@ -606,7 +593,7 @@ exports.getTeamReport = async (req, res, next) => {
     });
 
   } catch (err) {
-    console.error('Error getting team report:', err);
+    console.error('Error getting team report:', errorText(err));
     err.code = err.code || 'SERVER_ERROR';
     err.status = err.status || 500;
     next(err);
