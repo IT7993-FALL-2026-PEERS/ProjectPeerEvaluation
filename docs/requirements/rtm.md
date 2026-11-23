@@ -83,6 +83,7 @@ security) and to fixed defects. IDs here may use a backlog number or `SEC` inste
 | One-command setup | `setupScript.test.js`: TC-50-01..06 | CICD-50 |
 | Security gate: the accepted-risk list | `securitySuppressions.test.js`: TC-SEC-01..06, TC-SEC-13 | CICD-24 |
 | Image scan before staging runs the image (read-only job, pinned scanner, blocks the deploy, accepted-risk list) | `imageScan.test.js`: TC-SEC-20..29 | CICD-90 |
+| Logs without student or login data (the backend log keeps no student name, university ID, email, rating, feedback, request body or login token; errors by their stack only, email errors by code) | `logPrivacy.integration.js`: TC-SEC-30..32 (a roster upload, a course report, a course creation) · `logSafe.test.js`: TC-SEC-33..37 (duplicate-key, validation and cast errors by field names only) | CICD-92 |
 | Repository hygiene and lint configuration | `repoHygiene.test.js` · `eslintConfig.test.js` · `requestLogger.test.js` | CICD-35, CICD-32 |
 | This matrix | `rtmTraceability.test.js`: TC-RTM-01..12 | CICD-23 |
 | CI can launch a browser | E2E `setup.spec.js` | Pipeline smoke |

@@ -6,6 +6,7 @@ function escapeHtml(text) {
   return String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 const { checkTransport } = require('./emailGuard');
+const { emailErrorText } = require('./logSafe');
 
 // Email configuration
 // In production, these should come from environment variables
@@ -113,7 +114,7 @@ async function sendEvaluationInvitation(student, course, evaluationToken, fronte
     console.log('Email sent successfully:', info.messageId);
     return { success: true, messageId: info.messageId };
   } catch (error) {
-    console.error('Error sending email:', error);
+    console.error('Error sending email:', emailErrorText(error));
     return { success: false, error: error.message };
   }
 }
@@ -157,7 +158,7 @@ async function sendEvaluationReminder(student, course, evaluationToken, frontend
     const info = await deliver(mailOptions);
     return { success: true, messageId: info.messageId };
   } catch (error) {
-    console.error('Error sending reminder email:', error);
+    console.error('Error sending reminder email:', emailErrorText(error));
     return { success: false, error: error.message };
   }
 }
@@ -201,7 +202,7 @@ async function sendPasswordResetEmail(email, token, frontendUrl = 'http://localh
     console.log('Password reset email sent:', info.messageId);
     return { success: true, messageId: info.messageId };
   } catch (error) {
-    console.error('Error sending password reset email:', error);
+    console.error('Error sending password reset email:', emailErrorText(error));
     return { success: false, error: error.message };
   }
 }
@@ -246,7 +247,7 @@ async function sendVerificationEmail(email, token, frontendUrl = 'http://localho
     console.log('Confirmation email sent:', info.messageId);
     return { success: true, messageId: info.messageId };
   } catch (error) {
-    console.error('Error sending confirmation email:', error);
+    console.error('Error sending confirmation email:', emailErrorText(error));
     return { success: false, error: error.message };
   }
 }

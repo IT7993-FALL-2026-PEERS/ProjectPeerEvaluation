@@ -5,6 +5,7 @@ const fs = require('fs');
 const { asText, firstNonText, validationError } = require('../utils/inputGuards');
 const { isEmailFormat } = require('../utils/emailFormat');
 const { normalizeTeamName, TEAM_NAME_HELP } = require('../utils/teamName');
+const { errorText } = require('../utils/logSafe');
 const { stripByteOrderMark } = require('../utils/byteOrderMark');
 
 // The instructor's final score for one student, used by the Contribution Multiplier report (CICD-81): a number from 0
@@ -137,7 +138,7 @@ exports.addStudent = async (req, res, next) => {
       const teamStudentCount = await Student.countDocuments({ team_id: teamId });
       await Team.findByIdAndUpdate(teamId, { student_count: teamStudentCount });
       
-      console.log(`Added student ${student_id} to team ${groupName}, new team count: ${teamStudentCount}`);
+      console.log(`Added a student to team ${groupName}, new team count: ${teamStudentCount}`);
     }
     
     // Update student_count in the Course document
@@ -422,8 +423,6 @@ exports.bulkDeleteStudents = async (req, res, next) => {
 };
 
 exports.uploadRoster = async (req, res, next) => {
-  console.log('params:', req.params);
-  console.log('file:', req.file);
   // Check for file
   if (!req.file) {
     const err = new Error('No file uploaded.');
@@ -442,10 +441,6 @@ exports.uploadRoster = async (req, res, next) => {
       .pipe(stripByteOrderMark())
       .pipe(csv())
       .on('data', (row) => {
-        console.log('Parsed row:', row);
-        console.log('team_name value:', row.team_name);
-        console.log('group_assignment value:', row.group_assignment);
-        console.log('group value:', row.group);
         // Validate required columns (name, student_id, email are required; team_name is optional)
         // Checked after trimming: a value that is only spaces is missing
         const studentId = (row.student_id || '').trim();
@@ -475,7 +470,6 @@ exports.uploadRoster = async (req, res, next) => {
         }
         idsInFile.add(studentId);
         // Prepare student object (evaluation_token will be generated when evaluations are sent)
-        console.log('Final team assignment for student:', row.student_id, '=', teamAssignment);
         studentsToCreate.push({
           student_id: studentId,
           name,
@@ -573,7 +567,7 @@ exports.uploadRoster = async (req, res, next) => {
           )];
 
           console.log('Unique team names found:', uniqueTeamNames);
-          console.log('All students for team processing:', allStudentsForTeamProcessing.map(s => ({ id: s.student_id, team: s.group_assignment })));
+          console.log('Students for team processing:', allStudentsForTeamProcessing.length);
 
           const createdTeams = {};
           for (const teamName of uniqueTeamNames) {
@@ -601,7 +595,7 @@ exports.uploadRoster = async (req, res, next) => {
               }
               createdTeams[teamName] = existingTeam._id;
             } catch (teamError) {
-              console.error(`❌ Error creating team ${teamName}:`, teamError);
+              console.error(`❌ Error creating team ${teamName}:`, errorText(teamError));
               errors.push(`Failed to create team: ${teamName}`);
             }
           }
@@ -614,7 +608,7 @@ exports.uploadRoster = async (req, res, next) => {
               created = await Student.insertMany(filteredToCreate, { ordered: false });
               console.log(`✅ Inserted ${created.length} new students`);
             } catch (insertError) {
-              console.error('❌ Error inserting students:', insertError);
+              console.error('❌ Error inserting students:', errorText(insertError));
               // Try to get partial results
               const insertedStudents = await Student.find({
                 course_id: courseObjectId,
@@ -650,7 +644,6 @@ exports.uploadRoster = async (req, res, next) => {
             }
           });
           
-          console.log('Student team mapping:', studentTeamMap);
           
           // Get all students in the course to link them
           const allStudentsInCourse = await Student.find({ course_id: courseObjectId });
@@ -671,7 +664,6 @@ exports.uploadRoster = async (req, res, next) => {
                   errors.push(`Student ${student.student_id} was not moved to ${teamAssignment}: they have submitted or received evaluations in this course, so their team was kept.`);
                   continue;
                 }
-                console.log(`Linking student ${student.student_id} to team ${teamAssignment} (ID: ${teamId})`);
 
                 await Student.findByIdAndUpdate(student._id, {
                   team_id: teamId,
@@ -686,14 +678,12 @@ exports.uploadRoster = async (req, res, next) => {
                     { $pull: { students: student._id } }
                   );
                 }
-                console.log(`✅ Linked student ${student.student_id} to team ${teamAssignment}`);
               } else if (studentTeamMap[student.student_id]) {
-                console.log(`Student ${student.student_id} has team assignment but team not found:`, teamAssignment);
-              } else {
-                console.log(`Student ${student.student_id} has no team assignment in CSV`);
+                console.log('A student has a team assignment but the team was not found:', teamAssignment);
               }
+              // A student with no team in the file is simply left without one.
             } catch (linkError) {
-              console.error(`❌ Error linking student ${student.student_id}:`, linkError);
+              console.error('❌ Error linking a student to a team:', errorText(linkError));
               errors.push(`Failed to link student ${student.student_id} to team`);
             }
           }
@@ -749,7 +739,7 @@ exports.uploadRoster = async (req, res, next) => {
             errors
           });
         } catch (insertErr) {
-          console.error('InsertMany error:', insertErr);
+          console.error('InsertMany error:', errorText(insertErr));
           fs.unlinkSync(req.file.path);
           errors.push('Some students could not be added (possible duplicates or DB error).');
           res.status(200).json({
@@ -819,7 +809,7 @@ exports.deleteAllStudents = async (req, res, next) => {
     });
 
   } catch (err) {
-    console.error('Error deleting all students:', err);
+    console.error('Error deleting all students:', errorText(err));
     err.code = err.code || 'SERVER_ERROR';
     err.status = err.status || 500;
     next(err);
@@ -876,7 +866,7 @@ exports.resetEvaluationState = async (req, res, next) => {
     });
 
   } catch (err) {
-    console.error('Error resetting evaluation state:', err);
+    console.error('Error resetting evaluation state:', errorText(err));
     err.code = err.code || 'SERVER_ERROR';
     err.status = err.status || 500;
     next(err);
