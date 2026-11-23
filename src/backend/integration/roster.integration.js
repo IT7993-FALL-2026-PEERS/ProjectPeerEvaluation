@@ -325,6 +325,37 @@ test('TC-06-87: the same student id twice in one file adds one student (the firs
   assert.equal(await Team.countDocuments({ course_id: IDS.courseAda, team_name: 'Team 4' }), 0, 'the ignored row made no team');
 });
 
+test('TC-06-97: a roster saved from Excel as "CSV UTF-8" (byte-order mark, CRLF lines) uploads like the same file without the mark', async () => {
+  const rows = ['student_id,name,email,group_assignment', '1005,Fay Foster,fay@example.edu,Team 3', '1006,Gus Green,gus@example.edu,Team 3', ''];
+  const res = await app.uploadCsv(uploadPath(IDS.courseAda), '\uFEFF' + rows.join('\r\n'), { token: ada });
+  assert.equal(res.status, 200, JSON.stringify(res.body));
+  assert.deepEqual(res.body.students.sort(), ['1005', '1006']);
+  assert.deepEqual(res.body.errors || [], []);
+  const fay = await Student.findOne({ course_id: IDS.courseAda, student_id: '1005' });
+  assert.equal(fay.student_id, '1005', 'the id has no mark in front of it');
+  assert.equal(fay.group_assignment, 'Team 3', 'the last column has no carriage return after it');
+
+  // The same file without the mark gives the same students.
+  await clearDatabase();
+  await seed();
+  const plain = await app.uploadCsv(uploadPath(IDS.courseAda), rows.join('\r\n'), { token: ada });
+  assert.deepEqual(plain.body.students.sort(), res.body.students.sort());
+
+  // A quoted header after the mark ("student_id" in quotes) works too: the mark goes before the parser sees the quotes.
+  await clearDatabase();
+  await seed();
+  const quoted = await app.uploadCsv(uploadPath(IDS.courseAda), '\uFEFF"student_id","name","email"\r\n1005,Fay Foster,fay@example.edu\r\n', { token: ada });
+  assert.equal(quoted.status, 200, JSON.stringify(quoted.body));
+  assert.deepEqual(quoted.body.students, ['1005']);
+
+  // A mark in front of a different first column is removed too.
+  await clearDatabase();
+  await seed();
+  const reordered = await app.uploadCsv(uploadPath(IDS.courseAda), '\uFEFFname,student_id,email\r\nHal Hill,1007,hal@example.edu\r\n', { token: ada });
+  assert.equal(reordered.status, 200, JSON.stringify(reordered.body));
+  assert.deepEqual(reordered.body.students, ['1007']);
+});
+
 test('TC-06-82: uploading rosters for several sections of the same professor keeps every section\'s data', async () => {
   const sectionTwo = await Course.create({
     course_name: 'Capstone', course_number: 'CS 4850', course_section: '02', professor_id: IDS.ada,

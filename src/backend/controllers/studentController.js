@@ -6,6 +6,7 @@ const { asText, firstNonText, validationError } = require('../utils/inputGuards'
 const { isEmailFormat } = require('../utils/emailFormat');
 const { normalizeTeamName, TEAM_NAME_HELP } = require('../utils/teamName');
 const { errorText } = require('../utils/logSafe');
+const { stripByteOrderMark } = require('../utils/byteOrderMark');
 
 // The instructor's final score for one student, used by the Contribution Multiplier report (CICD-81): a number from 0
 // to 100, used exactly as typed, or null to go back to the calculated grade. The student is looked up within the
@@ -435,7 +436,9 @@ exports.uploadRoster = async (req, res, next) => {
   const idsInFile = new Set();
   try {
     // Parse CSV and collect students
+    // An Excel "CSV UTF-8" file starts with a byte-order mark, which would hide the first column (CICD-93)
     fs.createReadStream(req.file.path)
+      .pipe(stripByteOrderMark())
       .pipe(csv())
       .on('data', (row) => {
         // Validate required columns (name, student_id, email are required; team_name is optional)
