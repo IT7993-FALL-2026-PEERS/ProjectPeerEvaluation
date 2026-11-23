@@ -112,7 +112,17 @@ on `main`).
 CodeQL runs on every pull request and its check fails on a new alert. Making it a required check means a
 new injection or path problem has to be fixed or explained before it can merge.
 
-## 6. Review
+## 6. What the backend log must not contain
+
+The deployed backend keeps its console output in Render's log. That log must never contain a student's
+name, university ID or email, a rating or written feedback, a request body, or the decoded login token.
+Counts and database ids are fine. Errors go through `src/backend/utils/logSafe.js`: an error is logged by its
+stack, never as the whole object, because a database error carries the documents it tried to write; a
+duplicate-key, validation or cast error, whose message quotes the value, only by its field names; an email
+error only by its code and SMTP status, because its message can quote the recipient. `integration/logPrivacy.integration.js` checks a
+roster upload, a report and a course creation (CICD-92).
+
+## 7. Review
 
 - At each milestone review (next: Nov 30): re-run the counts above, delete suppressions that are no
   longer needed, and re-justify any that remain.
