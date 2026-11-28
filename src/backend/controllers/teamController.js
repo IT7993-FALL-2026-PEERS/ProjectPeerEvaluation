@@ -2,6 +2,7 @@ const Team = require('../models/Team');
 const Student = require('../models/Student');
 const mongoose = require('mongoose');
 const { normalizeTeamName, TEAM_NAME_HELP } = require('../utils/teamName');
+const { errorText } = require('../utils/logSafe');
 
 // A team request body is untrusted input: the URL's :course_id is checked by the
 // course ownership middleware, but nothing in the body is. Only the team name and
@@ -275,7 +276,7 @@ exports.clearAllTeams = async (req, res, next) => {
       teams_deleted: deleteResult.deletedCount
     });
   } catch (err) {
-    console.error('Error clearing teams:', err);
+    console.error('Error clearing teams:', errorText(err));
     err.code = err.code || 'SERVER_ERROR';
     err.status = err.status || 500;
     next(err);

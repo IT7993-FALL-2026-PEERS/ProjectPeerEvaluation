@@ -12,6 +12,7 @@ const evaluationStore = require('../utils/saveEvaluations');
 const { rotateLink } = require('../utils/linkRotation');
 const { loadSubmitters, hasSubmitted } = require('../utils/submitted');
 const { countPeers, hasNobodyToRate } = require('../utils/peers');
+const { errorText } = require('../utils/logSafe');
 
 // The students an evaluator rates: the rest of their team, and nobody when they have no team (CICD-79: the
 // instructor is told about such a student, who is not sent a form). The form and the submission both use
@@ -104,7 +105,7 @@ async function releaseLink(student, token) {
     );
     return '';
   } catch (error) {
-    console.error(`Could not reset the evaluation link of ${student.email}:`, error);
+    console.error(`Could not reset the evaluation link of student ${student._id}:`, errorText(error));
     return '; the link could not be reset, so a new send will skip this student until the deadline';
   }
 }
@@ -199,7 +200,7 @@ exports.previewTeamSend = async (req, res, next) => {
     const students = await Student.find({ course_id, team_id });
     res.status(200).json(previewAnswer(await planInvitations(students, course_id)));
   } catch (err) {
-    console.error('Error previewing a team send:', err);
+    console.error('Error previewing a team send:', errorText(err));
     err.code = err.code || 'SERVER_ERROR';
     err.status = err.status || 500;
     next(err);
@@ -212,7 +213,7 @@ exports.previewCourseSend = async (req, res, next) => {
     const students = await Student.find({ course_id }).populate('team_id');
     res.status(200).json(previewAnswer(await planInvitations(students, course_id)));
   } catch (err) {
-    console.error('Error previewing a course send:', err);
+    console.error('Error previewing a course send:', errorText(err));
     err.code = err.code || 'SERVER_ERROR';
     err.status = err.status || 500;
     next(err);
@@ -249,7 +250,7 @@ exports.sendTeamEvaluations = async (req, res, next) => {
       plan, result, deadline
     ));
   } catch (err) {
-    console.error('Error sending team evaluations:', err);
+    console.error('Error sending team evaluations:', errorText(err));
     err.code = err.code || 'SERVER_ERROR';
     err.status = err.status || 500;
     next(err);
@@ -279,7 +280,7 @@ exports.sendEvaluations = async (req, res, next) => {
       plan, result, deadline
     ));
   } catch (err) {
-    console.error('Error sending evaluations:', err);
+    console.error('Error sending evaluations:', errorText(err));
     err.code = err.code || 'SERVER_ERROR';
     err.status = err.status || 500;
     next(err);
@@ -368,7 +369,7 @@ exports.extendEvaluations = async (req, res, next) => {
       deadline: deadline.toISOString()
     });
   } catch (err) {
-    console.error('Error extending evaluations:', err);
+    console.error('Error extending evaluations:', errorText(err));
     err.code = err.code || 'SERVER_ERROR';
     err.status = err.status || 500;
     next(err);
@@ -426,7 +427,7 @@ exports.allowResubmission = async (req, res, next) => {
     }
     res.status(200).json({ message: `${student.name} can submit again until the new deadline.`, deadline: deadline.toISOString() });
   } catch (err) {
-    console.error('Error allowing a resubmission:', err);
+    console.error('Error allowing a resubmission:', errorText(err));
     err.code = err.code || 'SERVER_ERROR';
     err.status = err.status || 500;
     next(err);
@@ -512,7 +513,6 @@ exports.evaluationStatus = async (req, res, next) => {
         resubmission_allowed: Boolean(student.resubmission_allowed),
         // CICD-72: true only for a student who has not submitted and has nobody to rate
         nobody_to_rate: !hasCompleted && hasNobodyToRate(student, peers),
-        evaluation_token: student.evaluation_token,
         last_activity: lastActivity              // Show actual submission date
       };
     }));
@@ -533,7 +533,7 @@ exports.evaluationStatus = async (req, res, next) => {
     });
 
   } catch (err) {
-    console.error('Error getting evaluation status:', err);
+    console.error('Error getting evaluation status:', errorText(err));
     err.code = err.code || 'SERVER_ERROR';
     err.status = err.status || 500;
     next(err);
@@ -665,7 +665,7 @@ exports.remindEvaluations = async (req, res, next) => {
     });
 
   } catch (err) {
-    console.error('Error sending reminders:', err);
+    console.error('Error sending reminders:', errorText(err));
     err.code = err.code || 'SERVER_ERROR';
     err.status = err.status || 500;
     next(err);
@@ -732,7 +732,7 @@ exports.getEvaluationForm = async (req, res, next) => {
     res.status(200).json(evaluationForm);
 
   } catch (err) {
-    console.error('Error getting evaluation form:', err);
+    console.error('Error getting evaluation form:', errorText(err));
     err.code = err.code || 'SERVER_ERROR';
     err.status = err.status || 500;
     next(err);
@@ -896,7 +896,7 @@ exports.submitEvaluation = async (req, res, next) => {
     });
 
   } catch (err) {
-    console.error('Error submitting evaluation:', err);
+    console.error('Error submitting evaluation:', errorText(err));
     err.code = err.code || 'SERVER_ERROR';
     err.status = err.status || 500;
     next(err);
@@ -939,7 +939,7 @@ exports.evaluationTokenStatus = async (req, res, next) => {
     });
 
   } catch (err) {
-    console.error('Error checking token status:', err);
+    console.error('Error checking token status:', errorText(err));
     err.code = err.code || 'SERVER_ERROR';
     err.status = err.status || 500;
     next(err);

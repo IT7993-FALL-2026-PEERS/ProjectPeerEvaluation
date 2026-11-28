@@ -52,10 +52,11 @@ student_id,name,email,team_name
 
 1. **File Format**: Only CSV files (.csv) are accepted
 2. **Headers**: The first row must contain column headers
-3. **Required Fields**: student_id, name, and email are mandatory on every row.4. **Duplicates**: Students with existing student_ids in the course are updated, not added twice; a student_id that appears twice in the file is added once (the first row) and reported
+3. **Required Fields**: student_id, name, and email are mandatory on every row.
+4. **Duplicates**: Students with existing student_ids in the course are updated, not added twice; a student_id that appears twice in the file is added once (the first row) and reported
 5. **Team**: This field is optional and can be left empty; when given it must be a numbered team name (see above)
 6. **Email Format**: Each email must have the form `name@domain.tld`: one `@`, text before it, and a domain with a dot in it (for example `jane.smith@university.edu`), with no spaces inside the address. A row whose email does not match, such as `bob@`, `bob` or `bob@x`, is reported as an error and that student is not added. Only the form is checked: the system does not check that the address exists or can receive mail. Adding or editing a student by hand uses the same check.
-7. **Encoding**: UTF-8 encoding is recommended
+7. **Encoding**: UTF-8 encoding is recommended. In Excel, use **File > Save As > CSV UTF-8 (Comma delimited)**; the invisible byte-order mark Excel puts at the start of that file is ignored, and Windows (CRLF) line endings are fine
 
 ## Error Handling
 

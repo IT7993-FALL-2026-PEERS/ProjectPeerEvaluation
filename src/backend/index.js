@@ -1,4 +1,15 @@
 require('dotenv').config();
+
+// Check the configuration once, before anything connects or listens (CICD-91). In production a
+// missing or short JWT_SECRET stops the process here with a clear message, instead of a service that
+// reports healthy while every login fails. Elsewhere it warns and uses the development default.
+try {
+  require('./config/env').getConfig();
+} catch (err) {
+  console.error(`❌ ${err.message}`);
+  process.exit(1);
+}
+
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');

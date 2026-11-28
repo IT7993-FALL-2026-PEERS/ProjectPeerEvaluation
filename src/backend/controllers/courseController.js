@@ -1,6 +1,7 @@
 const Course = require('../models/Course');
 const mongoose = require('mongoose');
 const { asText, firstNonText, validationError, escapeRegex } = require('../utils/inputGuards');
+const { errorText } = require('../utils/logSafe');
 
 // A course search is a plain substring search; this keeps the pattern short.
 const MAX_SEARCH_LENGTH = 100;
@@ -85,12 +86,9 @@ exports.listCourses = async (req, res, next) => {
 
 exports.createCourse = async (req, res, next) => {
 	try {
-			console.log('Received course creation request:', req.body);
-			console.log('User from token:', req.user);
 			const { course_name, course_number, course_section, semester } = req.body;
 			const nonText = firstNonText(req.body, ['course_name', 'course_number', 'course_section', 'semester']);
 			if (nonText) return next(validationError(`${nonText} must be text.`));
-			console.log('Extracted fields:', { course_name, course_number, course_section, semester });
 			if (!course_name || !course_number || !course_section || !semester) {
 				console.log('Validation failed - missing fields');
 				const err = new Error('Course name, number, section, and semester are required.');
@@ -234,7 +232,7 @@ exports.deleteCourse = async (req, res, next) => {
 		console.log('Course status updated to Inactive:', course.course_name);
 		res.status(200).json({ message: 'Course deleted successfully.' });
 	} catch (err) {
-		console.error('Delete course error:', err);
+		console.error('Delete course error:', errorText(err));
 		err.code = err.code || 'SERVER_ERROR';
 		err.status = err.status || 500;
 		next(err);
@@ -301,7 +299,7 @@ exports.migrateCourses = async (req, res, next) => {
 			totalFound: coursesToMigrate.length
 		});
 	} catch (err) {
-		console.error('Course migration failed:', err);
+		console.error('Course migration failed:', errorText(err));
 		err.code = err.code || 'SERVER_ERROR';
 		err.status = err.status || 500;
 		next(err);
